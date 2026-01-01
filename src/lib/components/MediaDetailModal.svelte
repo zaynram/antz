@@ -15,7 +15,7 @@
   let editedNotes = $state('');
   let newComment = $state('');
   let watchDateInput = $state('');
-  let prevWatchDate = $state<Timestamp | null | undefined>(undefined);
+  let prevWatchDate = $state<Timestamp | null>(null);
   
   const statusOptions: MediaStatus[] = ['queued', 'watching', 'completed', 'dropped'];
 
