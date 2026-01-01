@@ -71,7 +71,7 @@
   async function clearWatchDate(): Promise<void> {
     if (!media?.id) return;
     watchDateInput = '';
-    await updateDocument<Media>('media', media.id, { watchDate: undefined }, $activeUser);
+    await updateWatchDate();
   }
 
   async function addComment(): Promise<void> {
@@ -202,7 +202,6 @@
                 type="date"
                 bind:value={watchDateInput}
                 onchange={updateWatchDate}
-                placeholder="Unknown"
                 class="flex-1 p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
               />
               {#if watchDateInput}
