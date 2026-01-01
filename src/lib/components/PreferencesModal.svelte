@@ -26,9 +26,16 @@
 
   $effect(() => {
     if (open && $currentPreferences) {
-      localTheme = $currentPreferences.theme;
-      localAccentColor = $currentPreferences.accentColor;
-      localName = $currentPreferences.name;
+      // Only update if values have changed to prevent redundant state updates
+      if (localTheme !== $currentPreferences.theme) {
+        localTheme = $currentPreferences.theme;
+      }
+      if (localAccentColor !== $currentPreferences.accentColor) {
+        localAccentColor = $currentPreferences.accentColor;
+      }
+      if (localName !== $currentPreferences.name) {
+        localName = $currentPreferences.name;
+      }
     }
   });
 

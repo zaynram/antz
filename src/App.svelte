@@ -34,11 +34,26 @@
     currentPath = path;
   }
 
+  let prevTheme = $state<string | undefined>(undefined);
+  let prevAccentColor = $state<string | undefined>(undefined);
+
   $effect(() => {
     if ($currentPreferences) {
       const root = document.documentElement;
-      root.classList.toggle('dark', $currentPreferences.theme === 'dark');
-      root.style.setProperty('--color-accent', $currentPreferences.accentColor);
+      const isDark = $currentPreferences.theme === 'dark';
+      const accentColor = $currentPreferences.accentColor;
+
+      // Only update theme if it changed
+      if (prevTheme !== $currentPreferences.theme) {
+        root.classList.toggle('dark', isDark);
+        prevTheme = $currentPreferences.theme;
+      }
+
+      // Only update accent color if it changed
+      if (prevAccentColor !== accentColor) {
+        root.style.setProperty('--color-accent', accentColor);
+        prevAccentColor = accentColor;
+      }
     }
   });
 </script>
