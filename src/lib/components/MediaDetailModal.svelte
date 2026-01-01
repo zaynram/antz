@@ -2,7 +2,8 @@
   import { tmdbConfig } from '$lib/config'
   import { updateDocument } from '$lib/firebase'
   import { activeUser } from '$lib/stores/app'
-  import type { Media, MediaComment, MediaStatus } from '$lib/types'
+  import type { Media, MediaComment, MediaStatus, UserId } from '$lib/types'
+  import { getUserRating, getAverageRating } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
 
   interface Props {
@@ -59,9 +60,14 @@
     await updateDocument<Media>('media', media.id, { status }, $activeUser);
   }
 
-  async function updateRating(rating: number | null): Promise<void> {
+  async function updateRating(userId: UserId, rating: number | null): Promise<void> {
     if (!media?.id) return;
-    await updateDocument<Media>('media', media.id, { rating }, $activeUser);
+    
+    // Create or update the ratings object
+    const currentRatings = media.ratings || { Z: null, T: null };
+    const updatedRatings = { ...currentRatings, [userId]: rating };
+    
+    await updateDocument<Media>('media', media.id, { ratings: updatedRatings }, $activeUser);
   }
 
   async function updateWatchDate(): Promise<void> {
@@ -165,7 +171,7 @@
       
       <div class="p-4 space-y-4">
         <!-- Status & Rating row -->
-        <div class="flex flex-wrap gap-4 items-center">
+        <div class="flex flex-wrap gap-4 items-start">
           <div class="flex-1 min-w-[120px]">
             <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Status</label>
             <select
@@ -179,18 +185,59 @@
             </select>
           </div>
           
-          <div>
-            <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Rating</label>
-            <div class="flex gap-1">
-              {#each [1, 2, 3, 4, 5] as star}
-                <button
-                  class="text-xl transition-colors {(media.rating ?? 0) >= star ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600 hover:text-amber-300'}"
-                  onclick={() => updateRating(media.rating === star ? null : star)}
-                >
-                  ★
-                </button>
-              {/each}
+          <div class="flex-1 min-w-[200px]">
+            <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Ratings</label>
+            
+            <!-- User Z Rating -->
+            <div class="mb-2">
+              <div class="text-xs text-slate-400 mb-0.5">Z's Rating</div>
+              <div class="flex gap-1">
+                {#each [1, 2, 3, 4, 5] as star}
+                  <button
+                    class="text-lg transition-colors {(getUserRating(media, 'Z') ?? 0) >= star ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600 hover:text-amber-300'}"
+                    onclick={() => updateRating('Z', getUserRating(media, 'Z') === star ? null : star)}
+                  >
+                    ★
+                  </button>
+                {/each}
+              </div>
             </div>
+            
+            <!-- User T Rating -->
+            <div class="mb-2">
+              <div class="text-xs text-slate-400 mb-0.5">T's Rating</div>
+              <div class="flex gap-1">
+                {#each [1, 2, 3, 4, 5] as star}
+                  <button
+                    class="text-lg transition-colors {(getUserRating(media, 'T') ?? 0) >= star ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600 hover:text-amber-300'}"
+                    onclick={() => updateRating('T', getUserRating(media, 'T') === star ? null : star)}
+                  >
+                    ★
+                  </button>
+                {/each}
+              </div>
+            </div>
+            
+            <!-- Average Rating -->
+            {#if getAverageRating(media) !== null}
+              <div class="pt-2 border-t border-slate-200 dark:border-slate-600">
+                <div class="text-xs text-slate-400 mb-0.5">Average</div>
+                <div class="flex items-center gap-2">
+                  <div class="flex gap-0.5">
+                    {#each [1, 2, 3, 4, 5] as star}
+                      <span
+                        class="text-lg {(getAverageRating(media) ?? 0) >= star ? 'text-amber-400' : (getAverageRating(media) ?? 0) >= star - 0.5 ? 'text-amber-300' : 'text-slate-300 dark:text-slate-600'}"
+                      >
+                        ★
+                      </span>
+                    {/each}
+                  </div>
+                  <span class="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                    {getAverageRating(media)?.toFixed(1)}
+                  </span>
+                </div>
+              </div>
+            {/if}
           </div>
           
           <div class="flex-1 min-w-[140px]">
