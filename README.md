@@ -1,5 +1,7 @@
 # Couples App
 
+[![Deploy to Firebase Hosting](https://github.com/zaynram/antz/actions/workflows/firebase-deploy.yml/badge.svg)](https://github.com/zaynram/antz/actions/workflows/firebase-deploy.yml)
+
 Relationship documentation app for Z & T. Serverless SPA with Firebase backend.
 
 ## Stack
