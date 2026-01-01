@@ -2,7 +2,8 @@
   import { tmdbConfig } from '$lib/config'
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
   import { activeUser, mediaSearchHistory, addToSearchHistory, removeFromSearchHistory } from '$lib/stores/app'
-  import type { Media, MediaStatus, MediaType, TMDBSearchResult } from '$lib/types'
+  import type { Media, MediaStatus, MediaType, TMDBSearchResult, UserId } from '$lib/types'
+  import { getDisplayRating } from '$lib/types'
   import { onMount } from 'svelte'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
 
@@ -143,8 +144,15 @@
     await updateDocument<Media>('media', id, { status: status as MediaStatus }, $activeUser);
   }
 
-  async function updateRating(id: string, rating: number | null): Promise<void> {
-    await updateDocument<Media>('media', id, { rating }, $activeUser);
+  async function updateRating(id: string, userId: UserId, rating: number | null): Promise<void> {
+    const item = media.find(m => m.id === id);
+    if (!item) return;
+    
+    // Create or update the ratings object
+    const currentRatings = item.ratings || { Z: null, T: null };
+    const updatedRatings = { ...currentRatings, [userId]: rating };
+    
+    await updateDocument<Media>('media', id, { ratings: updatedRatings }, $activeUser);
   }
 
   async function remove(id: string): Promise<void> {
@@ -371,10 +379,12 @@
           <!-- Star Rating -->
           <div class="flex items-center gap-0.5 mt-2">
             {#each [1, 2, 3, 4, 5] as star}
+              {@const displayRating = getDisplayRating(item)}
+              {@const userRating = item.ratings?.[($activeUser as UserId)] ?? null}
               <button
-                class="text-sm transition-colors {(item.rating ?? 0) >= star ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600 hover:text-amber-300'}"
-                onclick={() => item.id && updateRating(item.id, item.rating === star ? null : star)}
-                title={item.rating === star ? 'Clear rating' : `Rate ${star} star${star > 1 ? 's' : ''}`}
+                class="text-sm transition-colors {(displayRating ?? 0) >= star ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600 hover:text-amber-300'}"
+                onclick={() => item.id && updateRating(item.id, $activeUser, userRating === star ? null : star)}
+                title={userRating === star ? 'Clear your rating' : `Rate ${star} star${star > 1 ? 's' : ''}`}
               >
                 ★
               </button>

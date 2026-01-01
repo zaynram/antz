@@ -10,6 +10,7 @@ import type {
   Media,
   Place,
 } from './types';
+import { getUserRating, getAverageRating, getDisplayRating } from './types';
 
 describe('Type definitions', () => {
   describe('UserId', () => {
@@ -269,6 +270,163 @@ describe('Type definitions', () => {
       expect(place.visited).toBe(false);
       expect(place.visitDates).toHaveLength(0);
       expect(place.rating).toBeNull();
+    });
+  });
+
+  describe('Rating helper functions', () => {
+    describe('getUserRating', () => {
+      it('should return user rating from ratings object', () => {
+        const media: Partial<Media> = {
+          type: 'movie',
+          title: 'Test Movie',
+          status: 'completed',
+          rating: null,
+          ratings: { Z: 5, T: 4 },
+          notes: '',
+          posterPath: null,
+          createdBy: 'Z',
+        };
+        
+        expect(getUserRating(media as Media, 'Z')).toBe(5);
+        expect(getUserRating(media as Media, 'T')).toBe(4);
+      });
+
+      it('should return null if user has not rated', () => {
+        const media: Partial<Media> = {
+          type: 'movie',
+          title: 'Test Movie',
+          status: 'completed',
+          rating: null,
+          ratings: { Z: 5, T: null },
+          notes: '',
+          posterPath: null,
+          createdBy: 'Z',
+        };
+        
+        expect(getUserRating(media as Media, 'T')).toBeNull();
+      });
+
+      it('should fallback to legacy rating field if ratings object missing', () => {
+        const media: Partial<Media> = {
+          type: 'movie',
+          title: 'Test Movie',
+          status: 'completed',
+          rating: 5,
+          notes: '',
+          posterPath: null,
+          createdBy: 'Z',
+        };
+        
+        expect(getUserRating(media as Media, 'Z')).toBe(5);
+        expect(getUserRating(media as Media, 'T')).toBe(5);
+      });
+    });
+
+    describe('getAverageRating', () => {
+      it('should return average when both users have rated', () => {
+        const media: Partial<Media> = {
+          type: 'movie',
+          title: 'Test Movie',
+          status: 'completed',
+          rating: null,
+          ratings: { Z: 5, T: 3 },
+          notes: '',
+          posterPath: null,
+          createdBy: 'Z',
+        };
+        
+        expect(getAverageRating(media as Media)).toBe(4);
+      });
+
+      it('should return individual rating when only one user has rated', () => {
+        const media: Partial<Media> = {
+          type: 'movie',
+          title: 'Test Movie',
+          status: 'completed',
+          rating: null,
+          ratings: { Z: 5, T: null },
+          notes: '',
+          posterPath: null,
+          createdBy: 'Z',
+        };
+        
+        expect(getAverageRating(media as Media)).toBe(5);
+      });
+
+      it('should return null when no users have rated', () => {
+        const media: Partial<Media> = {
+          type: 'movie',
+          title: 'Test Movie',
+          status: 'completed',
+          rating: null,
+          ratings: { Z: null, T: null },
+          notes: '',
+          posterPath: null,
+          createdBy: 'Z',
+        };
+        
+        expect(getAverageRating(media as Media)).toBeNull();
+      });
+
+      it('should fallback to legacy rating field', () => {
+        const media: Partial<Media> = {
+          type: 'movie',
+          title: 'Test Movie',
+          status: 'completed',
+          rating: 4,
+          notes: '',
+          posterPath: null,
+          createdBy: 'Z',
+        };
+        
+        expect(getAverageRating(media as Media)).toBe(4);
+      });
+    });
+
+    describe('getDisplayRating', () => {
+      it('should return average rating when available', () => {
+        const media: Partial<Media> = {
+          type: 'movie',
+          title: 'Test Movie',
+          status: 'completed',
+          rating: null,
+          ratings: { Z: 5, T: 3 },
+          notes: '',
+          posterPath: null,
+          createdBy: 'Z',
+        };
+        
+        expect(getDisplayRating(media as Media)).toBe(4);
+      });
+
+      it('should return individual rating when only one user rated', () => {
+        const media: Partial<Media> = {
+          type: 'movie',
+          title: 'Test Movie',
+          status: 'completed',
+          rating: null,
+          ratings: { Z: 5, T: null },
+          notes: '',
+          posterPath: null,
+          createdBy: 'Z',
+        };
+        
+        expect(getDisplayRating(media as Media)).toBe(5);
+      });
+
+      it('should fallback to legacy rating', () => {
+        const media: Partial<Media> = {
+          type: 'movie',
+          title: 'Test Movie',
+          status: 'completed',
+          rating: 4,
+          notes: '',
+          posterPath: null,
+          createdBy: 'Z',
+        };
+        
+        expect(getDisplayRating(media as Media)).toBe(4);
+      });
     });
   });
 });
