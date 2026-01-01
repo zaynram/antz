@@ -21,16 +21,20 @@
   $effect(() => {
     if (media) {
       const newNotes = media.notes || '';
-      const newWatchDate = media.watchDate 
-        ? new Date(media.watchDate.toDate()).toISOString().split('T')[0] 
-        : '';
       
       // Only update if values have changed to prevent redundant state updates
       if (editedNotes !== newNotes) {
         editedNotes = newNotes;
       }
-      if (watchDateInput !== newWatchDate) {
-        watchDateInput = newWatchDate;
+      
+      // Only compute and update watch date if it has potentially changed
+      if (media.watchDate) {
+        const newWatchDate = new Date(media.watchDate.toDate()).toISOString().split('T')[0];
+        if (watchDateInput !== newWatchDate) {
+          watchDateInput = newWatchDate;
+        }
+      } else if (watchDateInput !== '') {
+        watchDateInput = '';
       }
     }
   });
