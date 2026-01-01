@@ -9,11 +9,14 @@
   let unsubscribe: (() => void) | undefined;
   let searchQuery = $state('');
   let searchResults = $state<TMDBSearchResult[]>([]);
+  let allSearchResults = $state<TMDBSearchResult[]>([]);
+  let visibleResultCount = $state(10);
   let searching = $state(false);
   let activeTab = $state<'all' | MediaType>('all');
 
   const tabs: Array<'all' | MediaType> = ['all', 'tv', 'movie', 'game'];
   const statusOptions: MediaStatus[] = ['queued', 'watching', 'completed', 'dropped'];
+  const DEFAULT_RESULT_COUNT = 10;
 
   onMount(() => {
     unsubscribe = subscribeToCollection<Media>('media', (items) => {
@@ -26,21 +29,28 @@
   async function searchTMDB(): Promise<void> {
     if (!searchQuery.trim()) return;
     searching = true;
+    visibleResultCount = DEFAULT_RESULT_COUNT;
 
     try {
       const res = await fetch(
         `${tmdbConfig.baseUrl}/search/multi?api_key=${tmdbConfig.apiKey}&query=${encodeURIComponent(searchQuery)}`
       );
       const data = await res.json();
-      searchResults = (data.results as TMDBSearchResult[])
-        .filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
-        .slice(0, 8);
+      allSearchResults = (data.results as TMDBSearchResult[])
+        .filter((r) => r.media_type === 'movie' || r.media_type === 'tv');
+      searchResults = allSearchResults.slice(0, visibleResultCount);
     } catch (e) {
       console.error('Search failed:', e);
+      allSearchResults = [];
       searchResults = [];
     } finally {
       searching = false;
     }
+  }
+
+  function showMoreResults(): void {
+    visibleResultCount += 10;
+    searchResults = allSearchResults.slice(0, visibleResultCount);
   }
 
   async function addFromSearch(item: TMDBSearchResult): Promise<void> {
@@ -106,6 +116,32 @@
     return `${tmdbConfig.imageBaseUrl}/w185${path}`;
   }
 
+  function getStatusBadgeClass(status: MediaStatus): string {
+    switch (status) {
+      case 'completed':
+        return 'bg-emerald-500 text-white';
+      case 'watching':
+        return 'bg-amber-500 text-amber-900';
+      case 'dropped':
+        return 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300';
+      default:
+        return 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300';
+    }
+  }
+
+  function getStatusLabel(status: MediaStatus): string {
+    switch (status) {
+      case 'completed':
+        return '✓ Done';
+      case 'watching':
+        return '▶ Watching';
+      case 'dropped':
+        return '✕ Dropped';
+      default:
+        return '○ Queued';
+    }
+  }
+
   let filteredMedia = $derived(activeTab === 'all' ? media : media.filter((m) => m.type === activeTab));
 </script>
 
@@ -128,16 +164,18 @@
         {searching ? '...' : 'Search'}
       </button>
     </form>
-    <button
-      class="px-4 py-3 bg-surface-2 text-slate-900 dark:text-slate-100 rounded-lg font-medium"
-      onclick={addManualGame}
-    >
-      + Add Game
-    </button>
+    {#if activeTab === 'game'}
+      <button
+        class="px-4 py-3 bg-surface-2 text-slate-900 dark:text-slate-100 rounded-lg font-medium"
+        onclick={addManualGame}
+      >
+        + Add Game
+      </button>
+    {/if}
   </div>
 
   {#if searchResults.length > 0}
-    <div class="flex gap-3 overflow-x-auto py-4 mb-4">
+    <div class="flex gap-3 overflow-x-auto py-4 mb-2">
       {#each searchResults as result}
         <button
           class="shrink-0 w-24 p-0 bg-surface border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden text-center cursor-pointer hover:border-accent"
@@ -167,6 +205,14 @@
         </button>
       {/each}
     </div>
+    {#if allSearchResults.length > visibleResultCount}
+      <button
+        class="w-full py-2 mb-4 text-sm text-slate-500 dark:text-slate-400 hover:text-accent transition-colors"
+        onclick={showMoreResults}
+      >
+        View More ({allSearchResults.length - visibleResultCount} remaining)
+      </button>
+    {/if}
   {/if}
 
   <div class="flex gap-2 mb-6">
@@ -187,19 +233,40 @@
   <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
     {#each filteredMedia as item (item.id)}
       <article
-        class="bg-surface border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden group"
+        class="bg-surface border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden group relative"
       >
-        {#if item.posterPath}
-          <img src={posterUrl(item.posterPath)} alt="" class="w-full h-48 object-cover" />
-        {:else}
-          <div
-            class="w-full h-48 flex items-center justify-center bg-surface-2 text-4xl"
-          >
-            {item.type === 'game' ? '🎮' : '?'}
-          </div>
-        {/if}
+        <!-- Status badge -->
+        <div
+          class="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide {getStatusBadgeClass(item.status)}"
+        >
+          {getStatusLabel(item.status)}
+        </div>
+        
+        <div class="relative">
+          {#if item.posterPath}
+            <img 
+              src={posterUrl(item.posterPath)} 
+              alt="" 
+              class="w-full h-48 object-cover"
+              class:opacity-50={item.status === 'completed'}
+            />
+          {:else}
+            <div
+              class="w-full h-48 flex items-center justify-center bg-surface-2 text-4xl"
+              class:opacity-50={item.status === 'completed'}
+            >
+              {item.type === 'game' ? '🎮' : '?'}
+            </div>
+          {/if}
+          {#if item.status === 'completed'}
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-5xl opacity-80">✓</span>
+            </div>
+          {/if}
+        </div>
+        
         <div class="p-3 relative">
-          <h3 class="text-sm font-semibold mb-1 truncate">{item.title}</h3>
+          <h3 class="text-sm font-semibold mb-1 truncate" class:line-through={item.status === 'dropped'}>{item.title}</h3>
           <span class="text-[10px] uppercase text-slate-400">{item.type}</span>
           <select
             value={item.status}
