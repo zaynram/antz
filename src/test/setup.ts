@@ -1,9 +1,8 @@
 import { expect, afterEach } from 'vitest';
 import { cleanup } from '@testing-library/svelte';
+import * as matchers from '@testing-library/jest-dom/matchers';
 
 // Extend Vitest's expect with @testing-library/jest-dom matchers
-// @ts-ignore
-import * as matchers from '@testing-library/jest-dom/matchers';
 expect.extend(matchers);
 
 // Cleanup after each test
