@@ -1,0 +1,20 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-accent: #6366f1;
+  --color-surface: #f8fafc;
+  --color-surface-2: #e2e8f0;
+}
+
+.dark {
+  --color-surface: #1e293b;
+  --color-surface-2: #334155;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
+  }
+}
