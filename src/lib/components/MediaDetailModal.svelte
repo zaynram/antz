@@ -16,16 +16,20 @@
   let newComment = $state('');
   let watchDateInput = $state('');
   let prevWatchDate = $state<Timestamp | null>(null);
+  let prevMediaId = $state<string | undefined>(undefined);
   
   const statusOptions: MediaStatus[] = ['queued', 'watching', 'completed', 'dropped'];
 
   $effect(() => {
     if (media) {
       const newNotes = media.notes || '';
+      const mediaIdChanged = prevMediaId !== media.id;
       
-      // Only update if values have changed to prevent redundant state updates
-      if (editedNotes !== newNotes) {
+      // Always update notes when switching to a different media item
+      // Otherwise, only update if the notes value has changed
+      if (mediaIdChanged || editedNotes !== newNotes) {
         editedNotes = newNotes;
+        prevMediaId = media.id;
       }
       
       // Only compute and update watch date if the timestamp reference has changed
