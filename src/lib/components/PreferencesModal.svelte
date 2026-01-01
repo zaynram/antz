@@ -62,6 +62,11 @@
       onClose();
     }
   }
+
+  function handleModalClick(e: MouseEvent): void {
+    // Stop propagation to prevent backdrop click handler from firing
+    e.stopPropagation();
+  }
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -73,7 +78,7 @@
     role="dialog"
     aria-modal="true"
   >
-    <div class="bg-surface rounded-xl max-w-md w-full shadow-2xl">
+    <div class="bg-surface rounded-xl max-w-md w-full shadow-2xl" onclick={handleModalClick}>
       <div class="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
         <h2 class="text-lg font-semibold">Preferences for {$activeUser}</h2>
         <button
