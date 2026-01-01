@@ -20,6 +20,8 @@
   const tabs: Array<'all' | MediaType> = ['all', 'tv', 'movie', 'game'];
   const statusOptions: MediaStatus[] = ['queued', 'watching', 'completed', 'dropped'];
   const DEFAULT_RESULT_COUNT = 10;
+  // Delay before hiding search history dropdown to allow click events on dropdown items
+  const SEARCH_HISTORY_CLOSE_DELAY_MS = 200;
 
   onMount(() => {
     unsubscribe = subscribeToCollection<Media>('media', (items) => {
@@ -80,10 +82,9 @@
   }
 
   function handleSearchBlur(): void {
-    // Delay to allow click on history item
     setTimeout(() => {
       showSearchHistory = false;
-    }, 200);
+    }, SEARCH_HISTORY_CLOSE_DELAY_MS);
   }
 
   function selectFromHistory(query: string): void {

@@ -86,7 +86,7 @@
   }
 
   // Filter notes based on active tab
-  let filteredNotes = $derived(() => {
+  let filteredNotes = $derived.by(() => {
     const otherUser = $activeUser === 'Z' ? 'T' : 'Z';
     
     switch (activeTab) {
@@ -105,7 +105,7 @@
   });
 
   // Count unread notes in inbox
-  let unreadCount = $derived(() => {
+  let unreadCount = $derived.by(() => {
     const otherUser = $activeUser === 'Z' ? 'T' : 'Z';
     return notes.filter(n => n.createdBy === otherUser && !n.read && !n.archived).length;
   });
@@ -151,9 +151,9 @@
       onclick={() => activeTab = 'inbox'}
     >
       Inbox
-      {#if unreadCount() > 0}
+      {#if unreadCount > 0}
         <span class="absolute -top-1 -right-1 w-5 h-5 bg-accent text-white text-xs rounded-full flex items-center justify-center">
-          {unreadCount()}
+          {unreadCount}
         </span>
       {/if}
     </button>
@@ -173,7 +173,7 @@
 
   <!-- Notes list -->
   <div class="flex flex-col gap-3">
-    {#each filteredNotes() as note (note.id)}
+    {#each filteredNotes as note (note.id)}
       <article
         class="relative p-4 bg-surface border rounded-xl group transition-all cursor-pointer {!note.read && note.createdBy !== $activeUser ? 'border-accent/50 bg-accent/5' : 'border-slate-200 dark:border-slate-700'}"
         onclick={() => markAsRead(note)}
