@@ -15,6 +15,7 @@
   let editedNotes = $state('');
   let newComment = $state('');
   let watchDateInput = $state('');
+  let prevWatchDate = $state<Timestamp | null | undefined>(undefined);
   
   const statusOptions: MediaStatus[] = ['queued', 'watching', 'completed', 'dropped'];
 
@@ -27,14 +28,14 @@
         editedNotes = newNotes;
       }
       
-      // Only compute and update watch date if it has potentially changed
-      if (media.watchDate) {
-        const newWatchDate = new Date(media.watchDate.toDate()).toISOString().split('T')[0];
-        if (watchDateInput !== newWatchDate) {
-          watchDateInput = newWatchDate;
+      // Only compute and update watch date if the timestamp reference has changed
+      if (prevWatchDate !== media.watchDate) {
+        prevWatchDate = media.watchDate;
+        if (media.watchDate) {
+          watchDateInput = new Date(media.watchDate.toDate()).toISOString().split('T')[0];
+        } else {
+          watchDateInput = '';
         }
-      } else if (watchDateInput !== '') {
-        watchDateInput = '';
       }
     }
   });

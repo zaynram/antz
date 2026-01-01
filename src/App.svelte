@@ -34,8 +34,8 @@
     currentPath = path;
   }
 
-  let prevTheme = $state<string | undefined>(undefined);
-  let prevAccentColor = $state<string | undefined>(undefined);
+  let prevTheme = $state<string>('');
+  let prevAccentColor = $state<string>('');
 
   $effect(() => {
     if ($currentPreferences) {
