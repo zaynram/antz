@@ -25,6 +25,9 @@ export interface Note extends BaseDocument {
     title: string
     content: string
     tags: string[]
+    read?: boolean
+    readAt?: Timestamp
+    archived?: boolean
 }
 
 export type MediaType = "tv" | "movie" | "game"
@@ -33,6 +36,13 @@ export type MediaStatus = "queued" | "watching" | "completed" | "dropped"
 export interface MediaProgress {
     season?: number
     episode?: number
+}
+
+export interface MediaComment {
+    id: string
+    text: string
+    createdBy: UserId
+    createdAt: Timestamp
 }
 
 export interface Media extends BaseDocument {
@@ -46,6 +56,10 @@ export interface Media extends BaseDocument {
     rating: number | null
     notes: string
     progress?: MediaProgress
+    // New metadata fields
+    genres?: string[]
+    watchDate?: Timestamp
+    comments?: MediaComment[]
 }
 
 export type PlaceCategory = "restaurant" | "cafe" | "bar" | "attraction" | "park" | "other"
@@ -68,4 +82,5 @@ export interface TMDBSearchResult {
     release_date?: string
     first_air_date?: string
     overview: string
+    genre_ids?: number[]
 }

@@ -1,9 +1,10 @@
 <script lang="ts">
   import { tmdbConfig } from '$lib/config'
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
-  import { activeUser } from '$lib/stores/app'
+  import { activeUser, mediaSearchHistory, addToSearchHistory, removeFromSearchHistory } from '$lib/stores/app'
   import type { Media, MediaStatus, MediaType, TMDBSearchResult } from '$lib/types'
   import { onMount } from 'svelte'
+  import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
 
   let media = $state<Media[]>([]);
   let unsubscribe: (() => void) | undefined;
@@ -13,6 +14,8 @@
   let visibleResultCount = $state(10);
   let searching = $state(false);
   let activeTab = $state<'all' | MediaType>('all');
+  let selectedMedia = $state<Media | null>(null);
+  let showSearchHistory = $state(false);
 
   const tabs: Array<'all' | MediaType> = ['all', 'tv', 'movie', 'game'];
   const statusOptions: MediaStatus[] = ['queued', 'watching', 'completed', 'dropped'];
@@ -21,24 +24,41 @@
   onMount(() => {
     unsubscribe = subscribeToCollection<Media>('media', (items) => {
       media = items;
+      // Update selectedMedia if it's still open
+      if (selectedMedia) {
+        const currentId = selectedMedia.id;
+        const updated = items.find(m => m.id === currentId);
+        if (updated) {
+          selectedMedia = updated;
+        }
+      }
     });
 
     return () => unsubscribe?.();
   });
 
-  async function searchTMDB(): Promise<void> {
-    if (!searchQuery.trim()) return;
+  async function searchTMDB(query?: string): Promise<void> {
+    const searchTerm = query ?? searchQuery;
+    if (!searchTerm.trim()) return;
+    
+    searchQuery = searchTerm;
     searching = true;
+    showSearchHistory = false;
     visibleResultCount = DEFAULT_RESULT_COUNT;
 
     try {
       const res = await fetch(
-        `${tmdbConfig.baseUrl}/search/multi?api_key=${tmdbConfig.apiKey}&query=${encodeURIComponent(searchQuery)}`
+        `${tmdbConfig.baseUrl}/search/multi?api_key=${tmdbConfig.apiKey}&query=${encodeURIComponent(searchTerm)}`
       );
       const data = await res.json();
       allSearchResults = (data.results as TMDBSearchResult[])
         .filter((r) => r.media_type === 'movie' || r.media_type === 'tv');
       searchResults = allSearchResults.slice(0, visibleResultCount);
+      
+      // Add to search history on successful search
+      if (allSearchResults.length > 0) {
+        addToSearchHistory(searchTerm);
+      }
     } catch (e) {
       console.error('Search failed:', e);
       allSearchResults = [];
@@ -51,6 +71,23 @@
   function showMoreResults(): void {
     visibleResultCount += 10;
     searchResults = allSearchResults.slice(0, visibleResultCount);
+  }
+
+  function handleSearchFocus(): void {
+    if ($mediaSearchHistory.length > 0 && !searchQuery.trim()) {
+      showSearchHistory = true;
+    }
+  }
+
+  function handleSearchBlur(): void {
+    // Delay to allow click on history item
+    setTimeout(() => {
+      showSearchHistory = false;
+    }, 200);
+  }
+
+  function selectFromHistory(query: string): void {
+    searchTMDB(query);
   }
 
   async function addFromSearch(item: TMDBSearchResult): Promise<void> {
@@ -146,20 +183,61 @@
     }
   }
 
+  function openDetail(item: Media): void {
+    selectedMedia = item;
+  }
+
+  function closeDetail(): void {
+    selectedMedia = null;
+  }
+
   let filteredMedia = $derived(activeTab === 'all' ? media : media.filter((m) => m.type === activeTab));
 </script>
+
+<MediaDetailModal media={selectedMedia} onClose={closeDetail} />
 
 <div>
   <h1 class="text-2xl font-bold mb-6">Media</h1>
 
   <div class="flex gap-4 mb-4">
-    <form class="flex gap-2 flex-1" onsubmit={(e) => { e.preventDefault(); searchTMDB(); }}>
-      <input
-        type="text"
-        placeholder="Search movies & TV shows..."
-        class="flex-1 px-4 py-3 bg-surface border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-accent"
-        bind:value={searchQuery}
-      />
+    <form class="flex gap-2 flex-1 relative" onsubmit={(e) => { e.preventDefault(); searchTMDB(); }}>
+      <div class="flex-1 relative">
+        <input
+          type="text"
+          placeholder="Search movies & TV shows..."
+          class="w-full px-4 py-3 bg-surface border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-accent"
+          bind:value={searchQuery}
+          onfocus={handleSearchFocus}
+          onblur={handleSearchBlur}
+        />
+        
+        <!-- Search History Dropdown -->
+        {#if showSearchHistory && $mediaSearchHistory.length > 0}
+          <div class="absolute top-full left-0 right-0 mt-1 bg-surface border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-30 overflow-hidden">
+            <div class="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+              Recent searches
+            </div>
+            {#each $mediaSearchHistory as historyItem}
+              <div class="flex items-center hover:bg-slate-50 dark:hover:bg-slate-800">
+                <button
+                  type="button"
+                  class="flex-1 px-3 py-2 text-left text-sm"
+                  onclick={() => selectFromHistory(historyItem)}
+                >
+                  {historyItem}
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-2 text-slate-400 hover:text-red-500"
+                  onclick={() => removeFromSearchHistory(historyItem)}
+                >
+                  ×
+                </button>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
       <button
         type="submit"
         disabled={searching}
@@ -242,7 +320,7 @@
         <!-- Delete button - always visible on mobile, hover on desktop -->
         <button
           class="absolute top-2 right-2 z-20 w-6 h-6 rounded-full bg-slate-900/50 text-white text-sm flex items-center justify-center transition-all hover:bg-red-500 active:bg-red-600 md:opacity-0 md:group-hover:opacity-100"
-          onclick={() => item.id && remove(item.id)}
+          onclick={(e) => { e.stopPropagation(); item.id && remove(item.id); }}
           title="Remove"
         >
           ×
@@ -255,30 +333,37 @@
           {getStatusLabel(item.status)}
         </div>
         
-        <div class="relative">
-          {#if item.posterPath}
-            <img 
-              src={posterUrl(item.posterPath)} 
-              alt="" 
-              class="w-full h-48 object-cover"
-              class:opacity-50={item.status === 'completed'}
-            />
-          {:else}
-            <div
-              class="w-full h-48 flex items-center justify-center bg-surface-2 text-4xl"
-              class:opacity-50={item.status === 'completed'}
-            >
-              {item.type === 'game' ? '🎮' : '?'}
-            </div>
-          {/if}
-          {#if item.status === 'completed'}
-            <div class="absolute inset-0 flex items-center justify-center">
-              <span class="text-5xl opacity-80">✓</span>
-            </div>
-          {/if}
-        </div>
+        <!-- Clickable poster area -->
+        <button
+          class="w-full text-left cursor-pointer"
+          onclick={() => openDetail(item)}
+          title="View details"
+        >
+          <div class="relative">
+            {#if item.posterPath}
+              <img 
+                src={posterUrl(item.posterPath)} 
+                alt="" 
+                class="w-full h-48 object-cover"
+                class:opacity-50={item.status === 'completed'}
+              />
+            {:else}
+              <div
+                class="w-full h-48 flex items-center justify-center bg-surface-2 text-4xl"
+                class:opacity-50={item.status === 'completed'}
+              >
+                {item.type === 'game' ? '🎮' : '?'}
+              </div>
+            {/if}
+            {#if item.status === 'completed'}
+              <div class="absolute inset-0 flex items-center justify-center">
+                <span class="text-5xl opacity-80">✓</span>
+              </div>
+            {/if}
+          </div>
+        </button>
         
-        <div class="p-3 relative">
+        <div class="p-3">
           <h3 class="text-sm font-semibold mb-1 truncate" class:line-through={item.status === 'dropped'}>{item.title}</h3>
           <span class="text-[10px] uppercase text-slate-400">{item.type}</span>
           
