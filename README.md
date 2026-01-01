@@ -1,5 +1,7 @@
 # Couples App
 
+[![Deploy to Firebase Hosting](https://github.com/zaynram/antz/actions/workflows/firebase-deploy.yml/badge.svg)](https://github.com/zaynram/antz/actions/workflows/firebase-deploy.yml)
+
 Relationship documentation app for Z & T. Serverless SPA with Firebase backend.
 
 ## Stack
@@ -50,7 +52,29 @@ bun dev
 
 ### 6. Deploy
 
+#### Automated Deployment (Recommended)
+
+The project is configured with GitHub Actions for automatic deployment:
+
+- **Production Deployment**: Automatically deploys to Firebase Hosting when changes are pushed to the `main` branch
+- **Preview Deployment**: Automatically creates preview deployments for pull requests
+
+**Setup Required:**
+1. Go to your Firebase project → Project Settings → Service Accounts
+2. Click "Generate New Private Key" to download a service account JSON file
+3. In your GitHub repository, go to Settings → Secrets and Variables → Actions
+4. Create a new secret named `FIREBASE_SERVICE_ACCOUNT_ANTZ_ANTZ`
+5. Paste the entire content of the service account JSON file as the secret value
+
+Once configured, deployments will happen automatically on every push to `main`.
+
+#### Manual Deployment
+
+For local manual deployment (requires Firebase CLI authentication):
+
 ```bash
+npm run deploy
+# or with bun
 bun run deploy
 ```
 
