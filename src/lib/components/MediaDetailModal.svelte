@@ -15,7 +15,7 @@
   let editedNotes = $state('');
   let newComment = $state('');
   let watchDateInput = $state('');
-  let prevWatchDate = $state<Timestamp | null>(null);
+  let prevWatchDate = $state<Timestamp | undefined>(undefined);
   
   const statusOptions: MediaStatus[] = ['queued', 'watching', 'completed', 'dropped'];
 
@@ -66,6 +66,12 @@
       ? Timestamp.fromDate(new Date(watchDateInput)) 
       : undefined;
     await updateDocument<Media>('media', media.id, { watchDate }, $activeUser);
+  }
+
+  async function clearWatchDate(): Promise<void> {
+    if (!media?.id) return;
+    watchDateInput = '';
+    await updateDocument<Media>('media', media.id, { watchDate: undefined }, $activeUser);
   }
 
   async function addComment(): Promise<void> {
@@ -191,12 +197,27 @@
           
           <div class="flex-1 min-w-[140px]">
             <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Watch Date</label>
-            <input
-              type="date"
-              bind:value={watchDateInput}
-              onchange={updateWatchDate}
-              class="w-full p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
-            />
+            <div class="flex gap-2">
+              <input
+                type="date"
+                bind:value={watchDateInput}
+                onchange={updateWatchDate}
+                placeholder="Unknown"
+                class="flex-1 p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
+              />
+              {#if watchDateInput}
+                <button
+                  onclick={clearWatchDate}
+                  title="Clear date"
+                  class="px-3 py-2 text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                >
+                  Clear
+                </button>
+              {/if}
+            </div>
+            {#if !watchDateInput}
+              <span class="text-xs text-slate-400 mt-1 block">Not specified</span>
+            {/if}
           </div>
         </div>
         

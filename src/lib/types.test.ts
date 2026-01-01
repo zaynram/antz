@@ -210,6 +210,21 @@ describe('Type definitions', () => {
       expect(media.releaseDate).toBe('2024-01-01');
       expect(media.overview).toBe('A test movie');
     });
+
+    it('should allow watchDate to be undefined', () => {
+      const mediaWithoutDate: Partial<Media> = {
+        type: 'movie',
+        title: 'Movie Without Date',
+        status: 'completed',
+        rating: 4,
+        notes: '',
+        posterPath: null,
+        createdBy: 'T',
+        watchDate: undefined,
+      };
+      
+      expect(mediaWithoutDate.watchDate).toBeUndefined();
+    });
   });
 
   describe('Place interface', () => {
