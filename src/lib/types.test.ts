@@ -224,6 +224,25 @@ describe('Type definitions', () => {
       };
       
       expect(mediaWithoutDate.watchDate).toBeUndefined();
+      expect(mediaWithoutDate.title).toBe('Movie Without Date');
+      expect(mediaWithoutDate.type).toBe('movie');
+    });
+
+    it('should create Media object without specifying watchDate', () => {
+      const mediaOmittedDate: Partial<Media> = {
+        type: 'tv',
+        title: 'TV Show',
+        status: 'watching',
+        rating: null,
+        notes: 'Great show',
+        posterPath: '/poster.jpg',
+        createdBy: 'Z',
+        // watchDate intentionally omitted
+      };
+      
+      expect(mediaOmittedDate.watchDate).toBeUndefined();
+      expect(mediaOmittedDate).not.toHaveProperty('watchDate');
+      expect(mediaOmittedDate.title).toBe('TV Show');
     });
   });
 
