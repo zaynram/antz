@@ -68,12 +68,6 @@
     await updateDocument<Media>('media', media.id, { watchDate }, $activeUser);
   }
 
-  async function clearWatchDate(): Promise<void> {
-    if (!media?.id) return;
-    watchDateInput = '';
-    await updateWatchDate();
-  }
-
   async function addComment(): Promise<void> {
     if (!media?.id || !newComment.trim()) return;
     
