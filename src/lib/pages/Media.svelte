@@ -105,6 +105,10 @@
     await updateDocument<Media>('media', id, { status: status as MediaStatus }, $activeUser);
   }
 
+  async function updateRating(id: string, rating: number | null): Promise<void> {
+    await updateDocument<Media>('media', id, { rating }, $activeUser);
+  }
+
   async function remove(id: string): Promise<void> {
     if (confirm('Remove this?')) {
       await deleteDocument('media', id);
@@ -235,6 +239,15 @@
       <article
         class="bg-surface border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden group relative"
       >
+        <!-- Delete button - always visible on mobile, hover on desktop -->
+        <button
+          class="absolute top-2 right-2 z-20 w-6 h-6 rounded-full bg-slate-900/50 text-white text-sm flex items-center justify-center transition-all hover:bg-red-500 active:bg-red-600 md:opacity-0 md:group-hover:opacity-100"
+          onclick={() => item.id && remove(item.id)}
+          title="Remove"
+        >
+          ×
+        </button>
+        
         <!-- Status badge -->
         <div
           class="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide {getStatusBadgeClass(item.status)}"
@@ -268,6 +281,20 @@
         <div class="p-3 relative">
           <h3 class="text-sm font-semibold mb-1 truncate" class:line-through={item.status === 'dropped'}>{item.title}</h3>
           <span class="text-[10px] uppercase text-slate-400">{item.type}</span>
+          
+          <!-- Star Rating -->
+          <div class="flex items-center gap-0.5 mt-2">
+            {#each [1, 2, 3, 4, 5] as star}
+              <button
+                class="text-sm transition-colors {(item.rating ?? 0) >= star ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600 hover:text-amber-300'}"
+                onclick={() => item.id && updateRating(item.id, item.rating === star ? null : star)}
+                title={item.rating === star ? 'Clear rating' : `Rate ${star} star${star > 1 ? 's' : ''}`}
+              >
+                ★
+              </button>
+            {/each}
+          </div>
+          
           <select
             value={item.status}
             onchange={(e) => item.id && updateStatus(item.id, e.currentTarget.value)}
@@ -277,12 +304,6 @@
               <option value={status}>{status}</option>
             {/each}
           </select>
-          <button
-            class="absolute top-2 right-2 w-5 h-5 text-slate-400 text-sm opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
-            onclick={() => item.id && remove(item.id)}
-          >
-            ×
-          </button>
         </div>
       </article>
     {:else}
