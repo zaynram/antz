@@ -41,3 +41,29 @@ export const currentPreferences = derived<
 
 export const authUser = writable<User | null>(null);
 export const authLoading = writable<boolean>(true);
+
+// Search history store (stores last 5 searches)
+const MAX_SEARCH_HISTORY = 5;
+export const mediaSearchHistory = createPersistedStore<string[]>('mediaSearchHistory', []);
+
+export function addToSearchHistory(query: string): void {
+  mediaSearchHistory.update(history => {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) return history;
+    
+    // Remove if already exists, then add to front
+    const filtered = history.filter(h => h.toLowerCase() !== trimmedQuery.toLowerCase());
+    const updated = [trimmedQuery, ...filtered].slice(0, MAX_SEARCH_HISTORY);
+    return updated;
+  });
+}
+
+export function removeFromSearchHistory(query: string): void {
+  mediaSearchHistory.update(history => 
+    history.filter(h => h !== query)
+  );
+}
+
+export function clearSearchHistory(): void {
+  mediaSearchHistory.set([]);
+}
