@@ -10,7 +10,7 @@ import type {
   Media,
   Place,
 } from './types';
-import { getUserRating, getAverageRating, getDisplayRating } from './types';
+import { getUserRating, getAverageRating, getDisplayRating, calculateDistance, formatDistance, type GeoLocation } from './types';
 
 describe('Type definitions', () => {
   describe('UserId', () => {
@@ -466,6 +466,82 @@ describe('Type definitions', () => {
         };
         
         expect(getDisplayRating(media as Media)).toBe(4);
+      });
+    });
+  });
+
+  describe('Distance helper functions', () => {
+    describe('calculateDistance', () => {
+      it('should return 0 for same location', () => {
+        const loc: GeoLocation = { lat: 40.7128, lng: -74.006 };
+        expect(calculateDistance(loc, loc)).toBe(0);
+      });
+
+      it('should calculate distance between NYC and LA (approx 3944 km)', () => {
+        const nyc: GeoLocation = { lat: 40.7128, lng: -74.006 };
+        const la: GeoLocation = { lat: 34.0522, lng: -118.2437 };
+        const distance = calculateDistance(nyc, la);
+        // Should be approximately 3944 km (within 50km tolerance)
+        expect(distance).toBeGreaterThan(3900);
+        expect(distance).toBeLessThan(4000);
+      });
+
+      it('should calculate distance between London and Paris (approx 344 km)', () => {
+        const london: GeoLocation = { lat: 51.5074, lng: -0.1278 };
+        const paris: GeoLocation = { lat: 48.8566, lng: 2.3522 };
+        const distance = calculateDistance(london, paris);
+        expect(distance).toBeGreaterThan(340);
+        expect(distance).toBeLessThan(350);
+      });
+
+      it('should be symmetric', () => {
+        const loc1: GeoLocation = { lat: 40.7128, lng: -74.006 };
+        const loc2: GeoLocation = { lat: 34.0522, lng: -118.2437 };
+        const d1 = calculateDistance(loc1, loc2);
+        const d2 = calculateDistance(loc2, loc1);
+        expect(d1).toBeCloseTo(d2, 5);
+      });
+
+      it('should handle locations across the prime meridian', () => {
+        const london: GeoLocation = { lat: 51.5074, lng: -0.1278 };
+        const berlin: GeoLocation = { lat: 52.52, lng: 13.405 };
+        const distance = calculateDistance(london, berlin);
+        expect(distance).toBeGreaterThan(900);
+        expect(distance).toBeLessThan(1000);
+      });
+
+      it('should handle locations across the equator', () => {
+        const singapore: GeoLocation = { lat: 1.3521, lng: 103.8198 };
+        const sydney: GeoLocation = { lat: -33.8688, lng: 151.2093 };
+        const distance = calculateDistance(singapore, sydney);
+        expect(distance).toBeGreaterThan(6000);
+        expect(distance).toBeLessThan(6500);
+      });
+    });
+
+    describe('formatDistance', () => {
+      it('should format meters for distances < 1km', () => {
+        expect(formatDistance(0.5)).toBe('500 m');
+        expect(formatDistance(0.1)).toBe('100 m');
+        expect(formatDistance(0.75)).toBe('750 m');
+      });
+
+      it('should format km with 1 decimal for distances < 10km', () => {
+        expect(formatDistance(1.5)).toBe('1.5 km');
+        expect(formatDistance(5.25)).toBe('5.3 km');
+        expect(formatDistance(9.99)).toBe('10.0 km');
+      });
+
+      it('should format km rounded for distances >= 10km', () => {
+        expect(formatDistance(10)).toBe('10 km');
+        expect(formatDistance(15.7)).toBe('16 km');
+        expect(formatDistance(100.4)).toBe('100 km');
+      });
+
+      it('should handle edge cases', () => {
+        expect(formatDistance(0)).toBe('0 m');
+        expect(formatDistance(1)).toBe('1.0 km');
+        expect(formatDistance(10)).toBe('10 km');
       });
     });
   });

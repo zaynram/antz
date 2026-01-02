@@ -1,19 +1,33 @@
 <script lang="ts">
   import { tmdbConfig } from '$lib/config'
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
-  import { activeUser } from '$lib/stores/app'
+  import { activeUser, displayNames } from '$lib/stores/app'
   import type { Media, MediaStatus, MediaType, TMDBSearchResult, UserId, ProductionCompany, MediaCollection } from '$lib/types'
   import { getDisplayRating } from '$lib/types'
   import { enrichMediaData } from '$lib/tmdb'
   import { searchGames, type WikiGameResult } from '$lib/wikipedia'
   import { fuzzyScoreMulti } from '$lib/fuzzy'
+  import {
+    applyFilters,
+    applySort,
+    extractGenres,
+    extractDecades,
+    hasActiveFilters,
+    countActiveFilters,
+    formatDecade,
+    getSortLabel,
+    DEFAULT_FILTERS,
+    DEFAULT_SORT,
+    type MediaFilters,
+    type SortConfig,
+    type SortField,
+  } from '$lib/filters'
   import { onMount } from 'svelte'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
 
   // Core state
   let media = $state<Media[]>([]);
   let unsubscribe: (() => void) | undefined;
-  let activeTab = $state<'all' | MediaType>('all');
   let selectedMedia = $state<Media | null>(null);
 
   // Search state
@@ -21,30 +35,38 @@
   let discoverResults = $state<TMDBSearchResult[]>([]);
   let gameResults = $state<WikiGameResult[]>([]);
   let searching = $state(false);
-  let adding = $state<string | null>(null); // Track which item is being added
+  let adding = $state<string | null>(null);
 
-  // Filter state (collapsed by default)
+  // Filter & Sort state
   let showFilters = $state(false);
-  let filterStatus = $state<MediaStatus | 'all'>('all');
-  let sortField = $state<'dateAdded' | 'title' | 'rating'>('dateAdded');
+  let filters = $state<MediaFilters>({ ...DEFAULT_FILTERS });
+  let sort = $state<SortConfig>({ ...DEFAULT_SORT });
 
   // Debounce
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
   const DEBOUNCE_MS = 300;
 
-  const tabs: Array<{ key: 'all' | MediaType; label: string; icon: string }> = [
+  const tabs: Array<{ key: MediaType | 'all'; label: string; icon: string }> = [
     { key: 'all', label: 'All', icon: '📚' },
     { key: 'movie', label: 'Movies', icon: '🎬' },
     { key: 'tv', label: 'TV', icon: '📺' },
     { key: 'game', label: 'Games', icon: '🎮' },
   ];
 
-  const statusFilters: Array<{ key: MediaStatus | 'all'; label: string }> = [
-    { key: 'all', label: 'All' },
+  const statusOptions: Array<{ key: MediaStatus | 'all'; label: string }> = [
+    { key: 'all', label: 'All Statuses' },
     { key: 'queued', label: 'Queued' },
     { key: 'watching', label: 'In Progress' },
     { key: 'completed', label: 'Completed' },
     { key: 'dropped', label: 'Dropped' },
+  ];
+
+  const sortOptions: Array<{ field: SortField; label: string; defaultDir: 'asc' | 'desc' }> = [
+    { field: 'dateAdded', label: 'Date Added', defaultDir: 'desc' },
+    { field: 'title', label: 'Title', defaultDir: 'asc' },
+    { field: 'rating', label: 'Rating', defaultDir: 'desc' },
+    { field: 'releaseDate', label: 'Release Date', defaultDir: 'desc' },
+    { field: 'watchDate', label: 'Watch Date', defaultDir: 'desc' },
   ];
 
   const FUZZY_THRESHOLD = 25;
@@ -63,10 +85,15 @@
     };
   });
 
+  // Sync tab to type filter
+  function setTab(tab: MediaType | 'all') {
+    filters = { ...filters, type: tab };
+  }
+
   // Live search effect
   $effect(() => {
     const query = searchQuery.trim();
-    const tab = activeTab;
+    const currentType = filters.type;
     
     if (searchTimer) clearTimeout(searchTimer);
     
@@ -77,10 +104,10 @@
     }
     
     searchTimer = setTimeout(() => {
-      if (tab === 'game') {
+      if (currentType === 'game') {
         searchWikipedia(query);
       } else {
-        searchTMDB(query, tab);
+        searchTMDB(query, currentType);
       }
     }, DEBOUNCE_MS);
   });
@@ -160,7 +187,6 @@
         ...(isTV && { progress: { season: 1, episode: 1 } }),
       }, $activeUser);
       
-      // Clear from results after adding
       discoverResults = discoverResults.filter(r => r.id !== item.id);
     } catch (e) {
       console.error('Failed to add:', e);
@@ -214,20 +240,43 @@
     }
   }
 
+  function clearFilters(): void {
+    filters = { ...DEFAULT_FILTERS, type: filters.type }; // Keep tab selection
+    sort = { ...DEFAULT_SORT };
+  }
+
+  function toggleGenre(genre: string): void {
+    const current = filters.genres;
+    if (current.includes(genre)) {
+      filters = { ...filters, genres: current.filter(g => g !== genre) };
+    } else {
+      filters = { ...filters, genres: [...current, genre] };
+    }
+  }
+
+  function toggleSort(field: SortField): void {
+    if (sort.field === field) {
+      // Toggle direction
+      sort = { ...sort, direction: sort.direction === 'asc' ? 'desc' : 'asc' };
+    } else {
+      // New field, use its default direction
+      const option = sortOptions.find(o => o.field === field);
+      sort = { field, direction: option?.defaultDir ?? 'desc' };
+    }
+  }
+
+  // Derived data from media
+  let availableGenres = $derived(extractGenres(media));
+  let availableDecades = $derived(extractDecades(media));
+  let activeFilterCount = $derived(countActiveFilters({ ...filters, type: 'all' })); // Don't count type tab
+
   // Filtered and sorted library
   let filteredMedia = $derived.by(() => {
     let result = media;
     const query = searchQuery.trim().toLowerCase();
 
-    // Tab filter
-    if (activeTab !== 'all') {
-      result = result.filter(m => m.type === activeTab);
-    }
-
-    // Status filter
-    if (filterStatus !== 'all') {
-      result = result.filter(m => m.status === filterStatus);
-    }
+    // Apply structured filters
+    result = applyFilters(result, filters);
 
     // Search filter with fuzzy matching
     if (query) {
@@ -240,20 +289,8 @@
         .sort((a, b) => b.score - a.score)
         .map(r => r.item);
     } else {
-      // Sort when not searching
-      result = [...result].sort((a, b) => {
-        switch (sortField) {
-          case 'title':
-            return a.title.localeCompare(b.title);
-          case 'rating': {
-            const rA = getDisplayRating(a) ?? 0;
-            const rB = getDisplayRating(b) ?? 0;
-            return rB - rA;
-          }
-          default: // dateAdded
-            return (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0);
-        }
-      });
+      // Apply sort when not searching
+      result = applySort(result, sort);
     }
 
     return result;
@@ -277,7 +314,7 @@
   }
 
   let isSearching = $derived(searchQuery.trim().length > 0);
-  let hasDiscoverResults = $derived(activeTab === 'game' ? gameResults.length > 0 : discoverResults.length > 0);
+  let hasDiscoverResults = $derived(filters.type === 'game' ? gameResults.length > 0 : discoverResults.length > 0);
 </script>
 
 <MediaDetailModal media={selectedMedia} onClose={() => selectedMedia = null} />
@@ -288,13 +325,18 @@
     <h1 class="text-2xl font-bold">Media</h1>
     <div class="flex items-center gap-2">
       <button
-        class="p-2 rounded-lg transition-colors {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}"
+        class="relative p-2 rounded-lg transition-colors {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}"
         onclick={() => showFilters = !showFilters}
-        title="Filters"
+        title="Filters & Sort"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
         </svg>
+        {#if activeFilterCount > 0}
+          <span class="absolute -top-1 -right-1 w-4 h-4 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+            {activeFilterCount}
+          </span>
+        {/if}
       </button>
     </div>
   </div>
@@ -330,8 +372,8 @@
   <div class="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-4">
     {#each tabs as tab (tab.key)}
       <button
-        class="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all {activeTab === tab.key ? 'bg-surface shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}"
-        onclick={() => activeTab = tab.key}
+        class="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all {filters.type === tab.key ? 'bg-surface shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}"
+        onclick={() => setTab(tab.key)}
       >
         <span>{tab.icon}</span>
         <span class="hidden sm:inline">{tab.label}</span>
@@ -339,39 +381,148 @@
     {/each}
   </div>
 
-  <!-- Filters (collapsible) -->
+  <!-- Filters Panel (collapsible) -->
   {#if showFilters}
-    <div class="flex flex-wrap items-center gap-4 p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl mb-4">
-      <div class="flex items-center gap-2">
-        <span class="text-sm text-slate-500">Status:</span>
-        <select
-          bind:value={filterStatus}
-          class="px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
-        >
-          {#each statusFilters as sf}
-            <option value={sf.key}>{sf.label}</option>
-          {/each}
-        </select>
+    <div class="p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl mb-4 space-y-4">
+      <!-- Row 1: Status, Added By, Sort -->
+      <div class="flex flex-wrap gap-4">
+        <div class="flex-1 min-w-[120px]">
+          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Status</label>
+          <select
+            bind:value={filters.status}
+            class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
+          >
+            {#each statusOptions as opt}
+              <option value={opt.key}>{opt.label}</option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="flex-1 min-w-[120px]">
+          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Added By</label>
+          <select
+            bind:value={filters.addedBy}
+            class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
+          >
+            <option value="all">Anyone</option>
+            <option value="Z">{$displayNames.Z}</option>
+            <option value="T">{$displayNames.T}</option>
+          </select>
+        </div>
+
+        <div class="flex-1 min-w-[140px]">
+          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Sort By</label>
+          <div class="flex gap-1 flex-wrap">
+            {#each sortOptions as opt}
+              <button
+                class="px-2 py-1.5 text-xs rounded-lg transition-colors {sort.field === opt.field 
+                  ? 'bg-accent text-white' 
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'}"
+                onclick={() => toggleSort(opt.field)}
+              >
+                {opt.label}
+                {#if sort.field === opt.field}
+                  <span class="ml-0.5">{sort.direction === 'asc' ? '↑' : '↓'}</span>
+                {/if}
+              </button>
+            {/each}
+          </div>
+        </div>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="text-sm text-slate-500">Sort:</span>
-        <select
-          bind:value={sortField}
-          class="px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
-        >
-          <option value="dateAdded">Recently Added</option>
-          <option value="title">Title</option>
-          <option value="rating">Rating</option>
-        </select>
+
+      <!-- Row 2: Decade, Rating Filter -->
+      <div class="flex flex-wrap gap-4">
+        {#if availableDecades.length > 0}
+          <div class="flex-1 min-w-[120px]">
+            <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Decade</label>
+            <select
+              bind:value={filters.releaseDecade}
+              class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
+            >
+              <option value={null}>Any Decade</option>
+              {#each availableDecades as decade}
+                <option value={decade}>{formatDecade(decade)}</option>
+              {/each}
+            </select>
+          </div>
+        {/if}
+
+        <div class="flex-1 min-w-[120px]">
+          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Rating</label>
+          <select
+            bind:value={filters.hasRating}
+            class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
+          >
+            <option value={null}>Any</option>
+            <option value={true}>Rated</option>
+            <option value={false}>Unrated</option>
+          </select>
+        </div>
+
+        <div class="flex-1 min-w-[120px]">
+          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Collection</label>
+          <select
+            bind:value={filters.hasCollection}
+            class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
+          >
+            <option value={null}>Any</option>
+            <option value={true}>In Collection</option>
+            <option value={false}>Standalone</option>
+          </select>
+        </div>
       </div>
-      {#if filterStatus !== 'all'}
-        <button
-          class="ml-auto text-sm text-slate-500 hover:text-red-500"
-          onclick={() => filterStatus = 'all'}
-        >
-          Clear
-        </button>
+
+      <!-- Row 3: Genres (chips) -->
+      {#if availableGenres.length > 0}
+        <div>
+          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Genres</label>
+          <div class="flex flex-wrap gap-1.5">
+            {#each availableGenres as genre}
+              <button
+                class="px-2.5 py-1 text-xs rounded-full transition-colors {filters.genres.includes(genre)
+                  ? 'bg-accent text-white'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'}"
+                onclick={() => toggleGenre(genre)}
+              >
+                {genre}
+              </button>
+            {/each}
+          </div>
+        </div>
       {/if}
+
+      <!-- Clear Button -->
+      {#if activeFilterCount > 0}
+        <div class="pt-2 border-t border-slate-200 dark:border-slate-700">
+          <button
+            class="text-sm text-slate-500 hover:text-red-500 transition-colors"
+            onclick={clearFilters}
+          >
+            Clear {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'}
+          </button>
+        </div>
+      {/if}
+    </div>
+  {/if}
+
+  <!-- Quick filter summary (when collapsed but active) -->
+  {#if !showFilters && activeFilterCount > 0}
+    <div class="flex items-center gap-2 mb-4 text-sm text-slate-500">
+      <span>{activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'} active</span>
+      <span>·</span>
+      <span>{getSortLabel(sort)}</span>
+      <button
+        class="text-accent hover:underline"
+        onclick={() => showFilters = true}
+      >
+        Edit
+      </button>
+      <button
+        class="text-red-500 hover:underline"
+        onclick={clearFilters}
+      >
+        Clear
+      </button>
     </div>
   {/if}
 
@@ -382,7 +533,7 @@
         Add to collection
       </h2>
       <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-        {#if activeTab === 'game'}
+        {#if filters.type === 'game'}
           {#each gameResults as game (game.pageid)}
             {@const isAdding = adding === `wiki-${game.pageid}`}
             <button
@@ -400,7 +551,6 @@
               <div class="p-2">
                 <p class="text-xs font-medium truncate">{game.title}</p>
               </div>
-              <!-- Add overlay -->
               <div class="absolute inset-0 bg-accent/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 {#if isAdding}
                   <div class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -431,7 +581,6 @@
                 <p class="text-xs font-medium truncate">{result.title || result.name}</p>
                 <p class="text-[10px] text-slate-400 uppercase">{result.media_type}</p>
               </div>
-              <!-- Add overlay -->
               <div class="absolute inset-0 bg-accent/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 {#if isAdding}
                   <div class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -458,10 +607,16 @@
 
     {#if filteredMedia.length === 0}
       <div class="text-center py-16">
-        <div class="text-5xl mb-4">{activeTab === 'game' ? '🎮' : activeTab === 'movie' ? '🎬' : activeTab === 'tv' ? '📺' : '📚'}</div>
-        {#if isSearching}
-          <p class="text-slate-500 dark:text-slate-400">No matches in your collection</p>
-          <p class="text-sm text-slate-400 mt-1">Try adding from the results above</p>
+        <div class="text-5xl mb-4">{filters.type === 'game' ? '🎮' : filters.type === 'movie' ? '🎬' : filters.type === 'tv' ? '📺' : '📚'}</div>
+        {#if isSearching || activeFilterCount > 0}
+          <p class="text-slate-500 dark:text-slate-400">No matches found</p>
+          <p class="text-sm text-slate-400 mt-1">
+            {#if activeFilterCount > 0}
+              Try adjusting your filters
+            {:else}
+              Try adding from the results above
+            {/if}
+          </p>
         {:else}
           <p class="text-slate-500 dark:text-slate-400">Nothing here yet</p>
           <p class="text-sm text-slate-400 mt-1">Search for something to add</p>
@@ -521,6 +676,20 @@
               <h3 class="font-medium text-sm truncate mb-1" class:line-through={item.status === 'dropped'} class:text-slate-400={item.status === 'dropped'}>
                 {item.title}
               </h3>
+              
+              <!-- Release year & collection badge -->
+              {#if item.releaseDate || item.collection}
+                <div class="flex items-center gap-1.5 mb-1 text-[10px] text-slate-400">
+                  {#if item.releaseDate}
+                    <span>{item.releaseDate.split('-')[0]}</span>
+                  {/if}
+                  {#if item.collection}
+                    <span class="px-1 py-0.5 bg-accent/10 text-accent rounded text-[9px] truncate max-w-[80px]" title={item.collection.name}>
+                      {item.collection.name}
+                    </span>
+                  {/if}
+                </div>
+              {/if}
               
               <!-- Rating -->
               <div class="flex items-center gap-0.5">
