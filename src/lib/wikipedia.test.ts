@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { searchGames } from './wikipedia';
+import { searchGames, clearSearchCache } from './wikipedia';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -9,6 +9,7 @@ describe('wikipedia.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch.mockReset();
+    clearSearchCache(); // Clear cache between tests
   });
 
   describe('searchGames', () => {

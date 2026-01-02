@@ -124,7 +124,9 @@ describe("location.ts", () => {
         it("should reject with permission denied error", async () => {
             const mockGeolocation = {
                 getCurrentPosition: vi.fn((_success, error) => {
-                    error({ code: 1, message: "User denied" })
+                    // Mock error needs PERMISSION_DENIED constant to match against
+                    const mockError = { code: 1, message: "User denied", PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 }
+                    error(mockError)
                 }),
             }
             Object.defineProperty(global, "navigator", {
@@ -141,7 +143,8 @@ describe("location.ts", () => {
         it("should reject with unavailable error", async () => {
             const mockGeolocation = {
                 getCurrentPosition: vi.fn((_success, error) => {
-                    error({ code: 2, message: "Position unavailable" })
+                    const mockError = { code: 2, message: "Position unavailable", PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 }
+                    error(mockError)
                 }),
             }
             Object.defineProperty(global, "navigator", {
@@ -158,7 +161,8 @@ describe("location.ts", () => {
         it("should reject with timeout error", async () => {
             const mockGeolocation = {
                 getCurrentPosition: vi.fn((_success, error) => {
-                    error({ code: 3, message: "Timeout" })
+                    const mockError = { code: 3, message: "Timeout", PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 }
+                    error(mockError)
                 }),
             }
             Object.defineProperty(global, "navigator", {

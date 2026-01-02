@@ -92,7 +92,8 @@ export function applyFilters(media: Media[], filters: MediaFilters): Media[] {
         }
 
         // Release decade filter
-        if (filters.releaseDecade !== null && item.releaseDate) {
+        if (filters.releaseDecade !== null) {
+            if (!item.releaseDate) return false // Exclude items without releaseDate
             const year = parseInt(item.releaseDate.split('-')[0], 10)
             const decade = Math.floor(year / 10) * 10
             if (decade !== filters.releaseDecade) return false

@@ -21,6 +21,11 @@ const WIKI_API = 'https://en.wikipedia.org/w/api.php';
 // Cache for game search results
 const searchCache = new Map<string, WikiGameResult[]>();
 
+/** Clear the search cache (for testing) */
+export function clearSearchCache(): void {
+  searchCache.clear();
+}
+
 /**
  * Search Wikipedia for video games
  */

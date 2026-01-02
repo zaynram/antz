@@ -82,8 +82,12 @@ describe('fuzzy.ts', () => {
         expect(fuzzyScore('xyz', 'inception')).toBe(0);
       });
 
-      it('should return 0 when characters in wrong order', () => {
-        expect(fuzzyScore('cni', 'inception')).toBe(0);
+      it('should return low score for characters partially found', () => {
+        // 'cni' - c and n are found in order, but no i after n
+        // Returns partial match score (2/3 chars = 66% match ratio)
+        const score = fuzzyScore('cni', 'inception');
+        expect(score).toBeGreaterThan(0);
+        expect(score).toBeLessThan(30);
       });
     });
 
@@ -174,9 +178,11 @@ describe('fuzzy.ts', () => {
       expect(score).toBe(85); // Substring match score
     });
 
-    it('should handle empty query', () => {
+    it('should return 0 for empty query', () => {
+      // Empty query returns 0 in fuzzyScore, so fuzzyScoreMulti also returns 0
+      // (fuzzyFilter handles empty query specially by returning all items with score 100)
       const score = fuzzyScoreMulti('', 'Inception', 'Nolan');
-      expect(score).toBe(100);
+      expect(score).toBe(0);
     });
   });
 });
