@@ -106,13 +106,19 @@ describe('wikipedia.ts', () => {
       mockFetch.mockResolvedValueOnce({
         json: async () => ({
           query: {
-            search: [{ pageid: 1, title: 'Obscure Game', snippet: 'Unknown' }]
+            search: [{ pageid: 1, title: 'Obscure Game (video game)', snippet: 'A video game developed by Hydravision' }]
           }
         })
       });
       mockFetch.mockResolvedValueOnce({
         json: async () => ({
-          query: { pages: { '1': { title: 'Obscure Game' } } }
+          query: { pages: { '1': { title: 'Obscure Game (video game)', categories: [{ title: 'Category:Video games' }] } } }
+        })
+      });
+      // Third call for fetchPageImage when no thumbnail
+      mockFetch.mockResolvedValueOnce({
+        json: async () => ({
+          query: { pages: { '1': { images: [] } } }
         })
       });
 
@@ -124,40 +130,52 @@ describe('wikipedia.ts', () => {
       mockFetch.mockResolvedValueOnce({
         json: async () => ({
           query: {
-            search: [{ pageid: 1, title: 'Test Game', snippet: '<span>Game description</span>' }]
+            search: [{ pageid: 1, title: 'Test Game (video game)', snippet: '<span>A video game description</span>' }]
           }
         })
       });
       mockFetch.mockResolvedValueOnce({
         json: async () => ({
-          query: { pages: { '1': { title: 'Test Game' } } }
+          query: { pages: { '1': { title: 'Test Game (video game)', categories: [{ title: 'Category:Video games' }] } } }
+        })
+      });
+      // Third call for fetchPageImage
+      mockFetch.mockResolvedValueOnce({
+        json: async () => ({
+          query: { pages: { '1': { images: [] } } }
         })
       });
 
       const results = await searchGames('Test');
-      expect(results[0].description).toBe('Game description'); // HTML stripped
+      expect(results[0].description).toBe('A video game description'); // HTML stripped
     });
 
     it('should strip HTML from snippets', async () => {
       mockFetch.mockResolvedValueOnce({
         json: async () => ({
           query: {
-            search: [{ 
-              pageid: 1, 
-              title: 'Test', 
-              snippet: '<span class="searchmatch">Test</span> is a &quot;great&quot; game &amp; more' 
+            search: [{
+              pageid: 1,
+              title: 'Test (video game)',
+              snippet: '<span class="searchmatch">Test</span> is a &quot;great&quot; video game &amp; more'
             }]
           }
         })
       });
       mockFetch.mockResolvedValueOnce({
         json: async () => ({
-          query: { pages: { '1': { title: 'Test' } } }
+          query: { pages: { '1': { title: 'Test (video game)', categories: [{ title: 'Category:Video games' }] } } }
+        })
+      });
+      // Third call for fetchPageImage
+      mockFetch.mockResolvedValueOnce({
+        json: async () => ({
+          query: { pages: { '1': { images: [] } } }
         })
       });
 
       const results = await searchGames('Test');
-      expect(results[0].description).toBe('Test is a "great" game & more');
+      expect(results[0].description).toBe('Test is a "great" video game & more');
     });
 
     it('should handle empty search results', async () => {
@@ -199,15 +217,15 @@ describe('wikipedia.ts', () => {
       );
     });
 
-    it('should limit results to 8 items', async () => {
+    it('should fetch 15 results for filtering', async () => {
       mockFetch.mockResolvedValueOnce({
         json: async () => ({ query: { search: [] } })
       });
 
       await searchGames('RPG');
-      
+
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('srlimit=8')
+        expect.stringContaining('srlimit=15')
       );
     });
 
@@ -228,9 +246,9 @@ describe('wikipedia.ts', () => {
         json: async () => ({
           query: {
             search: [
-              { pageid: 1, title: 'Game One', snippet: 'First' },
-              { pageid: 2, title: 'Game Two', snippet: 'Second' },
-              { pageid: 3, title: 'Game Three', snippet: 'Third' }
+              { pageid: 1, title: 'Game One (video game)', snippet: 'A video game developed by Studio A' },
+              { pageid: 2, title: 'Game Two (video game)', snippet: 'A video game developed by Studio B' },
+              { pageid: 3, title: 'Game Three (video game)', snippet: 'A video game developed by Studio C' }
             ]
           }
         })
@@ -239,16 +257,22 @@ describe('wikipedia.ts', () => {
         json: async () => ({
           query: {
             pages: {
-              '1': { title: 'Game One', extract: 'First game' },
-              '2': { title: 'Game Two', extract: 'Second game' },
-              '3': { title: 'Game Three', extract: 'Third game' }
+              '1': { title: 'Game One (video game)', extract: 'First game', categories: [{ title: 'Category:Video games' }] },
+              '2': { title: 'Game Two (video game)', extract: 'Second game', categories: [{ title: 'Category:Video games' }] },
+              '3': { title: 'Game Three (video game)', extract: 'Third game', categories: [{ title: 'Category:Video games' }] }
             }
           }
         })
       });
+      // fetchPageImage calls for each result without thumbnail
+      mockFetch.mockResolvedValue({
+        json: async () => ({
+          query: { pages: { '1': { images: [] }, '2': { images: [] }, '3': { images: [] } } }
+        })
+      });
 
       const results = await searchGames('Game');
-      
+
       expect(results).toHaveLength(3);
       expect(results.map(r => r.title)).toEqual(['Game One', 'Game Two', 'Game Three']);
     });

@@ -26,6 +26,7 @@ vi.mock('firebase/firestore', () => ({
     return { id: 'generated-id', path: `${collectionOrDb.name}/generated-id` };
   }),
   deleteDoc: vi.fn(() => Promise.resolve()),
+  getDoc: vi.fn(() => Promise.resolve({ exists: () => false, data: () => null })),
   onSnapshot: vi.fn((_query, _callback) => {
     // Mock unsubscribe function
     return vi.fn();
@@ -35,6 +36,14 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: vi.fn(() => ({ _seconds: 1234567890 })),
   setDoc: vi.fn(() => Promise.resolve()),
   updateDoc: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('firebase/storage', () => ({
+  getStorage: vi.fn(() => ({ app: { name: 'mock-app' } })),
+  ref: vi.fn(() => ({ fullPath: 'mock-path' })),
+  uploadBytes: vi.fn(() => Promise.resolve()),
+  getDownloadURL: vi.fn(() => Promise.resolve('https://mock-url.com/image.jpg')),
+  deleteObject: vi.fn(() => Promise.resolve()),
 }));
 
 // Mock config
