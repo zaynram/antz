@@ -211,6 +211,40 @@ describe('Type definitions', () => {
       expect(media.releaseDate).toBe('2024-01-01');
       expect(media.overview).toBe('A test movie');
     });
+
+    it('should allow watchDate to be undefined', () => {
+      const mediaWithoutDate: Partial<Media> = {
+        type: 'movie',
+        title: 'Movie Without Date',
+        status: 'completed',
+        rating: 4,
+        notes: '',
+        posterPath: null,
+        createdBy: 'T',
+        watchDate: undefined,
+      };
+      
+      expect(mediaWithoutDate.watchDate).toBeUndefined();
+      expect(mediaWithoutDate.title).toBe('Movie Without Date');
+      expect(mediaWithoutDate.type).toBe('movie');
+    });
+
+    it('should create Media object without specifying watchDate', () => {
+      const mediaOmittedDate: Partial<Media> = {
+        type: 'tv',
+        title: 'TV Show',
+        status: 'watching',
+        rating: null,
+        notes: 'Great show',
+        posterPath: '/poster.jpg',
+        createdBy: 'Z',
+        // watchDate intentionally omitted
+      };
+      
+      expect(mediaOmittedDate.watchDate).toBeUndefined();
+      expect(mediaOmittedDate).not.toHaveProperty('watchDate');
+      expect(mediaOmittedDate.title).toBe('TV Show');
+    });
   });
 
   describe('Place interface', () => {
