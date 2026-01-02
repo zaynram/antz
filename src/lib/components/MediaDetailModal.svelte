@@ -16,31 +16,36 @@
   let editedNotes = $state('');
   let newComment = $state('');
   let watchDateInput = $state('');
-  let prevWatchDate = $state<Timestamp | null>(null);
-  let prevMediaId = $state<string | undefined>(undefined);
+  
+  // Non-reactive tracking - prevents effect from creating dependencies on local form state
+  let previousMediaId: string | undefined = undefined;
+  let previousWatchDate: Timestamp | undefined = undefined;
   
   const statusOptions: MediaStatus[] = ['queued', 'watching', 'completed', 'dropped'];
 
   $effect(() => {
     if (media) {
-      const newNotes = media.notes || '';
-      const mediaIdChanged = prevMediaId !== media.id;
-      
-      // Always update notes when switching to a different media item
-      // Otherwise, only update if the notes value has changed
-      if (mediaIdChanged || editedNotes !== newNotes) {
-        editedNotes = newNotes;
-        prevMediaId = media.id;
-      }
-      
-      // Only compute and update watch date if the timestamp reference has changed
-      if (prevWatchDate !== media.watchDate) {
-        prevWatchDate = media.watchDate;
+      // Only sync when viewing a different media item
+      if (media.id !== previousMediaId) {
+        editedNotes = media.notes || '';
+        
         if (media.watchDate) {
           watchDateInput = new Date(media.watchDate.toDate()).toISOString().split('T')[0];
         } else {
           watchDateInput = '';
         }
+        
+        previousMediaId = media.id;
+        previousWatchDate = media.watchDate;
+      }
+      // Also sync watch date if it changed externally (e.g., real-time update from other user)
+      else if (media.watchDate !== previousWatchDate) {
+        if (media.watchDate) {
+          watchDateInput = new Date(media.watchDate.toDate()).toISOString().split('T')[0];
+        } else {
+          watchDateInput = '';
+        }
+        previousWatchDate = media.watchDate;
       }
     }
   });

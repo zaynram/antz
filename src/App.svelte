@@ -34,22 +34,20 @@
     currentPath = path;
   }
 
-  let prevTheme = $state<string | undefined>(undefined);
-  let prevAccentColor = $state<string | undefined>(undefined);
+  // Non-reactive tracking to prevent effect double-runs
+  let prevTheme: string | undefined = undefined;
+  let prevAccentColor: string | undefined = undefined;
 
   $effect(() => {
     if ($currentPreferences) {
       const root = document.documentElement;
-      const isDark = $currentPreferences.theme === 'dark';
-      const accentColor = $currentPreferences.accentColor;
+      const { theme, accentColor } = $currentPreferences;
 
-      // Only update theme if it changed
-      if (prevTheme !== $currentPreferences.theme) {
-        root.classList.toggle('dark', isDark);
-        prevTheme = $currentPreferences.theme;
+      if (prevTheme !== theme) {
+        root.classList.toggle('dark', theme === 'dark');
+        prevTheme = theme;
       }
 
-      // Only update accent color if it changed
       if (prevAccentColor !== accentColor) {
         root.style.setProperty('--color-accent', accentColor);
         prevAccentColor = accentColor;

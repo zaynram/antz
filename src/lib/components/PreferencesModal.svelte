@@ -13,6 +13,10 @@
   let localAccentColor = $state('#6366f1');
   let localName = $state('');
 
+  // Non-reactive tracking for sync triggers
+  let previousOpen = false;
+  let previousUser: 'Z' | 'T' | null = null;
+
   const presetColors = [
     '#6366f1', // Indigo
     '#ec4899', // Pink
@@ -25,18 +29,18 @@
   ];
 
   $effect(() => {
-    if (open && $currentPreferences) {
-      // Only update if values have changed to prevent redundant state updates
-      if (localTheme !== $currentPreferences.theme) {
-        localTheme = $currentPreferences.theme;
-      }
-      if (localAccentColor !== $currentPreferences.accentColor) {
-        localAccentColor = $currentPreferences.accentColor;
-      }
-      if (localName !== $currentPreferences.name) {
-        localName = $currentPreferences.name;
-      }
+    // Only sync local state when modal opens or user switches
+    const justOpened = open && !previousOpen;
+    const userSwitched = open && $activeUser !== previousUser;
+    
+    if ((justOpened || userSwitched) && $currentPreferences) {
+      localTheme = $currentPreferences.theme;
+      localAccentColor = $currentPreferences.accentColor;
+      localName = $currentPreferences.name;
     }
+    
+    previousOpen = open;
+    previousUser = $activeUser;
   });
 
   function savePreferences(): void {
