@@ -14,7 +14,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install
       - name: Type check
-        run: bun run check
+        run: bunx svelte-check --tsconfig ./tsconfig.json --threshold error
       - name: Run tests
         run: bun test:run
 
