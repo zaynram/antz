@@ -906,22 +906,17 @@
 
 <style>
   :global(.virtual-grid-viewport) {
-    /* Use dvh for proper mobile viewport handling */
-    height: calc(100dvh - 280px);
-    min-height: 300px;
-    max-height: calc(100dvh - 200px);
-    overflow-y: auto;
+    height: calc(100svh - 280px);
+    min-height: 200px;
+    overflow-y: scroll !important;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    touch-action: pan-y;
   }
 
-  /* Fallback for browsers without dvh support */
-  @supports not (height: 100dvh) {
+  /* Fallback for browsers without svh support */
+  @supports not (height: 100svh) {
     :global(.virtual-grid-viewport) {
       height: calc(100vh - 280px);
-      max-height: calc(100vh - 200px);
     }
   }
 

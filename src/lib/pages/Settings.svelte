@@ -28,10 +28,11 @@
   let isReloading = $state(false);
   let updateAvailable = $state(false);
 
-  // Long-press for debug access
-  let longPressTimer: ReturnType<typeof setTimeout> | null = null;
-  let longPressTriggered = false;
-  const LONG_PRESS_DURATION = 2000; // 2 seconds
+  // Tap-5-times for debug access
+  let tapCount = 0;
+  let tapTimer: ReturnType<typeof setTimeout> | null = null;
+  const TAP_THRESHOLD = 5;
+  const TAP_RESET_MS = 1500;
 
   // Track previous user to detect switches
   let previousUser: 'Z' | 'T' | null = null;
@@ -161,12 +162,6 @@
   }
 
   async function reloadApp(): Promise<void> {
-    // Don't reload if this was a long-press (going to debug instead)
-    if (longPressTriggered) {
-      longPressTriggered = false;
-      return;
-    }
-
     isReloading = true;
 
     try {
@@ -197,22 +192,23 @@
     }
   }
 
-  function startLongPress(): void {
-    longPressTriggered = false;
-    longPressTimer = setTimeout(() => {
-      longPressTriggered = true;
-      longPressTimer = null;
+  function handleVersionTap(): void {
+    tapCount++;
+
+    // Reset timer on each tap
+    if (tapTimer) clearTimeout(tapTimer);
+    tapTimer = setTimeout(() => {
+      tapCount = 0;
+    }, TAP_RESET_MS);
+
+    if (tapCount >= TAP_THRESHOLD) {
+      tapCount = 0;
+      if (tapTimer) clearTimeout(tapTimer);
       toast.success('Entering debug mode...');
       navigate('/debug');
-    }, LONG_PRESS_DURATION);
-  }
-
-  function cancelLongPress(): void {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      longPressTimer = null;
+    } else if (tapCount >= 3) {
+      toast.info(`${TAP_THRESHOLD - tapCount} more taps for debug mode`);
     }
-    // Don't reset longPressTriggered here - let reloadApp check it
   }
 
   async function handleLogout(): Promise<void> {
@@ -457,16 +453,10 @@
       App
     </h2>
 
-    <!-- Update/Reload Button (hold 2s for debug mode) -->
+    <!-- Update/Reload Button -->
     <button
-      class="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors touch-manipulation select-none"
+      class="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors touch-manipulation"
       onclick={reloadApp}
-      onmousedown={startLongPress}
-      onmouseup={cancelLongPress}
-      onmouseleave={cancelLongPress}
-      ontouchstart={startLongPress}
-      ontouchend={cancelLongPress}
-      ontouchcancel={cancelLongPress}
       disabled={isReloading}
     >
       <RefreshCw size={18} class={isReloading ? 'animate-spin' : ''} />
@@ -485,10 +475,14 @@
       <span>Log Out</span>
     </button>
 
-    <!-- Version Info -->
-    <div class="text-center text-xs text-slate-400 pt-2">
+    <!-- Version Info (tap 5 times for debug) -->
+    <button
+      type="button"
+      class="w-full text-center text-xs text-slate-400 pt-2 cursor-default"
+      onclick={handleVersionTap}
+    >
       <p>Us - Couples App v0.1.0</p>
       <p class="mt-1">Preferences sync across devices</p>
-    </div>
+    </button>
   </section>
 </div>
