@@ -11,7 +11,7 @@ Antz is a serverless SPA for relationship documentation (couples app for Z & T).
 - **Runtime:** Bun (npm also works)
 - **Frontend:** Svelte 5 + Vite + TypeScript
 - **Styling:** Tailwind CSS 4 with PostCSS
-- **Backend:** Firebase (Auth, Firestore, Hosting)
+- **Backend:** Firebase (Auth, Firestore, Storage, Hosting)
 - **Testing:** Vitest with Testing Library & happy-dom
 - **External APIs:** TMDB (movies/TV), Wikipedia (games), Google Places
 
@@ -32,7 +32,7 @@ bun run deploy       # Build + Firebase deploy
 
 ### Directory Structure
 - `src/lib/components/` - Reusable Svelte components
-- `src/lib/pages/` - Page-level components (Home, Login, Media, Notes, Places, Debug)
+- `src/lib/pages/` - Page-level components (Home, Login, Media, Notes, Places, Settings, Debug)
 - `src/lib/stores/` - Svelte stores for state management
 - `src/lib/services/` - Service modules (location)
 - `src/test/` - Test setup files
@@ -40,7 +40,8 @@ bun run deploy       # Build + Firebase deploy
 
 ### Key Files
 - `src/lib/config.ts` - Firebase & TMDB configuration
-- `src/lib/firebase.ts` - Firebase SDK wrapper functions
+- `src/lib/firebase.ts` - Firebase SDK wrapper (Auth, Firestore, Storage)
+- `src/lib/wikipedia.ts` - Wikipedia API for game search with relevance scoring
 - `src/lib/types.ts` - TypeScript interfaces for all data models
 - `src/lib/filters.ts` - Media filtering/sorting pure functions
 - `src/lib/stores/app.ts` - Central Svelte stores (auth, preferences, search)
@@ -55,7 +56,11 @@ Uses manual `window.history.pushState` - no router library. Routes are handled v
 - Derived stores for computed state (e.g., `currentPreferences` derives from `activeUser` + `userPreferences`)
 
 ### User Identity System
-Two identities ("Z" and "T") with independent preferences stored per-user in localStorage. Theme and accent color are per-identity.
+Two identities ("Z" and "T") with independent preferences stored per-user in localStorage and synced to Firestore for cross-device access. Per-identity settings include:
+- Theme (light/dark)
+- Accent color
+- Profile picture (stored in Firebase Storage)
+- Location preferences
 
 ### Filtering System
 Pure functions in `filters.ts`: `applyFilters()`, `applySort()` with composable utilities like `extractGenres()`, `extractDecades()`.
@@ -70,6 +75,8 @@ Pure functions in `filters.ts`: `applyFilters()`, `applySort()` with composable 
 **`/notes/{id}`** - Free-form notes with tags
 
 **`/places/{id}`** - Location tracking with categories and visit history
+
+**`/preferences`** - Cross-device user preferences sync (single document with Z/T preferences)
 
 ## Testing
 
@@ -95,6 +102,7 @@ The app is a Progressive Web App with:
 - Offline caching via Workbox service worker
 - App icons generated from `public/favicon.svg`
 - Runtime caching for TMDB API and images
+- In-app update mechanism via Settings page (clears service worker cache)
 
 ### PWA Commands
 ```bash
@@ -105,3 +113,14 @@ bun run generate-pwa-assets  # Generate icons from favicon.svg
 - `vite.config.ts` - VitePWA plugin configuration
 - `pwa-assets.config.ts` - Icon generation settings
 - `public/favicon.svg` - Source icon (gradient purple/pink with "Us" text)
+
+## Routes
+
+| Path | Component | Description |
+|------|-----------|-------------|
+| `/` | Home | Dashboard with recent activity |
+| `/notes` | Notes | Free-form notes with tags |
+| `/media` | Media | Movies, TV shows, games tracker |
+| `/places` | Places | Location/venue tracking |
+| `/settings` | Settings | Profile, theme, PWA updates |
+| `/debug` | Debug | Development tools |
