@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tmdbConfig } from '$lib/config'
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
-  import { activeUser, displayNames } from '$lib/stores/app'
+  import { activeUser, displayNames, mediaGridSize, type GridSize } from '$lib/stores/app'
   import type { Media, MediaStatus, MediaType, TMDBSearchResult, UserId, ProductionCompany, MediaCollection } from '$lib/types'
   import { toast } from 'svelte-sonner'
   import { getDisplayRating } from '$lib/types'
@@ -375,13 +375,34 @@
   let gridContainer = $state<HTMLElement | null>(null);
   let containerWidth = $state(0);
 
-  // Calculate columns based on container width (matching Tailwind breakpoints)
+  // Grid size configurations: [mobile, sm, md, lg]
+  const gridConfigs: Record<GridSize, [number, number, number, number]> = {
+    small: [3, 4, 5, 6],   // Compact, matches discovery
+    medium: [2, 3, 4, 5],  // Default
+    large: [1, 2, 3, 4],   // Large cards
+  };
+
+  // Calculate columns based on container width and grid size preference
   let columns = $derived.by(() => {
-    if (containerWidth >= 1024) return 5; // lg
-    if (containerWidth >= 768) return 4;  // md
-    if (containerWidth >= 640) return 3;  // sm
-    return 2; // default
+    const config = gridConfigs[$mediaGridSize];
+    if (containerWidth >= 1024) return config[3]; // lg
+    if (containerWidth >= 768) return config[2];  // md
+    if (containerWidth >= 640) return config[1];  // sm
+    return config[0]; // mobile
   });
+
+  function cycleGridSize() {
+    const sizes: GridSize[] = ['small', 'medium', 'large'];
+    const currentIndex = sizes.indexOf($mediaGridSize);
+    const nextIndex = (currentIndex + 1) % sizes.length;
+    $mediaGridSize = sizes[nextIndex];
+  }
+
+  const gridSizeIcons: Record<GridSize, string> = {
+    small: '▪▪▪',
+    medium: '◼◼',
+    large: '⬛',
+  };
 
   // Group media items into rows for virtual scrolling
   type MediaRow = { id: string; items: Media[] };
@@ -420,19 +441,34 @@
   <!-- Header -->
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold">Media</h1>
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-1">
+      <!-- Grid size toggle -->
       <button
         type="button"
-        class="relative p-2 rounded-lg transition-colors touch-manipulation {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700'}"
-        onclick={() => showFilters = !showFilters}
+        class="p-2.5 rounded-lg bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700 transition-colors text-xs font-mono"
+        onclick={cycleGridSize}
+        aria-label="Change grid size: {$mediaGridSize}"
+        title="Grid: {$mediaGridSize}"
+      >
+        {gridSizeIcons[$mediaGridSize]}
+      </button>
+
+      <!-- Filter toggle -->
+      <button
+        type="button"
+        class="relative p-2.5 rounded-lg transition-colors {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700'}"
+        onclick={() => { showFilters = !showFilters; }}
+        onpointerdown={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+        onpointerup={(e) => { e.currentTarget.style.opacity = '1'; }}
+        onpointerleave={(e) => { e.currentTarget.style.opacity = '1'; }}
         aria-label="Filters & Sort"
         aria-expanded={showFilters}
       >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
         </svg>
         {#if activeFilterCount > 0}
-          <span class="absolute -top-1 -right-1 w-4 h-4 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+          <span class="absolute -top-1 -right-1 w-4 h-4 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center pointer-events-none">
             {activeFilterCount}
           </span>
         {/if}
@@ -722,9 +758,10 @@
         {/if}
       </div>
     {:else}
+      {@const rowHeight = $mediaGridSize === 'large' ? 420 : $mediaGridSize === 'small' ? 240 : 320}
       <SvelteVirtualList
         items={mediaRows}
-        defaultEstimatedItemHeight={320}
+        defaultEstimatedItemHeight={rowHeight}
         viewportClass="virtual-grid-viewport"
         contentClass="virtual-grid-content"
       >

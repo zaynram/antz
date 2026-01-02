@@ -70,6 +70,10 @@ export const authLoading = writable<boolean>(true);
 const MAX_SEARCH_HISTORY = 5;
 export const mediaSearchHistory = createPersistedStore<string[]>('mediaSearchHistory', []);
 
+// Media grid size preference
+export type GridSize = 'small' | 'medium' | 'large';
+export const mediaGridSize = createPersistedStore<GridSize>('mediaGridSize', 'medium');
+
 export function addToSearchHistory(query: string): void {
   mediaSearchHistory.update(history => {
     const trimmedQuery = query.trim();
