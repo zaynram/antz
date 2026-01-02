@@ -446,7 +446,6 @@
       <button
         type="button"
         class="min-w-[44px] min-h-[44px] p-2.5 rounded-lg bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700 transition-colors text-xs font-mono select-none cursor-pointer"
-        style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
         onclick={cycleGridSize}
         aria-label="Change grid size: {$mediaGridSize}"
       >
@@ -457,7 +456,6 @@
       <button
         type="button"
         class="relative min-w-[44px] min-h-[44px] p-2.5 rounded-lg transition-colors select-none cursor-pointer {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700'}"
-        style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
         onclick={() => { showFilters = !showFilters; }}
         aria-label="Filters & Sort"
         aria-expanded={showFilters}
@@ -883,11 +881,9 @@
   :global(.virtual-grid-viewport) {
     height: calc(100vh - 280px);
     min-height: 400px;
-  }
-
-  /* Ensure touch-manipulation works for faster touch response */
-  .touch-manipulation {
-    touch-action: manipulation;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   /* On touch devices, show hover elements when the article is focused/active */

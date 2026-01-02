@@ -24,17 +24,12 @@
     <style>
       html, body {
         -webkit-touch-callout: none;
-        overscroll-behavior: none;
+        overscroll-behavior-y: contain;
       }
       /* Allow text selection in inputs and textareas */
       input, textarea, [contenteditable="true"] {
         -webkit-user-select: text;
         user-select: text;
-      }
-      /* Ensure buttons are always tappable */
-      button, a, [role="button"] {
-        cursor: pointer;
-        touch-action: manipulation;
       }
     </style>
   </head>
