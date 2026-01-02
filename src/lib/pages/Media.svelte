@@ -754,11 +754,14 @@
 
 <!-- Custom Group Management Modal -->
 {#if showCustomGroupModal}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
     onclick={(e) => e.target === e.currentTarget && (showCustomGroupModal = false)}
+    onkeydown={(e) => e.key === 'Escape' && (showCustomGroupModal = false)}
     role="dialog"
     aria-modal="true"
+    tabindex="-1"
   >
     <div class="bg-surface rounded-xl max-w-md w-full shadow-2xl">
       <div class="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
@@ -837,11 +840,14 @@
 
 <!-- Add Game Modal -->
 {#if showAddGameModal}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
     onclick={(e) => e.target === e.currentTarget && closeAddGameModal()}
+    onkeydown={(e) => e.key === 'Escape' && closeAddGameModal()}
     role="dialog"
     aria-modal="true"
+    tabindex="-1"
   >
     <div class="bg-surface rounded-xl max-w-md w-full shadow-2xl">
       <div class="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">

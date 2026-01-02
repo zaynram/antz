@@ -98,12 +98,17 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if open}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
     onclick={handleBackdropClick}
+    onkeydown={handleKeydown}
     role="dialog"
     aria-modal="true"
+    tabindex="-1"
   >
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="bg-surface rounded-xl max-w-md w-full shadow-2xl max-h-[90vh] flex flex-col" onclick={handleModalClick}>
       <div class="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
         <h2 class="text-lg font-semibold">Preferences for {$activeUser}</h2>
@@ -162,7 +167,8 @@
                 class:ring-offset-2={localAccentColor === color}
                 class:ring-slate-400={localAccentColor === color}
                 onclick={() => localAccentColor = color}
-              />
+                aria-label="Select {color}"
+              ></button>
             {/each}
           </div>
           <div class="flex items-center gap-3">

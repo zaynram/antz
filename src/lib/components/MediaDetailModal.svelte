@@ -133,11 +133,14 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if media}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
     onclick={handleBackdropClick}
+    onkeydown={handleKeydown}
     role="dialog"
     aria-modal="true"
+    tabindex="-1"
   >
     <div class="bg-surface rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
       <!-- Header with poster -->
