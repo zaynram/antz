@@ -88,3 +88,20 @@ Pure functions in `filters.ts`: `applyFilters()`, `applySort()` with composable 
 - Production deploys automatically on push to `main` (uses Bun)
 - PR preview deployments via Firebase preview channels (uses npm)
 - Required secret: `FIREBASE_SERVICE_ACCOUNT_ANTZ_ANTZ`
+
+## PWA Support
+
+The app is a Progressive Web App with:
+- Offline caching via Workbox service worker
+- App icons generated from `public/favicon.svg`
+- Runtime caching for TMDB API and images
+
+### PWA Commands
+```bash
+bun run generate-pwa-assets  # Generate icons from favicon.svg
+```
+
+### PWA Configuration
+- `vite.config.ts` - VitePWA plugin configuration
+- `pwa-assets.config.ts` - Icon generation settings
+- `public/favicon.svg` - Source icon (gradient purple/pink with "Us" text)

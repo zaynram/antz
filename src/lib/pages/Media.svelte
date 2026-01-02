@@ -445,10 +445,10 @@
       <!-- Grid size toggle -->
       <button
         type="button"
-        class="p-2.5 rounded-lg bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700 transition-colors text-xs font-mono"
+        class="min-w-[44px] min-h-[44px] p-2.5 rounded-lg bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700 transition-colors text-xs font-mono select-none cursor-pointer"
+        style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
         onclick={cycleGridSize}
         aria-label="Change grid size: {$mediaGridSize}"
-        title="Grid: {$mediaGridSize}"
       >
         {gridSizeIcons[$mediaGridSize]}
       </button>
@@ -456,19 +456,17 @@
       <!-- Filter toggle -->
       <button
         type="button"
-        class="relative p-2.5 rounded-lg transition-colors {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700'}"
+        class="relative min-w-[44px] min-h-[44px] p-2.5 rounded-lg transition-colors select-none cursor-pointer {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700'}"
+        style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;"
         onclick={() => { showFilters = !showFilters; }}
-        onpointerdown={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-        onpointerup={(e) => { e.currentTarget.style.opacity = '1'; }}
-        onpointerleave={(e) => { e.currentTarget.style.opacity = '1'; }}
         aria-label="Filters & Sort"
         aria-expanded={showFilters}
       >
-        <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
         </svg>
         {#if activeFilterCount > 0}
-          <span class="absolute -top-1 -right-1 w-4 h-4 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center pointer-events-none">
+          <span class="absolute -top-1 -right-1 w-4 h-4 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center" aria-hidden="true">
             {activeFilterCount}
           </span>
         {/if}

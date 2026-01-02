@@ -11,9 +11,12 @@
         "deploy": "bun run build && firebase deploy",
         "test": "vitest",
         "test:ui": "vitest --ui",
-        "test:run": "vitest run"
+        "test:run": "vitest run",
+        "generate-pwa-assets": "pwa-assets-generator"
     },
     "devDependencies": {
+        "@vite-pwa/assets-generator": "^1.0.6",
+        "vite-plugin-pwa": "^1.0.0",
         "@sveltejs/vite-plugin-svelte": "^6.2.1",
         "@testing-library/jest-dom": "^6.9.1",
         "@testing-library/svelte": "^5.3.1",
