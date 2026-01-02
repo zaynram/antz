@@ -233,11 +233,11 @@
   <div class="flex flex-col gap-3">
     {#each filteredPlaces as place (place.id)}
       {@const distance = getDistanceFromReference(place)}
+      {@const Icon = categoryIcons[place.category]}
       <article
         class="flex items-start gap-4 p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl transition-opacity"
         class:opacity-70={place.visited}
       >
-        {@const Icon = categoryIcons[place.category]}
         <span class="shrink-0 text-accent"><Icon size={24} /></span>
         <div class="flex-1 min-w-0">
           <h3 class="font-medium" class:line-through={place.visited}>{place.name}</h3>
