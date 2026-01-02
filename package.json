@@ -15,7 +15,7 @@
         "generate-pwa-assets": "pwa-assets-generator"
     },
     "devDependencies": {
-        "@vite-pwa/assets-generator": "^1.0.6",
+        "@vite-pwa/assets-generator": "^1.0.2",
         "vite-plugin-pwa": "^1.0.0",
         "@sveltejs/vite-plugin-svelte": "^6.2.1",
         "@testing-library/jest-dom": "^6.9.1",
