@@ -197,7 +197,7 @@
     }
   }
 
-  function startLongPress(e: Event): void {
+  function startLongPress(): void {
     longPressTriggered = false;
     longPressTimer = setTimeout(() => {
       longPressTriggered = true;
