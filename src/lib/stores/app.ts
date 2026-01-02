@@ -1,6 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import type { User } from 'firebase/auth';
 import type { UserId, UserPreferences, UserPreferencesMap } from '../types';
+import { loadPreferencesFromFirestore, savePreferencesToFirestore, subscribeToPreferences } from '../firebase';
 
 const DEFAULT_PREFERENCES: UserPreferencesMap = {
   Z: {
@@ -37,6 +38,77 @@ export const userPreferences = createPersistedStore<UserPreferencesMap>(
   'userPreferences',
   DEFAULT_PREFERENCES
 );
+
+// Firestore sync for preferences
+let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let isRemoteUpdate = false;
+let unsubscribeFirestore: (() => void) | null = null;
+
+// Debounced save to Firestore
+function debouncedSaveToFirestore(prefs: UserPreferencesMap): void {
+  if (isRemoteUpdate) return; // Don't save if this was a remote update
+
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(() => {
+    savePreferencesToFirestore(prefs).catch(err => {
+      console.warn('Failed to sync preferences to Firestore:', err);
+    });
+  }, 1000); // 1 second debounce
+}
+
+// Initialize Firestore sync (call after auth)
+export async function initPreferencesSync(): Promise<void> {
+  // Load initial preferences from Firestore
+  try {
+    const remotePrefs = await loadPreferencesFromFirestore();
+    if (remotePrefs) {
+      // Merge with local - remote wins for each user's prefs
+      const localPrefs = get(userPreferences);
+      const merged: UserPreferencesMap = {
+        Z: { ...DEFAULT_PREFERENCES.Z, ...localPrefs.Z, ...remotePrefs.Z },
+        T: { ...DEFAULT_PREFERENCES.T, ...localPrefs.T, ...remotePrefs.T }
+      };
+      isRemoteUpdate = true;
+      userPreferences.set(merged);
+      isRemoteUpdate = false;
+    } else {
+      // No remote prefs yet, push local to Firestore
+      const localPrefs = get(userPreferences);
+      await savePreferencesToFirestore(localPrefs);
+    }
+  } catch (err) {
+    console.warn('Failed to load preferences from Firestore:', err);
+  }
+
+  // Subscribe to remote changes
+  unsubscribeFirestore = subscribeToPreferences((remotePrefs) => {
+    const localPrefs = get(userPreferences);
+    // Only update if different (avoid loops)
+    if (JSON.stringify(remotePrefs) !== JSON.stringify(localPrefs)) {
+      isRemoteUpdate = true;
+      userPreferences.set({
+        Z: { ...DEFAULT_PREFERENCES.Z, ...remotePrefs.Z },
+        T: { ...DEFAULT_PREFERENCES.T, ...remotePrefs.T }
+      });
+      isRemoteUpdate = false;
+    }
+  });
+
+  // Subscribe to local changes and sync to Firestore
+  userPreferences.subscribe(debouncedSaveToFirestore);
+}
+
+// Cleanup sync subscription
+export function cleanupPreferencesSync(): void {
+  if (unsubscribeFirestore) {
+    unsubscribeFirestore();
+    unsubscribeFirestore = null;
+  }
+  if (syncDebounceTimer) {
+    clearTimeout(syncDebounceTimer);
+    syncDebounceTimer = null;
+  }
+}
 
 export const currentPreferences = derived<
   [typeof activeUser, typeof userPreferences],

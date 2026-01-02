@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onAuthChange } from '$lib/firebase'
-  import { authLoading, authUser, currentPreferences } from '$lib/stores/app'
+  import { authLoading, authUser, currentPreferences, initPreferencesSync, cleanupPreferencesSync } from '$lib/stores/app'
   import { onMount } from 'svelte'
   import { Toaster } from 'svelte-sonner'
+  import { Home as HomeIcon, StickyNote, Film, MapPin, SearchX } from 'lucide-svelte'
 
   import UserToggle from '$lib/components/UserToggle.svelte'
   import Home from '$lib/pages/Home.svelte'
@@ -18,6 +19,14 @@
     const unsubscribe = onAuthChange((user) => {
       authUser.set(user);
       authLoading.set(false);
+
+      if (user) {
+        // Initialize preference sync when authenticated
+        initPreferencesSync();
+      } else {
+        // Cleanup sync on logout
+        cleanupPreferencesSync();
+      }
     });
 
     const handlePopState = () => {
@@ -27,6 +36,7 @@
 
     return () => {
       unsubscribe();
+      cleanupPreferencesSync();
       window.removeEventListener('popstate', handlePopState);
     };
   });
@@ -67,44 +77,48 @@
 {:else if !$authUser}
   <Login />
 {:else}
-  <div class="min-h-screen flex flex-col">
+  <div class="h-full flex flex-col overflow-hidden">
     <header
-      class="flex items-center justify-between px-6 py-4 bg-surface border-b border-slate-200 dark:border-slate-700"
+      class="flex items-center justify-between px-6 py-4 bg-surface border-b border-slate-200 dark:border-slate-700 shrink-0"
     >
-      <nav class="flex gap-6">
+      <nav class="flex gap-4 sm:gap-6">
         <button
           onclick={() => navigate('/')}
-          class="text-slate-500 dark:text-slate-400 font-medium hover:text-accent transition-colors"
+          class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium hover:text-accent transition-colors"
           class:text-accent={currentPath === '/'}
         >
-          Home
+          <HomeIcon size={18} />
+          <span class="hidden sm:inline">Home</span>
         </button>
         <button
           onclick={() => navigate('/notes')}
-          class="text-slate-500 dark:text-slate-400 font-medium hover:text-accent transition-colors"
+          class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium hover:text-accent transition-colors"
           class:text-accent={currentPath === '/notes'}
         >
-          Notes
+          <StickyNote size={18} />
+          <span class="hidden sm:inline">Notes</span>
         </button>
         <button
           onclick={() => navigate('/media')}
-          class="text-slate-500 dark:text-slate-400 font-medium hover:text-accent transition-colors"
+          class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium hover:text-accent transition-colors"
           class:text-accent={currentPath === '/media'}
         >
-          Media
+          <Film size={18} />
+          <span class="hidden sm:inline">Media</span>
         </button>
         <button
           onclick={() => navigate('/places')}
-          class="text-slate-500 dark:text-slate-400 font-medium hover:text-accent transition-colors"
+          class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium hover:text-accent transition-colors"
           class:text-accent={currentPath === '/places'}
         >
-          Places
+          <MapPin size={18} />
+          <span class="hidden sm:inline">Places</span>
         </button>
       </nav>
       <UserToggle />
     </header>
 
-    <main class="flex-1 p-6 max-w-5xl mx-auto w-full">
+    <main class="flex-1 overflow-y-auto overflow-x-hidden p-6 max-w-5xl mx-auto w-full">
       {#if currentPath === '/'}
         <Home {navigate} />
       {:else if currentPath === '/notes'}
@@ -118,7 +132,9 @@
       {:else}
         <!-- 404 Not Found -->
         <div class="text-center py-16">
-          <div class="text-6xl mb-4">🔍</div>
+          <div class="text-slate-300 dark:text-slate-600 mb-4 flex justify-center">
+            <SearchX size={80} />
+          </div>
           <h1 class="text-2xl font-bold mb-2">Page not found</h1>
           <p class="text-slate-500 dark:text-slate-400 mb-6">The page you're looking for doesn't exist.</p>
           <button

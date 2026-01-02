@@ -17,4 +17,14 @@
   body {
     @apply bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
   }
+
+  /* Ensure smooth scrolling on all scroll containers */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent pull-to-refresh in PWA */
+  html {
+    overscroll-behavior-y: contain;
+  }
 }

@@ -24,7 +24,20 @@
     <style>
       html, body {
         -webkit-touch-callout: none;
-        overscroll-behavior-y: contain;
+        height: 100%;
+        /* Use dvh for PWA - falls back to vh */
+        height: 100dvh;
+      }
+      body {
+        overflow: hidden;
+        position: fixed;
+        width: 100%;
+      }
+      #app {
+        height: 100%;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
       }
       /* Allow text selection in inputs and textareas */
       input, textarea, [contenteditable="true"] {

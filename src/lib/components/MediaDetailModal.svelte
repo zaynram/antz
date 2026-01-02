@@ -5,6 +5,7 @@
   import type { Media, MediaComment, MediaStatus, UserId } from '$lib/types'
   import { getUserRating, getAverageRating } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
+  import { Film, Tv, Gamepad2 } from 'lucide-svelte'
 
   interface Props {
     media: Media | null;
@@ -154,8 +155,14 @@
           />
           <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent rounded-t-xl"></div>
         {:else}
-          <div class="w-full h-32 bg-surface-2 rounded-t-xl flex items-center justify-center text-6xl">
-            {media.type === 'game' ? '🎮' : media.type === 'tv' ? '📺' : '🎬'}
+          <div class="w-full h-32 bg-surface-2 rounded-t-xl flex items-center justify-center text-slate-300">
+            {#if media.type === 'game'}
+              <Gamepad2 size={64} />
+            {:else if media.type === 'tv'}
+              <Tv size={64} />
+            {:else}
+              <Film size={64} />
+            {/if}
           </div>
         {/if}
         

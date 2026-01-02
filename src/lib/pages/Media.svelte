@@ -25,6 +25,7 @@
   import { onMount } from 'svelte'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
   import SvelteVirtualList from '@humanspeak/svelte-virtual-list'
+  import { Library, Film, Tv, Gamepad2, FolderOpen } from 'lucide-svelte'
 
   // Core state
   let media = $state<Media[]>([]);
@@ -48,11 +49,11 @@
   let searchAbortController: AbortController | null = null;
   const DEBOUNCE_MS = 300;
 
-  const tabs: Array<{ key: MediaType | 'all'; label: string; icon: string }> = [
-    { key: 'all', label: 'All', icon: '📚' },
-    { key: 'movie', label: 'Movies', icon: '🎬' },
-    { key: 'tv', label: 'TV', icon: '📺' },
-    { key: 'game', label: 'Games', icon: '🎮' },
+  const tabs: Array<{ key: MediaType | 'all'; label: string }> = [
+    { key: 'all', label: 'All' },
+    { key: 'movie', label: 'Movies' },
+    { key: 'tv', label: 'TV' },
+    { key: 'game', label: 'Games' },
   ];
 
   const statusOptions: Array<{ key: MediaStatus | 'all'; label: string }> = [
@@ -506,7 +507,15 @@
         class="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all {filters.type === tab.key ? 'bg-surface shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}"
         onclick={() => setTab(tab.key)}
       >
-        <span>{tab.icon}</span>
+        {#if tab.key === 'all'}
+          <Library size={18} />
+        {:else if tab.key === 'movie'}
+          <Film size={18} />
+        {:else if tab.key === 'tv'}
+          <Tv size={18} />
+        {:else if tab.key === 'game'}
+          <Gamepad2 size={18} />
+        {/if}
         <span class="hidden sm:inline">{tab.label}</span>
       </button>
     {/each}
@@ -676,7 +685,9 @@
                 {#if game.thumbnail}
                   <img src={game.thumbnail} alt={game.title} loading="lazy" class="w-full h-full object-cover" />
                 {:else}
-                  <div class="w-full h-full flex items-center justify-center text-3xl text-slate-300">🎮</div>
+                  <div class="w-full h-full flex items-center justify-center text-slate-300">
+                    <Gamepad2 size={48} />
+                  </div>
                 {/if}
               </div>
               <div class="p-2">
@@ -738,7 +749,17 @@
 
     {#if filteredMedia.length === 0}
       <div class="text-center py-16">
-        <div class="text-5xl mb-4">{filters.type === 'game' ? '🎮' : filters.type === 'movie' ? '🎬' : filters.type === 'tv' ? '📺' : '📚'}</div>
+        <div class="text-slate-300 dark:text-slate-600 mb-4 flex justify-center">
+          {#if filters.type === 'game'}
+            <Gamepad2 size={64} />
+          {:else if filters.type === 'movie'}
+            <Film size={64} />
+          {:else if filters.type === 'tv'}
+            <Tv size={64} />
+          {:else}
+            <FolderOpen size={64} />
+          {/if}
+        </div>
         {#if isSearching || activeFilterCount > 0}
           <p class="text-slate-500 dark:text-slate-400">No matches found</p>
           <p class="text-sm text-slate-400 mt-1">
@@ -797,8 +818,14 @@
                         class:opacity-40={item.status === 'completed'}
                       />
                     {:else}
-                      <div class="w-full h-full flex items-center justify-center text-4xl text-slate-300">
-                        {item.type === 'game' ? '🎮' : item.type === 'tv' ? '📺' : '🎬'}
+                      <div class="w-full h-full flex items-center justify-center text-slate-300">
+                        {#if item.type === 'game'}
+                          <Gamepad2 size={48} />
+                        {:else if item.type === 'tv'}
+                          <Tv size={48} />
+                        {:else}
+                          <Film size={48} />
+                        {/if}
                       </div>
                     {/if}
                     {#if item.status === 'completed'}
@@ -879,11 +906,24 @@
 
 <style>
   :global(.virtual-grid-viewport) {
-    height: calc(100vh - 280px);
-    min-height: 400px;
+    /* Use flex-based height from parent - works better with PWA */
+    height: calc(100dvh - 220px);
+    min-height: 300px;
+    max-height: calc(100dvh - 180px);
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    /* Ensure touch scrolling works */
+    touch-action: pan-y;
+  }
+
+  /* Fallback for browsers without dvh support */
+  @supports not (height: 100dvh) {
+    :global(.virtual-grid-viewport) {
+      height: calc(100vh - 220px);
+      max-height: calc(100vh - 180px);
+    }
   }
 
   /* On touch devices, show hover elements when the article is focused/active */

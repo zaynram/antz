@@ -16,6 +16,7 @@ export interface UserPreferences {
     theme: Theme
     accentColor: string
     name: string
+    profilePicture?: string // URL to profile picture in Firebase Storage
     // Location settings
     locationMode: LocationMode
     currentLocation?: GeoLocation // Auto-detected or manually set

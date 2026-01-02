@@ -1,7 +1,10 @@
 <script lang="ts">
   import { activeUser, userPreferences, currentPreferences } from '$lib/stores/app'
+  import { uploadProfilePicture, deleteProfilePicture } from '$lib/firebase'
   import type { Theme, LocationMode, GeoLocation } from '$lib/types'
   import LocationPicker from './LocationPicker.svelte'
+  import { Sun, Moon, MapPin, Camera, X, Loader2 } from 'lucide-svelte'
+  import { toast } from 'svelte-sonner'
 
   interface Props {
     open: boolean;
@@ -13,6 +16,9 @@
   let localTheme = $state<Theme>('dark');
   let localAccentColor = $state('#6366f1');
   let localName = $state('');
+  let localProfilePicture = $state<string | undefined>(undefined);
+  let uploadingPicture = $state(false);
+  let fileInput = $state<HTMLInputElement | null>(null);
   // Location settings
   let localLocationMode = $state<LocationMode>('off');
   let localCurrentLocation = $state<GeoLocation | undefined>(undefined);
@@ -47,20 +53,64 @@
     // Only sync local state when modal opens or user switches
     const justOpened = open && !previousOpen;
     const userSwitched = open && $activeUser !== previousUser;
-    
+
     if ((justOpened || userSwitched) && $currentPreferences) {
       localTheme = $currentPreferences.theme;
       localAccentColor = $currentPreferences.accentColor;
       localName = $currentPreferences.name;
+      localProfilePicture = $currentPreferences.profilePicture;
       localLocationMode = $currentPreferences.locationMode;
       localCurrentLocation = $currentPreferences.currentLocation;
       localReferenceLocation = $currentPreferences.referenceLocation;
       localSearchRadius = $currentPreferences.searchRadius;
     }
-    
+
     previousOpen = open;
     previousUser = $activeUser;
   });
+
+  async function handleFileSelect(e: Event): Promise<void> {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    // Validate file type and size
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    uploadingPicture = true;
+    try {
+      const url = await uploadProfilePicture($activeUser, file);
+      localProfilePicture = url;
+      toast.success('Profile picture uploaded');
+    } catch (err) {
+      console.error('Upload failed:', err);
+      toast.error('Failed to upload picture');
+    } finally {
+      uploadingPicture = false;
+      input.value = '';
+    }
+  }
+
+  async function removePicture(): Promise<void> {
+    uploadingPicture = true;
+    try {
+      await deleteProfilePicture($activeUser);
+      localProfilePicture = undefined;
+      toast.success('Profile picture removed');
+    } catch (err) {
+      console.error('Delete failed:', err);
+      toast.error('Failed to remove picture');
+    } finally {
+      uploadingPicture = false;
+    }
+  }
 
   function savePreferences(): void {
     userPreferences.update(prefs => ({
@@ -69,6 +119,7 @@
         theme: localTheme,
         accentColor: localAccentColor,
         name: localName,
+        profilePicture: localProfilePicture,
         locationMode: localLocationMode,
         currentLocation: localCurrentLocation,
         referenceLocation: localReferenceLocation,
@@ -121,6 +172,61 @@
       </div>
       
       <div class="p-4 space-y-5 overflow-y-auto flex-1">
+        <!-- Profile Picture -->
+        <div>
+          <label class="block text-sm font-medium mb-2">Profile Picture</label>
+          <div class="flex items-center gap-4">
+            <div class="relative">
+              {#if localProfilePicture}
+                <img
+                  src={localProfilePicture}
+                  alt="Profile"
+                  class="w-16 h-16 rounded-full object-cover"
+                />
+                <button
+                  type="button"
+                  class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                  onclick={removePicture}
+                  disabled={uploadingPicture}
+                >
+                  <X size={12} />
+                </button>
+              {:else}
+                <div
+                  class="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-semibold"
+                  style:background-color={localAccentColor}
+                >
+                  {$activeUser}
+                </div>
+              {/if}
+              {#if uploadingPicture}
+                <div class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                  <Loader2 size={20} class="text-white animate-spin" />
+                </div>
+              {/if}
+            </div>
+            <div class="flex-1">
+              <input
+                type="file"
+                accept="image/*"
+                class="hidden"
+                bind:this={fileInput}
+                onchange={handleFileSelect}
+              />
+              <button
+                type="button"
+                class="flex items-center gap-2 px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
+                onclick={() => fileInput?.click()}
+                disabled={uploadingPicture}
+              >
+                <Camera size={16} />
+                {localProfilePicture ? 'Change' : 'Upload'} Photo
+              </button>
+              <p class="text-xs text-slate-400 mt-1">Max 5MB, JPG/PNG</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Display Name -->
         <div>
           <label class="block text-sm font-medium mb-2">Display Name</label>
@@ -131,7 +237,7 @@
             placeholder="Your name"
           />
         </div>
-        
+
         <!-- Theme -->
         <div>
           <label class="block text-sm font-medium mb-2">Theme</label>
@@ -140,14 +246,14 @@
               class="flex-1 py-3 px-4 rounded-lg border-2 transition-all flex items-center justify-center gap-2 {localTheme === 'light' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
               onclick={() => localTheme = 'light'}
             >
-              <span class="text-xl">☀️</span>
+              <Sun size={20} />
               <span>Light</span>
             </button>
             <button
               class="flex-1 py-3 px-4 rounded-lg border-2 transition-all flex items-center justify-center gap-2 {localTheme === 'dark' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
               onclick={() => localTheme = 'dark'}
             >
-              <span class="text-xl">🌙</span>
+              <Moon size={20} />
               <span>Dark</span>
             </button>
           </div>
@@ -189,7 +295,10 @@
         
         <!-- Location Settings -->
         <div class="pt-2 border-t border-slate-200 dark:border-slate-700">
-          <label class="block text-sm font-medium mb-3">📍 Location Settings</label>
+          <label class="flex items-center gap-2 text-sm font-medium mb-3">
+            <MapPin size={16} />
+            Location Settings
+          </label>
           
           <!-- Location Mode -->
           <div class="mb-4">
@@ -272,12 +381,20 @@
         <div class="p-3 rounded-lg border border-slate-200 dark:border-slate-700">
           <label class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Preview</label>
           <div class="flex items-center gap-3">
-            <div
-              class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
-              style:background-color={localAccentColor}
-            >
-              {$activeUser}
-            </div>
+            {#if localProfilePicture}
+              <img
+                src={localProfilePicture}
+                alt="Profile"
+                class="w-8 h-8 rounded-full object-cover"
+              />
+            {:else}
+              <div
+                class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+                style:background-color={localAccentColor}
+              >
+                {$activeUser}
+              </div>
+            {/if}
             <span class="font-medium">{localName || $activeUser}</span>
             <button
               class="ml-auto px-3 py-1 rounded text-white text-sm"

@@ -1,18 +1,23 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { activeUser, currentPreferences } from '$lib/stores/app';
+  import { activeUser, currentPreferences, userPreferences } from '$lib/stores/app';
   import PreferencesModal from './PreferencesModal.svelte';
+  import { Settings } from 'lucide-svelte';
 
   let transitioning = $state(false);
   let transitionDirection = $state<'left' | 'right'>('right');
   let showPreferences = $state(false);
 
+  // Get preferences for both users
+  let zPrefs = $derived($userPreferences.Z);
+  let tPrefs = $derived($userPreferences.T);
+
   function setUser(user: 'Z' | 'T'): void {
     if ($activeUser === user) return;
-    
+
     transitionDirection = user === 'T' ? 'right' : 'left';
     transitioning = true;
-    
+
     setTimeout(() => {
       activeUser.set(user);
       setTimeout(() => {
@@ -41,32 +46,41 @@
     onclick={() => showPreferences = true}
     title="Preferences"
   >
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-      <circle cx="12" cy="12" r="3"/>
-    </svg>
+<Settings size={18} />
   </button>
   
   <div class="flex gap-1 p-1 rounded-full bg-surface-2" title="Ctrl+U to toggle">
     <button
       onclick={() => setUser('Z')}
-      class="w-8 h-8 rounded-full text-sm font-semibold transition-all duration-150 ease-out"
-      style:background-color={$activeUser === 'Z' ? $currentPreferences.accentColor : 'transparent'}
+      class="w-8 h-8 rounded-full text-sm font-semibold transition-all duration-150 ease-out overflow-hidden flex items-center justify-center"
+      style:background-color={$activeUser === 'Z' && !zPrefs?.profilePicture ? zPrefs?.accentColor : 'transparent'}
       style:transform={transitioning && transitionDirection === 'left' ? 'translateX(4px)' : 'translateX(0)'}
-      class:text-white={$activeUser === 'Z'}
+      class:text-white={$activeUser === 'Z' && !zPrefs?.profilePicture}
       class:text-slate-400={$activeUser !== 'Z'}
+      class:ring-2={$activeUser === 'Z'}
+      style:--tw-ring-color={zPrefs?.accentColor}
     >
-      Z
+      {#if zPrefs?.profilePicture}
+        <img src={zPrefs.profilePicture} alt="Z" class="w-full h-full object-cover" />
+      {:else}
+        Z
+      {/if}
     </button>
     <button
       onclick={() => setUser('T')}
-      class="w-8 h-8 rounded-full text-sm font-semibold transition-all duration-150 ease-out"
-      style:background-color={$activeUser === 'T' ? $currentPreferences.accentColor : 'transparent'}
+      class="w-8 h-8 rounded-full text-sm font-semibold transition-all duration-150 ease-out overflow-hidden flex items-center justify-center"
+      style:background-color={$activeUser === 'T' && !tPrefs?.profilePicture ? tPrefs?.accentColor : 'transparent'}
       style:transform={transitioning && transitionDirection === 'right' ? 'translateX(-4px)' : 'translateX(0)'}
-      class:text-white={$activeUser === 'T'}
+      class:text-white={$activeUser === 'T' && !tPrefs?.profilePicture}
       class:text-slate-400={$activeUser !== 'T'}
+      class:ring-2={$activeUser === 'T'}
+      style:--tw-ring-color={tPrefs?.accentColor}
     >
-      T
+      {#if tPrefs?.profilePicture}
+        <img src={tPrefs.profilePicture} alt="T" class="w-full h-full object-cover" />
+      {:else}
+        T
+      {/if}
     </button>
   </div>
 </div>
