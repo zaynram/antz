@@ -13,7 +13,6 @@
     applySort,
     extractGenres,
     extractDecades,
-    hasActiveFilters,
     countActiveFilters,
     formatDecade,
     getSortLabel,
@@ -150,7 +149,7 @@
     }
   }
 
-  async function searchWikipedia(query: string, signal?: AbortSignal): Promise<void> {
+  async function searchWikipedia(query: string, _signal?: AbortSignal): Promise<void> {
     searching = true;
     try {
       gameResults = await searchGames(query);

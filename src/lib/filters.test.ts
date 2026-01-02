@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { Media, MediaStatus, UserId } from './types'
+import type { Media } from './types'
 import type { Timestamp } from 'firebase/firestore'
 import {
     applyFilters,

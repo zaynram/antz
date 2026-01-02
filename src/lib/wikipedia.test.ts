@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { searchGames, type WikiGameResult } from './wikipedia';
+import { searchGames } from './wikipedia';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
