@@ -16,9 +16,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build project
+      - name: Setup bun
       - uses: oven-sh/setup-bun@v2
-      - run: bun i && bun build
+      
+      - name: Install dependencies
+      - run: bun install
+      
+      - name: Build project
+      - run: bun build
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
