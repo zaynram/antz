@@ -422,9 +422,11 @@
     <h1 class="text-2xl font-bold">Media</h1>
     <div class="flex items-center gap-2">
       <button
-        class="relative p-2 rounded-lg transition-colors {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}"
+        type="button"
+        class="relative p-2 rounded-lg transition-colors touch-manipulation {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700'}"
         onclick={() => showFilters = !showFilters}
-        title="Filters & Sort"
+        aria-label="Filters & Sort"
+        aria-expanded={showFilters}
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -729,11 +731,13 @@
         {#snippet renderItem(row: MediaRow)}
           <div class="grid gap-4 pb-4" style="grid-template-columns: repeat({columns}, minmax(0, 1fr));">
             {#each row.items as item (item.id)}
-              <article class="group relative bg-surface border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden hover:shadow-lg transition-all">
-                <!-- Delete button -->
+              <article class="group relative bg-surface border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden hover:shadow-lg transition-all touch-manipulation">
+                <!-- Delete button (visible on hover/focus-within for touch) -->
                 <button
-                  class="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all"
+                  type="button"
+                  class="absolute top-2 right-2 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-red-500 active:bg-red-500 transition-all sm:w-7 sm:h-7"
                   onclick={(e) => { e.stopPropagation(); item.id && removeItem(item.id); }}
+                  aria-label="Remove {item.title}"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -809,11 +813,12 @@
                     {/each}
                   </div>
 
-                  <!-- Quick status buttons -->
-                  <div class="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <!-- Quick status buttons (visible on hover/focus-within for touch) -->
+                  <div class="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                     {#if item.status !== 'watching'}
                       <button
-                        class="flex-1 py-1 text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+                        type="button"
+                        class="flex-1 py-1.5 text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded hover:bg-amber-200 dark:hover:bg-amber-900/50 active:bg-amber-200 dark:active:bg-amber-900/50 transition-colors touch-manipulation"
                         onclick={() => quickStatusChange(item, 'watching')}
                       >
                         Start
@@ -821,7 +826,8 @@
                     {/if}
                     {#if item.status !== 'completed'}
                       <button
-                        class="flex-1 py-1 text-[10px] font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors"
+                        type="button"
+                        class="flex-1 py-1.5 text-[10px] font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded hover:bg-emerald-200 dark:hover:bg-emerald-900/50 active:bg-emerald-200 dark:active:bg-emerald-900/50 transition-colors touch-manipulation"
                         onclick={() => quickStatusChange(item, 'completed')}
                       >
                         Done
@@ -842,5 +848,18 @@
   :global(.virtual-grid-viewport) {
     height: calc(100vh - 280px);
     min-height: 400px;
+  }
+
+  /* Ensure touch-manipulation works for faster touch response */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  /* On touch devices, show hover elements when the article is focused/active */
+  @media (hover: none) {
+    .group:active .group-hover\:opacity-100,
+    .group:focus-within .group-hover\:opacity-100 {
+      opacity: 1;
+    }
   }
 </style>
