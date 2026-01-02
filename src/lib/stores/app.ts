@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import type { User } from 'firebase/auth';
 import type { UserId, UserPreferences, UserPreferencesMap } from '../types';
 
@@ -6,12 +6,16 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
   Z: {
     theme: 'dark',
     accentColor: '#6366f1',
-    name: 'Z'
+    name: 'Z',
+    locationMode: 'off',
+    searchRadius: 5000
   },
   T: {
     theme: 'light',
     accentColor: '#ec4899',
-    name: 'T'
+    name: 'T',
+    locationMode: 'off',
+    searchRadius: 5000
   }
 };
 
@@ -38,6 +42,26 @@ export const currentPreferences = derived<
   [typeof activeUser, typeof userPreferences],
   UserPreferences
 >([activeUser, userPreferences], ([$activeUser, $userPreferences]) => $userPreferences[$activeUser]);
+
+// Get display name for any user ID
+export function getDisplayName(userId: UserId): string {
+  const prefs = get(userPreferences);
+  return prefs[userId]?.name || userId;
+}
+
+// Reactive derived store for display names
+export const displayNames = derived(
+  userPreferences,
+  ($prefs) => ({
+    Z: $prefs.Z?.name || 'Z',
+    T: $prefs.T?.name || 'T'
+  })
+);
+
+// Get the other user's ID
+export function getOtherUserId(userId: UserId): UserId {
+  return userId === 'Z' ? 'T' : 'Z';
+}
 
 export const authUser = writable<User | null>(null);
 export const authLoading = writable<boolean>(true);

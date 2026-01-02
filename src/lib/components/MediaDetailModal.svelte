@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tmdbConfig } from '$lib/config'
   import { updateDocument } from '$lib/firebase'
-  import { activeUser } from '$lib/stores/app'
+  import { activeUser, displayNames } from '$lib/stores/app'
   import type { Media, MediaComment, MediaStatus, UserId } from '$lib/types'
   import { getUserRating, getAverageRating } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
@@ -49,6 +49,10 @@
       }
     }
   });
+
+  function getDisplayNameForUser(userId: UserId): string {
+    return $displayNames[userId];
+  }
 
   function posterUrl(path: string | null): string | null {
     if (!path) return null;
@@ -195,7 +199,7 @@
             
             <!-- User Z Rating -->
             <div class="mb-2">
-              <div class="text-xs text-slate-400 mb-0.5">Z's Rating</div>
+              <div class="text-xs text-slate-400 mb-0.5">{getDisplayNameForUser('Z')}'s Rating</div>
               <div class="flex gap-1">
                 {#each [1, 2, 3, 4, 5] as star}
                   <button
@@ -210,7 +214,7 @@
             
             <!-- User T Rating -->
             <div class="mb-2">
-              <div class="text-xs text-slate-400 mb-0.5">T's Rating</div>
+              <div class="text-xs text-slate-400 mb-0.5">{getDisplayNameForUser('T')}'s Rating</div>
               <div class="flex gap-1">
                 {#each [1, 2, 3, 4, 5] as star}
                   <button
@@ -270,6 +274,24 @@
           </div>
         </div>
         
+        <!-- Collection & Studio Info -->
+        {#if media.collection || media.productionCompanies?.length}
+          <div class="flex flex-wrap gap-4">
+            {#if media.collection}
+              <div class="flex-1 min-w-[120px]">
+                <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Collection</label>
+                <span class="text-sm font-medium text-accent">{media.collection.name}</span>
+              </div>
+            {/if}
+            {#if media.productionCompanies?.length}
+              <div class="flex-1 min-w-[120px]">
+                <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Studio</label>
+                <span class="text-sm">{media.productionCompanies.map(c => c.name).join(', ')}</span>
+              </div>
+            {/if}
+          </div>
+        {/if}
+        
         <!-- Overview -->
         {#if media.overview}
           <div>
@@ -301,7 +323,7 @@
                   <div class="flex-1">
                     <p class="text-sm">{comment.text}</p>
                     <span class="text-xs text-slate-400">
-                      {comment.createdBy} · {formatDate(comment.createdAt)}
+                      {getDisplayNameForUser(comment.createdBy)} · {formatDate(comment.createdAt)}
                     </span>
                   </div>
                   <button
@@ -334,9 +356,9 @@
         
         <!-- Metadata info -->
         <div class="text-xs text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
-          Added by {media.createdBy} · {formatDate(media.createdAt)}
+          Added by {getDisplayNameForUser(media.createdBy)} · {formatDate(media.createdAt)}
           {#if media.updatedBy}
-            · Updated by {media.updatedBy}
+            · Updated by {getDisplayNameForUser(media.updatedBy)}
           {/if}
         </div>
       </div>

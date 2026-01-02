@@ -1,14 +1,18 @@
 <script lang="ts">
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
-  import { activeUser } from '$lib/stores/app'
-  import type { Place, PlaceCategory } from '$lib/types'
+  import { activeUser, currentPreferences, displayNames } from '$lib/stores/app'
+  import type { Place, PlaceCategory, GeoLocation, UserId } from '$lib/types'
+  import { calculateDistance, formatDistance } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
   import { onMount } from 'svelte'
+  import PlaceSuggestions from '$lib/components/PlaceSuggestions.svelte'
+  import LocationPicker from '$lib/components/LocationPicker.svelte'
+  import type { PlaceSuggestion } from '$lib/services/location'
 
   let places = $state<Place[]>([]);
   let unsubscribe: (() => void) | undefined;
   let showForm = $state(false);
-  let newPlace = $state({ name: '', category: 'restaurant' as PlaceCategory, notes: '' });
+  let newPlace = $state({ name: '', category: 'restaurant' as PlaceCategory, notes: '', location: undefined as GeoLocation | undefined });
   let activeTab = $state<'all' | 'to-visit' | 'visited'>('all');
 
   const categories: PlaceCategory[] = ['restaurant', 'cafe', 'bar', 'attraction', 'park', 'other'];
@@ -42,13 +46,34 @@
         notes: newPlace.notes,
         visited: false,
         visitDates: [],
-        rating: null
+        rating: null,
+        location: newPlace.location
       },
       $activeUser
     );
 
-    newPlace = { name: '', category: 'restaurant', notes: '' };
+    newPlace = { name: '', category: 'restaurant', notes: '', location: undefined };
     showForm = false;
+  }
+
+  async function addFromSuggestion(suggestion: PlaceSuggestion): Promise<void> {
+    await addDocument<Place>(
+      'places',
+      {
+        name: suggestion.name,
+        category: suggestion.category,
+        notes: '',
+        visited: false,
+        visitDates: [],
+        rating: null,
+        location: {
+          lat: suggestion.coordinates.lat,
+          lng: suggestion.coordinates.lng,
+          address: suggestion.address
+        }
+      },
+      $activeUser
+    );
   }
 
   async function toggleVisited(place: Place): Promise<void> {
@@ -73,11 +98,32 @@
     }
   }
 
+  function getDistanceFromReference(place: Place): number | null {
+    if (!place.location) return null;
+    
+    const ref = $currentPreferences.referenceLocation || $currentPreferences.currentLocation;
+    if (!ref) return null;
+    
+    return calculateDistance(ref, place.location);
+  }
+
+  function getDisplayNameForUser(userId: UserId): string {
+    return $displayNames[userId];
+  }
+
   let filteredPlaces = $derived(places.filter((p) => {
     if (activeTab === 'all') return true;
     if (activeTab === 'visited') return p.visited;
     if (activeTab === 'to-visit') return !p.visited;
     return true;
+  }).sort((a, b) => {
+    // Sort by distance if available
+    const distA = getDistanceFromReference(a);
+    const distB = getDistanceFromReference(b);
+    if (distA !== null && distB !== null) return distA - distB;
+    if (distA !== null) return -1;
+    if (distB !== null) return 1;
+    return 0;
   }));
 </script>
 
@@ -85,12 +131,15 @@
   <header class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold">Places</h1>
     <button
-      class="w-9 h-9 rounded-full bg-accent text-white text-2xl leading-none"
+      class="w-9 h-9 rounded-full bg-accent text-white text-xl flex items-center justify-center"
       onclick={() => (showForm = !showForm)}
     >
       {showForm ? '×' : '+'}
     </button>
   </header>
+
+  <!-- Place Suggestions -->
+  <PlaceSuggestions onAddPlace={addFromSuggestion} />
 
   {#if showForm}
     <form
@@ -111,6 +160,17 @@
           <option value={cat}>{categoryIcons[cat]} {cat}</option>
         {/each}
       </select>
+      
+      <!-- Location picker -->
+      <div>
+        <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Location (optional)</label>
+        <LocationPicker
+          value={newPlace.location}
+          onChange={(loc) => newPlace.location = loc}
+          placeholder="Search for address..."
+        />
+      </div>
+      
       <textarea
         placeholder="Notes (optional)"
         rows="2"
@@ -143,6 +203,7 @@
 
   <div class="flex flex-col gap-3">
     {#each filteredPlaces as place (place.id)}
+      {@const distance = getDistanceFromReference(place)}
       <article
         class="flex items-start gap-4 p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl transition-opacity"
         class:opacity-70={place.visited}
@@ -150,11 +211,23 @@
         <span class="text-2xl shrink-0">{categoryIcons[place.category]}</span>
         <div class="flex-1 min-w-0">
           <h3 class="font-medium" class:line-through={place.visited}>{place.name}</h3>
-          {#if place.notes}
-            <p class="text-sm text-slate-500 dark:text-slate-400 mb-1">{place.notes}</p>
+          
+          {#if place.location}
+            <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <span class="text-accent">📍</span>
+              {#if distance !== null}
+                <span class="font-medium">{formatDistance(distance)}</span>
+                <span>·</span>
+              {/if}
+              <span class="truncate">{place.location.address || `${place.location.lat.toFixed(4)}, ${place.location.lng.toFixed(4)}`}</span>
+            </div>
           {/if}
-          <span class="text-xs text-slate-400">
-            Added by {place.createdBy}
+          
+          {#if place.notes}
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{place.notes}</p>
+          {/if}
+          <span class="text-xs text-slate-400 mt-1 block">
+            Added by {getDisplayNameForUser(place.createdBy)}
             {#if place.visited && place.visitDates?.length}
               · Visited {place.visitDates.length}×
             {/if}

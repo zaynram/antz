@@ -77,6 +77,8 @@ describe('Type definitions', () => {
         theme: 'dark',
         accentColor: '#6366f1',
         name: 'Test User',
+        locationMode: 'off',
+        searchRadius: 5000,
       };
       
       expect(prefs).toHaveProperty('theme');
@@ -89,12 +91,16 @@ describe('Type definitions', () => {
         theme: 'light',
         accentColor: '#000000',
         name: 'User',
+        locationMode: 'off',
+        searchRadius: 5000,
       };
       
       const darkPrefs: UserPreferences = {
         theme: 'dark',
         accentColor: '#ffffff',
         name: 'User',
+        locationMode: 'off',
+        searchRadius: 5000,
       };
       
       expect(lightPrefs.theme).toBe('light');

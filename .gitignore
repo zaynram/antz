@@ -12,6 +12,7 @@ dist/
 # Firebase
 .firebase/
 firebase-debug.log
+/admin-credential.ts
 
 # IDE
 .vscode/

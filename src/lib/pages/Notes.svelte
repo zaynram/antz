@@ -1,7 +1,7 @@
 <script lang="ts">
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
-  import { activeUser } from '$lib/stores/app'
-  import type { Note } from '$lib/types'
+  import { activeUser, displayNames } from '$lib/stores/app'
+  import type { Note, UserId } from '$lib/types'
   import { Timestamp, type Timestamp as TimestampType } from 'firebase/firestore'
   import { onMount } from 'svelte'
 
@@ -9,6 +9,9 @@
   let newNote = $state({ title: '', content: '' });
   let unsubscribe: (() => void) | undefined;
   let activeTab = $state<'inbox' | 'sent' | 'archive'>('inbox');
+
+  // Get the other user's ID
+  let otherUserId = $derived<UserId>($activeUser === 'Z' ? 'T' : 'Z');
 
   onMount(() => {
     unsubscribe = subscribeToCollection<Note>('notes', (items) => {
@@ -85,14 +88,16 @@
     return formatDate(timestamp);
   }
 
+  function getDisplayNameForUser(userId: UserId): string {
+    return $displayNames[userId];
+  }
+
   // Filter notes based on active tab
   let filteredNotes = $derived.by(() => {
-    const otherUser = $activeUser === 'Z' ? 'T' : 'Z';
-    
     switch (activeTab) {
       case 'inbox':
         // Notes from the other person that aren't archived
-        return notes.filter(n => n.createdBy === otherUser && !n.archived);
+        return notes.filter(n => n.createdBy === otherUserId && !n.archived);
       case 'sent':
         // Notes I created that aren't archived
         return notes.filter(n => n.createdBy === $activeUser && !n.archived);
@@ -106,8 +111,7 @@
 
   // Count unread notes in inbox
   let unreadCount = $derived.by(() => {
-    const otherUser = $activeUser === 'Z' ? 'T' : 'Z';
-    return notes.filter(n => n.createdBy === otherUser && !n.read && !n.archived).length;
+    return notes.filter(n => n.createdBy === otherUserId && !n.read && !n.archived).length;
   });
 </script>
 
@@ -121,7 +125,7 @@
   >
     <div class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-1">
       <span>✉️</span>
-      <span>Leave a note for {$activeUser === 'Z' ? 'T' : 'Z'}</span>
+      <span>Leave a note for {$displayNames[otherUserId]}</span>
     </div>
     <input
       type="text"
@@ -192,7 +196,9 @@
               <h2 class="text-lg font-semibold mb-1 {!note.read && note.createdBy !== $activeUser ? 'font-bold' : ''}">{note.title}</h2>
             {/if}
             <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <span class="font-medium {note.createdBy === $activeUser ? 'text-slate-400' : 'text-accent'}">{note.createdBy === $activeUser ? 'You' : note.createdBy}</span>
+              <span class="font-medium {note.createdBy === $activeUser ? 'text-slate-400' : 'text-accent'}">
+                {note.createdBy === $activeUser ? 'You' : getDisplayNameForUser(note.createdBy)}
+              </span>
               <span>·</span>
               <span>{getRelativeTime(note.createdAt)}</span>
               {#if note.read && note.readAt && note.createdBy === $activeUser}

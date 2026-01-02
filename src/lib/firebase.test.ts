@@ -8,7 +8,7 @@ vi.mock('firebase/app', () => ({
 vi.mock('firebase/auth', () => ({
   getAuth: vi.fn(() => ({ currentUser: null })),
   GoogleAuthProvider: vi.fn(),
-  onAuthStateChanged: vi.fn((auth, callback) => {
+  onAuthStateChanged: vi.fn((_auth, _callback) => {
     // Mock unsubscribe function
     return vi.fn();
   }),
@@ -26,7 +26,7 @@ vi.mock('firebase/firestore', () => ({
     return { id: 'generated-id', path: `${collectionOrDb.name}/generated-id` };
   }),
   deleteDoc: vi.fn(() => Promise.resolve()),
-  onSnapshot: vi.fn((query, callback) => {
+  onSnapshot: vi.fn((_query, _callback) => {
     // Mock unsubscribe function
     return vi.fn();
   }),

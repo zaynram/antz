@@ -13,6 +13,15 @@ export interface TMDBConfig {
     imageBaseUrl: string
 }
 
+export interface SteamConfig {
+    searchUrl: string
+}
+
+export interface GoogleMapsConfig {
+    apiKey: string
+    placesApiUrl: string
+}
+
 // Replace these values with your Firebase project config
 // Get from: Firebase Console > Project Settings > General > Your apps > Web app
 export const firebaseConfig: FirebaseConfig = {
@@ -29,4 +38,18 @@ export const tmdbConfig: TMDBConfig = {
     apiKey: "f3f1217db98c8298c6baa058a2e79de0",
     baseUrl: "https://api.themoviedb.org/3",
     imageBaseUrl: "https://image.tmdb.org/t/p",
+}
+
+// Steam Store API (undocumented, no auth required)
+export const steamConfig: SteamConfig = {
+    searchUrl: "https://store.steampowered.com/api/storesearch",
+}
+
+// Google Maps/Places API configuration
+// Get from: https://console.cloud.google.com/apis/credentials
+// Enable: Places API, Maps JavaScript API, Geocoding API
+// Note: $200/month free credit covers typical usage
+export const googleMapsConfig: GoogleMapsConfig = {
+    apiKey: "", // Add your Google Maps API key here
+    placesApiUrl: "https://maps.googleapis.com/maps/api/place",
 }

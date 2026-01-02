@@ -7,6 +7,7 @@
   import Home from '$lib/pages/Home.svelte'
   import Login from '$lib/pages/Login.svelte'
   import Media from '$lib/pages/Media.svelte'
+  import Debug from '$lib/pages/Debug.svelte'
   import Notes from '$lib/pages/Notes.svelte'
   import Places from '$lib/pages/Places.svelte'
 
@@ -109,6 +110,8 @@
         <Media />
       {:else if currentPath === '/places'}
         <Places />
+      {:else if currentPath === '/debug'}
+        <Debug />
       {/if}
     </main>
   </div>
