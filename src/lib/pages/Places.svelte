@@ -9,6 +9,17 @@
   import PlaceSuggestions from '$lib/components/PlaceSuggestions.svelte'
   import LocationPicker from '$lib/components/LocationPicker.svelte'
   import type { PlaceSuggestion } from '$lib/services/location'
+  import { UtensilsCrossed, Coffee, Wine, Sparkles, Trees, MapPin, Check, Circle, X } from 'lucide-svelte'
+  import type { ComponentType } from 'svelte'
+
+  const categoryIcons: Record<PlaceCategory, ComponentType> = {
+    restaurant: UtensilsCrossed,
+    cafe: Coffee,
+    bar: Wine,
+    attraction: Sparkles,
+    park: Trees,
+    other: MapPin
+  };
 
   let places = $state<Place[]>([]);
   let unsubscribe: (() => void) | undefined;
@@ -19,13 +30,13 @@
   const categories: PlaceCategory[] = ['restaurant', 'cafe', 'bar', 'attraction', 'park', 'other'];
   const tabs: Array<'all' | 'to-visit' | 'visited'> = ['all', 'to-visit', 'visited'];
 
-  const categoryIcons: Record<PlaceCategory, string> = {
-    restaurant: '🍽️',
-    cafe: '☕',
-    bar: '🍸',
-    attraction: '🎢',
-    park: '🌳',
-    other: '📍'
+  const categoryLabels: Record<PlaceCategory, string> = {
+    restaurant: 'Restaurant',
+    cafe: 'Cafe',
+    bar: 'Bar',
+    attraction: 'Attraction',
+    park: 'Park',
+    other: 'Other'
   };
 
   onMount(() => {
@@ -171,11 +182,11 @@
         bind:value={newPlace.name}
       />
       <select
-        class="px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
+        class="px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg capitalize"
         bind:value={newPlace.category}
       >
         {#each categories as cat}
-          <option value={cat}>{categoryIcons[cat]} {cat}</option>
+          <option value={cat}>{categoryLabels[cat]}</option>
         {/each}
       </select>
       
@@ -226,13 +237,14 @@
         class="flex items-start gap-4 p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl transition-opacity"
         class:opacity-70={place.visited}
       >
-        <span class="text-2xl shrink-0">{categoryIcons[place.category]}</span>
+        {@const Icon = categoryIcons[place.category]}
+        <span class="shrink-0 text-accent"><Icon size={24} /></span>
         <div class="flex-1 min-w-0">
           <h3 class="font-medium" class:line-through={place.visited}>{place.name}</h3>
           
           {#if place.location}
             <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              <span class="text-accent">📍</span>
+              <span class="text-accent"><MapPin size={12} /></span>
               {#if distance !== null}
                 <span class="font-medium">{formatDistance(distance)}</span>
                 <span>·</span>
@@ -264,13 +276,17 @@
             class:text-slate-400={!place.visited}
             onclick={() => toggleVisited(place)}
           >
-            {place.visited ? '✓' : '○'}
+            {#if place.visited}
+              <Check size={16} />
+            {:else}
+              <Circle size={16} />
+            {/if}
           </button>
           <button
             class="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-red-500 hover:border-red-500 transition-colors"
             onclick={() => place.id && remove(place.id)}
           >
-            ×
+            <X size={16} />
           </button>
         </div>
       </article>

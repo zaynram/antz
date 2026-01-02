@@ -438,7 +438,7 @@
 
 <MediaDetailModal media={selectedMedia} onClose={() => selectedMedia = null} />
 
-<div class="max-w-6xl mx-auto">
+<div class="max-w-6xl mx-auto h-full flex flex-col" class:filters-open={showFilters}>
   <!-- Header -->
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold">Media</h1>
@@ -456,16 +456,16 @@
       <!-- Filter toggle -->
       <button
         type="button"
-        class="relative min-w-[44px] min-h-[44px] p-2.5 rounded-lg transition-colors cursor-pointer touch-manipulation {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700'}"
+        class="relative min-w-[44px] min-h-[44px] p-2.5 rounded-lg transition-colors cursor-pointer select-none {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700'}"
         onclick={() => showFilters = !showFilters}
         aria-label="Filters & Sort"
         aria-expanded={showFilters}
       >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
         </svg>
         {#if activeFilterCount > 0}
-          <span class="absolute -top-1 -right-1 w-4 h-4 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center" aria-hidden="true">
+          <span class="absolute -top-1 -right-1 w-4 h-4 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center pointer-events-none" aria-hidden="true">
             {activeFilterCount}
           </span>
         {/if}
@@ -740,7 +740,7 @@
   {/if}
 
   <!-- Library -->
-  <div bind:this={gridContainer}>
+  <div bind:this={gridContainer} class="flex-1 min-h-0">
     {#if isSearching}
       <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">
         In your collection ({filteredMedia.length})
@@ -906,24 +906,18 @@
 
 <style>
   :global(.virtual-grid-viewport) {
-    /* Use flex-based height from parent - works better with PWA */
-    height: calc(100dvh - 220px);
-    min-height: 300px;
-    max-height: calc(100dvh - 180px);
+    /* Fill available flex space */
+    height: 100%;
+    min-height: 200px;
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    /* Ensure touch scrolling works */
+    /* Ensure touch scrolling works on mobile */
     touch-action: pan-y;
-  }
-
-  /* Fallback for browsers without dvh support */
-  @supports not (height: 100dvh) {
-    :global(.virtual-grid-viewport) {
-      height: calc(100vh - 220px);
-      max-height: calc(100vh - 180px);
-    }
+    /* Prevent text selection during scroll */
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   /* On touch devices, show hover elements when the article is focused/active */

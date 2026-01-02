@@ -28,6 +28,11 @@
   let isReloading = $state(false);
   let updateAvailable = $state(false);
 
+  // Long-press for debug access
+  let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+  let isLongPress = $state(false);
+  const LONG_PRESS_DURATION = 2000; // 2 seconds
+
   // Track previous user to detect switches
   let previousUser: 'Z' | 'T' | null = null;
 
@@ -156,6 +161,12 @@
   }
 
   async function reloadApp(): Promise<void> {
+    // Don't reload if this was a long-press (going to debug instead)
+    if (isLongPress) {
+      isLongPress = false;
+      return;
+    }
+
     isReloading = true;
 
     try {
@@ -183,6 +194,21 @@
       console.error('Reload failed:', err);
       toast.error('Failed to update');
       isReloading = false;
+    }
+  }
+
+  function startLongPress(): void {
+    longPressTimer = setTimeout(() => {
+      isLongPress = true;
+      toast.success('Entering debug mode...');
+      navigate('/debug');
+    }, LONG_PRESS_DURATION);
+  }
+
+  function cancelLongPress(): void {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
     }
   }
 
@@ -428,10 +454,16 @@
       App
     </h2>
 
-    <!-- Update/Reload Button -->
+    <!-- Update/Reload Button (hold 2s for debug mode) -->
     <button
-      class="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors touch-manipulation"
+      class="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors touch-manipulation select-none"
       onclick={reloadApp}
+      onmousedown={startLongPress}
+      onmouseup={cancelLongPress}
+      onmouseleave={cancelLongPress}
+      ontouchstart={startLongPress}
+      ontouchend={cancelLongPress}
+      ontouchcancel={cancelLongPress}
       disabled={isReloading}
     >
       <RefreshCw size={18} class={isReloading ? 'animate-spin' : ''} />

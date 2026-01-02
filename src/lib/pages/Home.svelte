@@ -1,6 +1,7 @@
 <script lang="ts">
   import { logOut } from '$lib/firebase'
   import { currentPreferences } from '$lib/stores/app'
+  import { StickyNote, Film, MapPin } from 'lucide-svelte'
 
   interface Props {
     navigate: (path: string) => void;
@@ -20,7 +21,7 @@
       onclick={() => navigate('/notes')}
       class="block p-6 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:border-accent hover:-translate-y-0.5 text-left text-slate-900 dark:text-slate-100"
     >
-      <span class="text-3xl block mb-3">📝</span>
+      <span class="block mb-3 text-accent"><StickyNote size={32} /></span>
       <h2 class="text-xl font-semibold mb-1 text-slate-900 dark:text-slate-100">Notes</h2>
       <p class="text-slate-500 dark:text-slate-400 text-sm">Thoughts, memories, and letters</p>
     </button>
@@ -29,7 +30,7 @@
       onclick={() => navigate('/media')}
       class="block p-6 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:border-accent hover:-translate-y-0.5 text-left text-slate-900 dark:text-slate-100"
     >
-      <span class="text-3xl block mb-3">🎬</span>
+      <span class="block mb-3 text-accent"><Film size={32} /></span>
       <h2 class="text-xl font-semibold mb-1 text-slate-900 dark:text-slate-100">Media</h2>
       <p class="text-slate-500 dark:text-slate-400 text-sm">Shows, movies, and games</p>
     </button>
@@ -38,7 +39,7 @@
       onclick={() => navigate('/places')}
       class="block p-6 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:border-accent hover:-translate-y-0.5 text-left text-slate-900 dark:text-slate-100"
     >
-      <span class="text-3xl block mb-3">📍</span>
+      <span class="block mb-3 text-accent"><MapPin size={32} /></span>
       <h2 class="text-xl font-semibold mb-1 text-slate-900 dark:text-slate-100">Places</h2>
       <p class="text-slate-500 dark:text-slate-400 text-sm">Restaurants and spots to visit</p>
     </button>

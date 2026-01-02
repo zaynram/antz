@@ -2,6 +2,8 @@
   import { searchNearbyPlaces, getCurrentPosition, formatDistance, type PlaceSuggestion, type Coordinates } from '$lib/services/location';
   import { currentPreferences } from '$lib/stores/app';
   import type { PlaceCategory } from '$lib/types';
+  import { UtensilsCrossed, Coffee, Wine, Sparkles, Trees, MapPin, ChevronDown, Plus } from 'lucide-svelte'
+  import type { ComponentType } from 'svelte'
 
   interface Props {
     onAddPlace: (suggestion: PlaceSuggestion) => void;
@@ -16,13 +18,21 @@
   let expanded = $state(false);
 
   const categories: PlaceCategory[] = ['restaurant', 'cafe', 'bar', 'attraction', 'park', 'other'];
-  const categoryIcons: Record<PlaceCategory, string> = {
-    restaurant: '🍽️',
-    cafe: '☕',
-    bar: '🍸',
-    attraction: '🎢',
-    park: '🌳',
-    other: '📍'
+  const categoryIcons: Record<PlaceCategory, ComponentType> = {
+    restaurant: UtensilsCrossed,
+    cafe: Coffee,
+    bar: Wine,
+    attraction: Sparkles,
+    park: Trees,
+    other: MapPin
+  };
+  const categoryLabels: Record<PlaceCategory, string> = {
+    restaurant: 'restaurant',
+    cafe: 'cafe',
+    bar: 'bar',
+    attraction: 'attraction',
+    park: 'park',
+    other: 'place'
   };
 
   async function loadSuggestions(): Promise<void> {
@@ -85,7 +95,7 @@
     onclick={() => expanded = !expanded}
   >
     <div class="flex items-center gap-2">
-      <span class="text-xl">✨</span>
+      <span class="text-accent"><Sparkles size={20} /></span>
       <span class="font-medium">Discover Places</span>
       {#if $currentPreferences.referenceLocation}
         <span class="text-xs text-slate-400">
@@ -93,7 +103,7 @@
         </span>
       {/if}
     </div>
-    <span class="text-slate-400 transition-transform" class:rotate-180={expanded}>▼</span>
+    <span class="text-slate-400 transition-transform" class:rotate-180={expanded}><ChevronDown size={16} /></span>
   </button>
   
   {#if expanded}
@@ -105,11 +115,13 @@
       {:else}
         <div class="flex flex-wrap gap-2 mb-4">
           {#each categories as cat}
+            {@const Icon = categoryIcons[cat]}
             <button
-              class="px-3 py-1.5 rounded-full text-sm transition-colors {selectedCategory === cat ? 'bg-accent text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}"
+              class="px-3 py-1.5 rounded-full text-sm transition-colors flex items-center gap-1.5 {selectedCategory === cat ? 'bg-accent text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}"
               onclick={() => { selectedCategory = cat; loadSuggestions(); }}
             >
-              {categoryIcons[cat]} {cat}
+              <Icon size={14} />
+              <span class="capitalize">{cat}</span>
             </button>
           {/each}
         </div>
@@ -123,8 +135,9 @@
         {:else if suggestions.length > 0}
           <div class="space-y-2 max-h-64 overflow-y-auto">
             {#each suggestions.slice(0, 10) as suggestion (suggestion.id)}
+              {@const SuggestionIcon = categoryIcons[suggestion.category]}
               <div class="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors">
-                <span class="text-lg shrink-0">{categoryIcons[suggestion.category]}</span>
+                <span class="shrink-0 text-accent"><SuggestionIcon size={18} /></span>
                 <div class="flex-1 min-w-0">
                   <div class="font-medium text-sm truncate">{suggestion.name}</div>
                   <div class="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -139,7 +152,7 @@
                   onclick={() => handleAdd(suggestion)}
                   title="Add to list"
                 >
-                  +
+                  <Plus size={16} />
                 </button>
               </div>
             {/each}
@@ -150,11 +163,14 @@
             </p>
           {/if}
         {:else}
+          {@const SearchIcon = categoryIcons[selectedCategory]}
           <button
-            class="w-full py-3 text-sm text-accent hover:bg-accent/10 rounded-lg transition-colors"
+            class="w-full py-3 text-sm text-accent hover:bg-accent/10 rounded-lg transition-colors flex items-center justify-center gap-2"
             onclick={loadSuggestions}
           >
-            Search {categoryIcons[selectedCategory]} {selectedCategory}s nearby
+            <span>Search</span>
+            <SearchIcon size={14} />
+            <span>{categoryLabels[selectedCategory]}s nearby</span>
           </button>
         {/if}
       {/if}

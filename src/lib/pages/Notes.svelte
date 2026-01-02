@@ -5,6 +5,7 @@
   import { toast } from 'svelte-sonner'
   import { Timestamp, type Timestamp as TimestampType } from 'firebase/firestore'
   import { onMount } from 'svelte'
+  import { Mail, Send, Check, Archive, ArchiveRestore, MailOpen, Package, X } from 'lucide-svelte'
 
   let notes = $state<Note[]>([]);
   let newNote = $state({ title: '', content: '' });
@@ -137,7 +138,7 @@
     onsubmit={(e) => { e.preventDefault(); addNote(); }}
   >
     <div class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-1">
-      <span>✉️</span>
+      <Mail size={16} />
       <span>Leave a note for {$displayNames[otherUserId]}</span>
     </div>
     <input
@@ -157,7 +158,7 @@
       class="self-end px-6 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90 flex items-center gap-2"
     >
       <span>Send</span>
-      <span>📨</span>
+      <Send size={16} />
     </button>
   </form>
 
@@ -216,7 +217,7 @@
               <span>{getRelativeTime(note.createdAt)}</span>
               {#if note.read && note.readAt && note.createdBy === $activeUser}
                 <span>·</span>
-                <span class="text-emerald-500">✓ Read</span>
+                <span class="text-emerald-500 flex items-center gap-0.5"><Check size={12} /> Read</span>
               {/if}
             </div>
           </div>
@@ -228,14 +229,18 @@
               onclick={(e) => { e.stopPropagation(); toggleArchive(note); }}
               title={note.archived ? 'Unarchive' : 'Archive'}
             >
-              {note.archived ? '📤' : '📥'}
+              {#if note.archived}
+                <ArchiveRestore size={14} />
+              {:else}
+                <Archive size={14} />
+              {/if}
             </button>
             <button
               class="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500"
               onclick={(e) => { e.stopPropagation(); note.id && removeNote(note.id); }}
               title="Delete"
             >
-              ×
+              <X size={14} />
             </button>
           </div>
         </header>
@@ -247,13 +252,13 @@
     {:else}
       <div class="text-center py-12">
         {#if activeTab === 'inbox'}
-          <p class="text-4xl mb-3">📭</p>
+          <div class="flex justify-center mb-3 text-slate-300 dark:text-slate-600"><MailOpen size={48} /></div>
           <p class="text-slate-500 dark:text-slate-400">No messages in your inbox</p>
         {:else if activeTab === 'sent'}
-          <p class="text-4xl mb-3">✉️</p>
+          <div class="flex justify-center mb-3 text-slate-300 dark:text-slate-600"><Mail size={48} /></div>
           <p class="text-slate-500 dark:text-slate-400">You haven't sent any notes yet</p>
         {:else}
-          <p class="text-4xl mb-3">📦</p>
+          <div class="flex justify-center mb-3 text-slate-300 dark:text-slate-600"><Package size={48} /></div>
           <p class="text-slate-500 dark:text-slate-400">Archive is empty</p>
         {/if}
       </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { geocode, reverseGeocode, getCurrentPosition, type GeocodedLocation } from '$lib/services/location';
   import type { GeoLocation } from '$lib/types';
+  import { MapPin, X, Loader2 } from 'lucide-svelte'
 
   interface Props {
     value: GeoLocation | undefined;
@@ -102,7 +103,7 @@
 <div class="space-y-2">
   {#if value}
     <div class="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600">
-      <span class="text-accent">📍</span>
+      <span class="text-accent"><MapPin size={16} /></span>
       <span class="flex-1 text-sm truncate" title={value.address || `${value.lat.toFixed(4)}, ${value.lng.toFixed(4)}`}>
         {value.address || `${value.lat.toFixed(4)}, ${value.lng.toFixed(4)}`}
       </span>
@@ -112,7 +113,7 @@
         onclick={clearLocation}
         title="Clear location"
       >
-        ×
+        <X size={14} />
       </button>
     </div>
   {:else}
@@ -137,15 +138,15 @@
         
         <button
           type="button"
-          class="px-3 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
+          class="px-3 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 flex items-center justify-center"
           onclick={detectCurrentLocation}
           disabled={detectingLocation}
           title="Use current location"
         >
           {#if detectingLocation}
-            <span class="inline-block w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
+            <Loader2 size={16} class="animate-spin" />
           {:else}
-            📍
+            <MapPin size={16} />
           {/if}
         </button>
       </div>
