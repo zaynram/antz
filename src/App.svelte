@@ -119,7 +119,7 @@
       <UserToggle {navigate} />
     </header>
 
-    <main class="flex-1 overflow-y-auto overflow-x-hidden p-6 max-w-5xl mx-auto w-full">
+    <main class="flex-1 overflow-x-hidden max-w-5xl mx-auto w-full" class:overflow-y-auto={currentPath !== '/media'} class:overflow-hidden={currentPath === '/media'} class:p-6={currentPath !== '/media'} class:pt-6={currentPath === '/media'} class:px-6={currentPath === '/media'}>
       {#if currentPath === '/'}
         <Home {navigate} />
       {:else if currentPath === '/notes'}

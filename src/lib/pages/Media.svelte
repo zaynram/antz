@@ -438,9 +438,9 @@
 
 <MediaDetailModal media={selectedMedia} onClose={() => selectedMedia = null} />
 
-<div class="max-w-6xl mx-auto">
+<div class="max-w-6xl mx-auto h-full flex flex-col">
   <!-- Header -->
-  <div class="flex items-center justify-between mb-6">
+  <div class="flex items-center justify-between mb-6 shrink-0">
     <h1 class="text-2xl font-bold">Media</h1>
     <div class="flex items-center gap-1">
       <!-- Grid size toggle -->
@@ -474,7 +474,7 @@
   </div>
 
   <!-- Search -->
-  <div class="relative mb-4">
+  <div class="relative mb-4 shrink-0">
     <input
       type="text"
       placeholder="Search your collection or discover new titles..."
@@ -501,7 +501,7 @@
   </div>
 
   <!-- Tabs -->
-  <div class="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-4">
+  <div class="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-4 shrink-0">
     {#each tabs as tab (tab.key)}
       <button
         class="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all {filters.type === tab.key ? 'bg-surface shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}"
@@ -523,7 +523,7 @@
 
   <!-- Filters Panel (collapsible) -->
   {#if showFilters}
-    <div class="p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl mb-4 space-y-4">
+    <div class="p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl mb-4 space-y-4 shrink-0">
       <!-- Row 1: Status, Added By, Sort -->
       <div class="flex flex-wrap gap-4">
         <div class="flex-1 min-w-[120px]">
@@ -647,7 +647,7 @@
 
   <!-- Quick filter summary (when collapsed but active) -->
   {#if !showFilters && activeFilterCount > 0}
-    <div class="flex items-center gap-2 mb-4 text-sm text-slate-500">
+    <div class="flex items-center gap-2 mb-4 text-sm text-slate-500 shrink-0">
       <span>{activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'} active</span>
       <span>·</span>
       <span>{getSortLabel(sort)}</span>
@@ -668,7 +668,7 @@
 
   <!-- Discover Results (when searching) -->
   {#if isSearching && hasDiscoverResults}
-    <div class="mb-6">
+    <div class="mb-6 shrink-0">
       <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">
         Add to collection
       </h2>
@@ -740,7 +740,7 @@
   {/if}
 
   <!-- Library -->
-  <div bind:this={gridContainer}>
+  <div bind:this={gridContainer} class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pb-6" style="-webkit-overflow-scrolling: touch;">
     {#if isSearching}
       <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">
         In your collection ({filteredMedia.length})
@@ -906,18 +906,16 @@
 
 <style>
   :global(.virtual-grid-viewport) {
-    height: calc(100svh - 280px);
-    min-height: 200px;
-    overflow-y: scroll !important;
-    overflow-x: hidden;
+    /* Let the virtual list fill available space in flex parent */
+    height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Fallback for browsers without svh support */
-  @supports not (height: 100svh) {
-    :global(.virtual-grid-viewport) {
-      height: calc(100vh - 280px);
-    }
+  :global(.virtual-grid-content) {
+    /* Ensure content can scroll */
+    min-height: min-content;
   }
 
   /* On touch devices, show hover elements when the article is focused/active */
