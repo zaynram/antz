@@ -24,7 +24,6 @@
   } from '$lib/filters'
   import { onMount } from 'svelte'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
-  import SvelteVirtualList from '@humanspeak/svelte-virtual-list'
   import { Library, Film, Tv, Gamepad2, FolderOpen } from 'lucide-svelte'
 
   // Core state
@@ -405,20 +404,6 @@
     large: '⬛',
   };
 
-  // Group media items into rows for virtual scrolling
-  type MediaRow = { id: string; items: Media[] };
-  let mediaRows = $derived.by(() => {
-    const rows: MediaRow[] = [];
-    for (let i = 0; i < filteredMedia.length; i += columns) {
-      const rowItems = filteredMedia.slice(i, i + columns);
-      rows.push({
-        id: `row-${i}-${columns}`,
-        items: rowItems
-      });
-    }
-    return rows;
-  });
-
   // Track container width with ResizeObserver
   $effect(() => {
     if (!gridContainer) return;
@@ -775,144 +760,127 @@
         {/if}
       </div>
     {:else}
-      {@const rowHeight = $mediaGridSize === 'large' ? 420 : $mediaGridSize === 'small' ? 240 : 320}
-      <SvelteVirtualList
-        items={mediaRows}
-        defaultEstimatedItemHeight={rowHeight}
-        viewportClass="virtual-grid-viewport"
-        contentClass="virtual-grid-content"
-      >
-        {#snippet renderItem(row: MediaRow)}
-          <div class="grid gap-4 pb-4" style="grid-template-columns: repeat({columns}, minmax(0, 1fr));">
-            {#each row.items as item (item.id)}
-              <article class="group relative bg-surface border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden hover:shadow-lg transition-all touch-manipulation">
-                <!-- Delete button (visible on hover/focus-within for touch) -->
-                <button
-                  type="button"
-                  class="absolute top-2 right-2 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-red-500 active:bg-red-500 transition-all sm:w-7 sm:h-7"
-                  onclick={(e) => { e.stopPropagation(); item.id && removeItem(item.id); }}
-                  aria-label="Remove {item.title}"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+      <!-- Simple grid without virtual list -->
+      <div class="grid gap-4" style="grid-template-columns: repeat({columns}, minmax(0, 1fr));">
+        {#each filteredMedia as item (item.id)}
+          <article class="group relative bg-surface border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden hover:shadow-lg transition-all">
+            <!-- Delete button -->
+            <button
+              type="button"
+              class="absolute top-2 right-2 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-red-500 active:bg-red-500 transition-all sm:w-7 sm:h-7"
+              onclick={(e) => { e.stopPropagation(); item.id && removeItem(item.id); }}
+              aria-label="Remove {item.title}"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
 
-                <!-- Status indicator -->
-                <div class="absolute top-2 left-2 z-10">
-                  <div class="w-2.5 h-2.5 rounded-full {getStatusColor(item.status)} ring-2 ring-white dark:ring-slate-900" title={item.status}></div>
-                </div>
+            <!-- Status indicator -->
+            <div class="absolute top-2 left-2 z-10">
+              <div class="w-2.5 h-2.5 rounded-full {getStatusColor(item.status)} ring-2 ring-white dark:ring-slate-900" title={item.status}></div>
+            </div>
 
-                <!-- Poster (clickable) -->
-                <button
-                  class="w-full text-left"
-                  onclick={() => selectedMedia = item}
-                >
-                  <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 relative">
-                    {#if item.posterPath}
-                      <img
-                        src={posterUrl(item.posterPath, 'md')}
-                        alt={item.title}
-                        loading="lazy"
-                        class="w-full h-full object-cover"
-                        class:opacity-40={item.status === 'completed'}
-                      />
+            <!-- Poster (clickable) -->
+            <button
+              class="w-full text-left"
+              onclick={() => selectedMedia = item}
+            >
+              <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 relative">
+                {#if item.posterPath}
+                  <img
+                    src={posterUrl(item.posterPath, 'md')}
+                    alt={item.title}
+                    loading="lazy"
+                    class="w-full h-full object-cover"
+                    class:opacity-40={item.status === 'completed'}
+                  />
+                {:else}
+                  <div class="w-full h-full flex items-center justify-center text-slate-300">
+                    {#if item.type === 'game'}
+                      <Gamepad2 size={48} />
+                    {:else if item.type === 'tv'}
+                      <Tv size={48} />
                     {:else}
-                      <div class="w-full h-full flex items-center justify-center text-slate-300">
-                        {#if item.type === 'game'}
-                          <Gamepad2 size={48} />
-                        {:else if item.type === 'tv'}
-                          <Tv size={48} />
-                        {:else}
-                          <Film size={48} />
-                        {/if}
-                      </div>
-                    {/if}
-                    {#if item.status === 'completed'}
-                      <div class="absolute inset-0 flex items-center justify-center">
-                        <div class="w-12 h-12 rounded-full bg-emerald-500/90 flex items-center justify-center">
-                          <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                      </div>
+                      <Film size={48} />
                     {/if}
                   </div>
-                </button>
-
-                <!-- Info -->
-                <div class="p-3">
-                  <h3 class="font-medium text-sm truncate mb-1" class:line-through={item.status === 'dropped'} class:text-slate-400={item.status === 'dropped'}>
-                    {item.title}
-                  </h3>
-
-                  <!-- Release year & collection badge -->
-                  {#if item.releaseDate || item.collection}
-                    <div class="flex items-center gap-1.5 mb-1 text-[10px] text-slate-400">
-                      {#if item.releaseDate}
-                        <span>{item.releaseDate.split('-')[0]}</span>
-                      {/if}
-                      {#if item.collection}
-                        <span class="px-1 py-0.5 bg-accent/10 text-accent rounded text-[9px] truncate max-w-[80px]" title={item.collection.name}>
-                          {item.collection.name}
-                        </span>
-                      {/if}
+                {/if}
+                {#if item.status === 'completed'}
+                  <div class="absolute inset-0 flex items-center justify-center">
+                    <div class="w-12 h-12 rounded-full bg-emerald-500/90 flex items-center justify-center">
+                      <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                      </svg>
                     </div>
+                  </div>
+                {/if}
+              </div>
+            </button>
+
+            <!-- Info -->
+            <div class="p-3">
+              <h3 class="font-medium text-sm truncate mb-1" class:line-through={item.status === 'dropped'} class:text-slate-400={item.status === 'dropped'}>
+                {item.title}
+              </h3>
+
+              <!-- Release year & collection badge -->
+              {#if item.releaseDate || item.collection}
+                <div class="flex items-center gap-1.5 mb-1 text-[10px] text-slate-400">
+                  {#if item.releaseDate}
+                    <span>{item.releaseDate.split('-')[0]}</span>
                   {/if}
-
-                  <!-- Rating -->
-                  <div class="flex items-center gap-0.5">
-                    {#each [1, 2, 3, 4, 5] as star}
-                      {@const displayRating = getDisplayRating(item)}
-                      <button
-                        class="text-base transition-colors {(displayRating ?? 0) >= star ? 'text-amber-400' : 'text-slate-200 dark:text-slate-700 hover:text-amber-300'}"
-                        onclick={() => quickRate(item, star)}
-                      >
-                        ★
-                      </button>
-                    {/each}
-                  </div>
-
-                  <!-- Quick status buttons (visible on hover/focus-within for touch) -->
-                  <div class="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                    {#if item.status !== 'watching'}
-                      <button
-                        type="button"
-                        class="flex-1 py-1.5 text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded hover:bg-amber-200 dark:hover:bg-amber-900/50 active:bg-amber-200 dark:active:bg-amber-900/50 transition-colors touch-manipulation"
-                        onclick={() => quickStatusChange(item, 'watching')}
-                      >
-                        Start
-                      </button>
-                    {/if}
-                    {#if item.status !== 'completed'}
-                      <button
-                        type="button"
-                        class="flex-1 py-1.5 text-[10px] font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded hover:bg-emerald-200 dark:hover:bg-emerald-900/50 active:bg-emerald-200 dark:active:bg-emerald-900/50 transition-colors touch-manipulation"
-                        onclick={() => quickStatusChange(item, 'completed')}
-                      >
-                        Done
-                      </button>
-                    {/if}
-                  </div>
+                  {#if item.collection}
+                    <span class="px-1 py-0.5 bg-accent/10 text-accent rounded text-[9px] truncate max-w-[80px]" title={item.collection.name}>
+                      {item.collection.name}
+                    </span>
+                  {/if}
                 </div>
-              </article>
-            {/each}
-          </div>
-        {/snippet}
-      </SvelteVirtualList>
+              {/if}
+
+              <!-- Rating -->
+              <div class="flex items-center gap-0.5">
+                {#each [1, 2, 3, 4, 5] as star}
+                  {@const displayRating = getDisplayRating(item)}
+                  <button
+                    class="text-base transition-colors {(displayRating ?? 0) >= star ? 'text-amber-400' : 'text-slate-200 dark:text-slate-700 hover:text-amber-300'}"
+                    onclick={() => quickRate(item, star)}
+                  >
+                    ★
+                  </button>
+                {/each}
+              </div>
+
+              <!-- Quick status buttons -->
+              <div class="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                {#if item.status !== 'watching'}
+                  <button
+                    type="button"
+                    class="flex-1 py-1.5 text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+                    onclick={() => quickStatusChange(item, 'watching')}
+                  >
+                    Start
+                  </button>
+                {/if}
+                {#if item.status !== 'completed'}
+                  <button
+                    type="button"
+                    class="flex-1 py-1.5 text-[10px] font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors"
+                    onclick={() => quickStatusChange(item, 'completed')}
+                  >
+                    Done
+                  </button>
+                {/if}
+              </div>
+            </div>
+          </article>
+        {/each}
+      </div>
     {/if}
   </div>
 </div>
 
 <style>
-  :global(.virtual-grid-viewport) {
-    height: calc(100vh - 340px);
-    min-height: 250px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-  }
-
   /* On touch devices, show hover elements when the article is focused/active */
   @media (hover: none) {
     .group:active .group-hover\:opacity-100,
