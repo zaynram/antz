@@ -1,12 +1,16 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { activeUser, userPreferences } from '$lib/stores/app';
-  import PreferencesModal from './PreferencesModal.svelte';
   import { Settings } from 'lucide-svelte';
+
+  interface Props {
+    navigate?: (path: string) => void;
+  }
+
+  let { navigate }: Props = $props();
 
   let transitioning = $state(false);
   let transitionDirection = $state<'left' | 'right'>('right');
-  let showPreferences = $state(false);
 
   // Get preferences for both users
   let zPrefs = $derived($userPreferences.Z);
@@ -38,15 +42,13 @@
   });
 </script>
 
-<PreferencesModal open={showPreferences} onClose={() => showPreferences = false} />
-
 <div class="flex items-center gap-2">
   <button
     class="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-    onclick={() => showPreferences = true}
-    title="Preferences"
+    onclick={() => navigate?.('/settings')}
+    title="Settings"
   >
-<Settings size={18} />
+    <Settings size={18} />
   </button>
   
   <div class="flex gap-1 p-1 rounded-full bg-surface-2" title="Ctrl+U to toggle">

@@ -12,6 +12,7 @@
   import Debug from '$lib/pages/Debug.svelte'
   import Notes from '$lib/pages/Notes.svelte'
   import Places from '$lib/pages/Places.svelte'
+  import Settings from '$lib/pages/Settings.svelte'
 
   let currentPath = $state(window.location.pathname);
 
@@ -115,7 +116,7 @@
           <span class="hidden sm:inline">Places</span>
         </button>
       </nav>
-      <UserToggle />
+      <UserToggle {navigate} />
     </header>
 
     <main class="flex-1 overflow-y-auto overflow-x-hidden p-6 max-w-5xl mx-auto w-full">
@@ -129,6 +130,8 @@
         <Places />
       {:else if currentPath === '/debug'}
         <Debug />
+      {:else if currentPath === '/settings'}
+        <Settings {navigate} />
       {:else}
         <!-- 404 Not Found -->
         <div class="text-center py-16">
