@@ -47,7 +47,8 @@
   }
 
   async function markAsRead(note: Note): Promise<void> {
-    if (!note.id || note.read) return;
+    // Only mark as read if the current user is the recipient (not the sender)
+    if (!note.id || note.read || note.createdBy === $activeUser) return;
     await updateDocument<Note>('notes', note.id, { 
       read: true, 
       readAt: Timestamp.now() 
