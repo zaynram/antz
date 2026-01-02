@@ -2,6 +2,7 @@
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
   import { activeUser, currentPreferences, displayNames } from '$lib/stores/app'
   import type { Place, PlaceCategory, GeoLocation, UserId } from '$lib/types'
+  import { toast } from 'svelte-sonner'
   import { calculateDistance, formatDistance } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
   import { onMount } from 'svelte'
@@ -38,42 +39,53 @@
   async function addPlace(): Promise<void> {
     if (!newPlace.name.trim()) return;
 
-    await addDocument<Place>(
-      'places',
-      {
-        name: newPlace.name,
-        category: newPlace.category,
-        notes: newPlace.notes,
-        visited: false,
-        visitDates: [],
-        rating: null,
-        location: newPlace.location
-      },
-      $activeUser
-    );
-
-    newPlace = { name: '', category: 'restaurant', notes: '', location: undefined };
-    showForm = false;
+    try {
+      await addDocument<Place>(
+        'places',
+        {
+          name: newPlace.name,
+          category: newPlace.category,
+          notes: newPlace.notes,
+          visited: false,
+          visitDates: [],
+          rating: null,
+          location: newPlace.location
+        },
+        $activeUser
+      );
+      toast.success(`Added "${newPlace.name}"`);
+      newPlace = { name: '', category: 'restaurant', notes: '', location: undefined };
+      showForm = false;
+    } catch (e) {
+      console.error('Failed to add place:', e);
+      toast.error('Failed to add place');
+    }
   }
 
   async function addFromSuggestion(suggestion: PlaceSuggestion): Promise<void> {
-    await addDocument<Place>(
-      'places',
-      {
-        name: suggestion.name,
-        category: suggestion.category,
-        notes: '',
-        visited: false,
-        visitDates: [],
-        rating: null,
-        location: {
-          lat: suggestion.coordinates.lat,
-          lng: suggestion.coordinates.lng,
-          address: suggestion.address
-        }
-      },
-      $activeUser
-    );
+    try {
+      await addDocument<Place>(
+        'places',
+        {
+          name: suggestion.name,
+          category: suggestion.category,
+          notes: '',
+          visited: false,
+          visitDates: [],
+          rating: null,
+          location: {
+            lat: suggestion.coordinates.lat,
+            lng: suggestion.coordinates.lng,
+            address: suggestion.address
+          }
+        },
+        $activeUser
+      );
+      toast.success(`Added "${suggestion.name}"`);
+    } catch (e) {
+      console.error('Failed to add place:', e);
+      toast.error('Failed to add place');
+    }
   }
 
   async function toggleVisited(place: Place): Promise<void> {
@@ -94,7 +106,13 @@
 
   async function remove(id: string): Promise<void> {
     if (confirm('Remove this place?')) {
-      await deleteDocument('places', id);
+      try {
+        await deleteDocument('places', id);
+        toast.success('Place removed');
+      } catch (e) {
+        console.error('Failed to remove:', e);
+        toast.error('Failed to remove place');
+      }
     }
   }
 

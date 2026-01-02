@@ -2,6 +2,7 @@
   import { onAuthChange } from '$lib/firebase'
   import { authLoading, authUser, currentPreferences } from '$lib/stores/app'
   import { onMount } from 'svelte'
+  import { Toaster } from 'svelte-sonner'
 
   import UserToggle from '$lib/components/UserToggle.svelte'
   import Home from '$lib/pages/Home.svelte'
@@ -56,6 +57,8 @@
     }
   });
 </script>
+
+<Toaster richColors position="bottom-center" />
 
 {#if $authLoading}
   <div class="flex items-center justify-center h-screen text-xl text-slate-500">
@@ -112,6 +115,19 @@
         <Places />
       {:else if currentPath === '/debug'}
         <Debug />
+      {:else}
+        <!-- 404 Not Found -->
+        <div class="text-center py-16">
+          <div class="text-6xl mb-4">🔍</div>
+          <h1 class="text-2xl font-bold mb-2">Page not found</h1>
+          <p class="text-slate-500 dark:text-slate-400 mb-6">The page you're looking for doesn't exist.</p>
+          <button
+            onclick={() => navigate('/')}
+            class="px-6 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90"
+          >
+            Go Home
+          </button>
+        </div>
       {/if}
     </main>
   </div>

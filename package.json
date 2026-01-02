@@ -33,8 +33,10 @@
         "vitest": "^4.0.16"
     },
     "dependencies": {
+        "@humanspeak/svelte-virtual-list": "^0.3.6",
         "@tailwindcss/postcss": "^4.1.18",
-        "firebase": "^12.7.0"
+        "firebase": "^12.7.0",
+        "svelte-sonner": "^1.0.7"
     },
     "trustedDependencies": [
         "esbuild",

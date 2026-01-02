@@ -3,6 +3,7 @@
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
   import { activeUser, displayNames } from '$lib/stores/app'
   import type { Media, MediaStatus, MediaType, TMDBSearchResult, UserId, ProductionCompany, MediaCollection } from '$lib/types'
+  import { toast } from 'svelte-sonner'
   import { getDisplayRating } from '$lib/types'
   import { enrichMediaData } from '$lib/tmdb'
   import { searchGames, type WikiGameResult } from '$lib/wikipedia'
@@ -24,6 +25,7 @@
   } from '$lib/filters'
   import { onMount } from 'svelte'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
+  import SvelteVirtualList from '@humanspeak/svelte-virtual-list'
 
   // Core state
   let media = $state<Media[]>([]);
@@ -42,8 +44,9 @@
   let filters = $state<MediaFilters>({ ...DEFAULT_FILTERS });
   let sort = $state<SortConfig>({ ...DEFAULT_SORT });
 
-  // Debounce
+  // Debounce and request cancellation
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
+  let searchAbortController: AbortController | null = null;
   const DEBOUNCE_MS = 300;
 
   const tabs: Array<{ key: MediaType | 'all'; label: string; icon: string }> = [
@@ -82,6 +85,7 @@
     return () => {
       unsubscribe?.();
       if (searchTimer) clearTimeout(searchTimer);
+      if (searchAbortController) searchAbortController.abort();
     };
   });
 
@@ -94,42 +98,51 @@
   $effect(() => {
     const query = searchQuery.trim();
     const currentType = filters.type;
-    
+
     if (searchTimer) clearTimeout(searchTimer);
-    
+    // Cancel any in-flight requests
+    if (searchAbortController) {
+      searchAbortController.abort();
+      searchAbortController = null;
+    }
+
     if (!query) {
       discoverResults = [];
       gameResults = [];
       return;
     }
-    
+
     searchTimer = setTimeout(() => {
+      searchAbortController = new AbortController();
       if (currentType === 'game') {
-        searchWikipedia(query);
+        searchWikipedia(query, searchAbortController.signal);
       } else {
-        searchTMDB(query, currentType);
+        searchTMDB(query, currentType, searchAbortController.signal);
       }
     }, DEBOUNCE_MS);
   });
 
-  async function searchTMDB(query: string, tab: 'all' | MediaType): Promise<void> {
+  async function searchTMDB(query: string, tab: 'all' | MediaType, signal?: AbortSignal): Promise<void> {
     searching = true;
     try {
       const endpoint = tab === 'movie' ? 'movie' : tab === 'tv' ? 'tv' : 'multi';
       const res = await fetch(
-        `${tmdbConfig.baseUrl}/search/${endpoint}?api_key=${tmdbConfig.apiKey}&query=${encodeURIComponent(query)}`
+        `${tmdbConfig.baseUrl}/search/${endpoint}?api_key=${tmdbConfig.apiKey}&query=${encodeURIComponent(query)}`,
+        { signal }
       );
       const data = await res.json();
       let results = data.results as TMDBSearchResult[];
-      
+
       if (endpoint !== 'multi') {
         results = results.map(r => ({ ...r, media_type: endpoint as 'movie' | 'tv' }));
       } else {
         results = results.filter(r => r.media_type === 'movie' || r.media_type === 'tv');
       }
-      
+
       discoverResults = results.slice(0, 12);
     } catch (e) {
+      // Ignore abort errors
+      if (e instanceof DOMException && e.name === 'AbortError') return;
       console.error('TMDB search failed:', e);
       discoverResults = [];
     } finally {
@@ -137,11 +150,13 @@
     }
   }
 
-  async function searchWikipedia(query: string): Promise<void> {
+  async function searchWikipedia(query: string, signal?: AbortSignal): Promise<void> {
     searching = true;
     try {
       gameResults = await searchGames(query);
     } catch (e) {
+      // Ignore abort errors
+      if (e instanceof DOMException && e.name === 'AbortError') return;
       console.error('Wikipedia search failed:', e);
       gameResults = [];
     } finally {
@@ -186,10 +201,12 @@
         productionCompanies,
         ...(isTV && { progress: { season: 1, episode: 1 } }),
       }, $activeUser);
-      
+
       discoverResults = discoverResults.filter(r => r.id !== item.id);
+      toast.success(`Added "${item.title || item.name}"`);
     } catch (e) {
       console.error('Failed to add:', e);
+      toast.error('Failed to add item');
     } finally {
       adding = null;
     }
@@ -210,10 +227,12 @@
         rating: null,
         notes: '',
       }, $activeUser);
-      
+
       gameResults = gameResults.filter(g => g.pageid !== game.pageid);
+      toast.success(`Added "${game.title}"`);
     } catch (e) {
       console.error('Failed to add game:', e);
+      toast.error('Failed to add game');
     } finally {
       adding = null;
     }
@@ -236,7 +255,13 @@
 
   async function removeItem(id: string): Promise<void> {
     if (confirm('Remove this item?')) {
-      await deleteDocument('media', id);
+      try {
+        await deleteDocument('media', id);
+        toast.success('Removed from collection');
+      } catch (e) {
+        console.error('Failed to remove:', e);
+        toast.error('Failed to remove item');
+      }
     }
   }
 
@@ -265,12 +290,31 @@
     }
   }
 
-  // Derived data from media
-  let availableGenres = $derived(extractGenres(media));
-  let availableDecades = $derived(extractDecades(media));
+  // Memoization caches
+  let genreCache = $state<{ key: string; genres: string[] } | null>(null);
+  let decadeCache = $state<{ key: string; decades: number[] } | null>(null);
+  let searchCache = $state<Map<string, Media[]>>(new Map());
+
+  // Derived data from media with memoization
+  let availableGenres = $derived.by(() => {
+    const key = media.map(m => m.id).join(',');
+    if (genreCache?.key === key) return genreCache.genres;
+    const genres = extractGenres(media);
+    genreCache = { key, genres };
+    return genres;
+  });
+
+  let availableDecades = $derived.by(() => {
+    const key = media.map(m => m.id).join(',');
+    if (decadeCache?.key === key) return decadeCache.decades;
+    const decades = extractDecades(media);
+    decadeCache = { key, decades };
+    return decades;
+  });
+
   let activeFilterCount = $derived(countActiveFilters({ ...filters, type: 'all' })); // Don't count type tab
 
-  // Filtered and sorted library
+  // Filtered and sorted library with search caching
   let filteredMedia = $derived.by(() => {
     let result = media;
     const query = searchQuery.trim().toLowerCase();
@@ -278,9 +322,13 @@
     // Apply structured filters
     result = applyFilters(result, filters);
 
-    // Search filter with fuzzy matching
+    // Search filter with fuzzy matching (cached)
     if (query) {
-      result = result
+      const cacheKey = `${query}|${result.map(m => m.id).join(',')}`;
+      const cached = searchCache.get(cacheKey);
+      if (cached) return cached;
+
+      const searched = result
         .map(item => ({
           item,
           score: fuzzyScoreMulti(query, item.title, item.overview, ...(item.genres ?? []))
@@ -288,6 +336,14 @@
         .filter(r => r.score >= FUZZY_THRESHOLD)
         .sort((a, b) => b.score - a.score)
         .map(r => r.item);
+
+      // Keep cache small (last 10 searches)
+      if (searchCache.size > 10) {
+        const firstKey = searchCache.keys().next().value;
+        if (firstKey) searchCache.delete(firstKey);
+      }
+      searchCache.set(cacheKey, searched);
+      return searched;
     } else {
       // Apply sort when not searching
       result = applySort(result, sort);
@@ -315,6 +371,48 @@
 
   let isSearching = $derived(searchQuery.trim().length > 0);
   let hasDiscoverResults = $derived(filters.type === 'game' ? gameResults.length > 0 : discoverResults.length > 0);
+
+  // Virtual scrolling state
+  let gridContainer = $state<HTMLElement | null>(null);
+  let containerWidth = $state(0);
+
+  // Calculate columns based on container width (matching Tailwind breakpoints)
+  let columns = $derived.by(() => {
+    if (containerWidth >= 1024) return 5; // lg
+    if (containerWidth >= 768) return 4;  // md
+    if (containerWidth >= 640) return 3;  // sm
+    return 2; // default
+  });
+
+  // Group media items into rows for virtual scrolling
+  type MediaRow = { id: string; items: Media[] };
+  let mediaRows = $derived.by(() => {
+    const rows: MediaRow[] = [];
+    for (let i = 0; i < filteredMedia.length; i += columns) {
+      const rowItems = filteredMedia.slice(i, i + columns);
+      rows.push({
+        id: `row-${i}-${columns}`,
+        items: rowItems
+      });
+    }
+    return rows;
+  });
+
+  // Track container width with ResizeObserver
+  $effect(() => {
+    if (!gridContainer) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        containerWidth = entry.contentRect.width;
+      }
+    });
+
+    resizeObserver.observe(gridContainer);
+    containerWidth = gridContainer.clientWidth;
+
+    return () => resizeObserver.disconnect();
+  });
 </script>
 
 <MediaDetailModal media={selectedMedia} onClose={() => selectedMedia = null} />
@@ -543,7 +641,7 @@
             >
               <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800">
                 {#if game.thumbnail}
-                  <img src={game.thumbnail} alt="" class="w-full h-full object-cover" />
+                  <img src={game.thumbnail} alt={game.title} loading="lazy" class="w-full h-full object-cover" />
                 {:else}
                   <div class="w-full h-full flex items-center justify-center text-3xl text-slate-300">🎮</div>
                 {/if}
@@ -572,7 +670,7 @@
             >
               <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800">
                 {#if result.poster_path}
-                  <img src={posterUrl(result.poster_path)} alt="" class="w-full h-full object-cover" />
+                  <img src={posterUrl(result.poster_path)} alt={result.title || result.name} loading="lazy" class="w-full h-full object-cover" />
                 {:else}
                   <div class="w-full h-full flex items-center justify-center text-3xl text-slate-300">?</div>
                 {/if}
@@ -598,7 +696,7 @@
   {/if}
 
   <!-- Library -->
-  <div>
+  <div bind:this={gridContainer}>
     {#if isSearching}
       <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">
         In your collection ({filteredMedia.length})
@@ -623,110 +721,127 @@
         {/if}
       </div>
     {:else}
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {#each filteredMedia as item (item.id)}
-          <article class="group relative bg-surface border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden hover:shadow-lg transition-all">
-            <!-- Delete button -->
-            <button
-              class="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all"
-              onclick={(e) => { e.stopPropagation(); item.id && removeItem(item.id); }}
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+      <SvelteVirtualList
+        items={mediaRows}
+        defaultEstimatedItemHeight={320}
+        viewportClass="virtual-grid-viewport"
+        contentClass="virtual-grid-content"
+      >
+        {#snippet renderItem(row: MediaRow)}
+          <div class="grid gap-4 pb-4" style="grid-template-columns: repeat({columns}, minmax(0, 1fr));">
+            {#each row.items as item (item.id)}
+              <article class="group relative bg-surface border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden hover:shadow-lg transition-all">
+                <!-- Delete button -->
+                <button
+                  class="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all"
+                  onclick={(e) => { e.stopPropagation(); item.id && removeItem(item.id); }}
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
 
-            <!-- Status indicator -->
-            <div class="absolute top-2 left-2 z-10">
-              <div class="w-2.5 h-2.5 rounded-full {getStatusColor(item.status)} ring-2 ring-white dark:ring-slate-900" title={item.status}></div>
-            </div>
-
-            <!-- Poster (clickable) -->
-            <button
-              class="w-full text-left"
-              onclick={() => selectedMedia = item}
-            >
-              <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 relative">
-                {#if item.posterPath}
-                  <img 
-                    src={posterUrl(item.posterPath, 'md')} 
-                    alt="" 
-                    class="w-full h-full object-cover"
-                    class:opacity-40={item.status === 'completed'}
-                  />
-                {:else}
-                  <div class="w-full h-full flex items-center justify-center text-4xl text-slate-300">
-                    {item.type === 'game' ? '🎮' : item.type === 'tv' ? '📺' : '🎬'}
-                  </div>
-                {/if}
-                {#if item.status === 'completed'}
-                  <div class="absolute inset-0 flex items-center justify-center">
-                    <div class="w-12 h-12 rounded-full bg-emerald-500/90 flex items-center justify-center">
-                      <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  </div>
-                {/if}
-              </div>
-            </button>
-
-            <!-- Info -->
-            <div class="p-3">
-              <h3 class="font-medium text-sm truncate mb-1" class:line-through={item.status === 'dropped'} class:text-slate-400={item.status === 'dropped'}>
-                {item.title}
-              </h3>
-              
-              <!-- Release year & collection badge -->
-              {#if item.releaseDate || item.collection}
-                <div class="flex items-center gap-1.5 mb-1 text-[10px] text-slate-400">
-                  {#if item.releaseDate}
-                    <span>{item.releaseDate.split('-')[0]}</span>
-                  {/if}
-                  {#if item.collection}
-                    <span class="px-1 py-0.5 bg-accent/10 text-accent rounded text-[9px] truncate max-w-[80px]" title={item.collection.name}>
-                      {item.collection.name}
-                    </span>
-                  {/if}
+                <!-- Status indicator -->
+                <div class="absolute top-2 left-2 z-10">
+                  <div class="w-2.5 h-2.5 rounded-full {getStatusColor(item.status)} ring-2 ring-white dark:ring-slate-900" title={item.status}></div>
                 </div>
-              {/if}
-              
-              <!-- Rating -->
-              <div class="flex items-center gap-0.5">
-                {#each [1, 2, 3, 4, 5] as star}
-                  {@const displayRating = getDisplayRating(item)}
-                  <button
-                    class="text-base transition-colors {(displayRating ?? 0) >= star ? 'text-amber-400' : 'text-slate-200 dark:text-slate-700 hover:text-amber-300'}"
-                    onclick={() => quickRate(item, star)}
-                  >
-                    ★
-                  </button>
-                {/each}
-              </div>
 
-              <!-- Quick status buttons -->
-              <div class="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                {#if item.status !== 'watching'}
-                  <button
-                    class="flex-1 py-1 text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
-                    onclick={() => quickStatusChange(item, 'watching')}
-                  >
-                    Start
-                  </button>
-                {/if}
-                {#if item.status !== 'completed'}
-                  <button
-                    class="flex-1 py-1 text-[10px] font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors"
-                    onclick={() => quickStatusChange(item, 'completed')}
-                  >
-                    Done
-                  </button>
-                {/if}
-              </div>
-            </div>
-          </article>
-        {/each}
-      </div>
+                <!-- Poster (clickable) -->
+                <button
+                  class="w-full text-left"
+                  onclick={() => selectedMedia = item}
+                >
+                  <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 relative">
+                    {#if item.posterPath}
+                      <img
+                        src={posterUrl(item.posterPath, 'md')}
+                        alt={item.title}
+                        loading="lazy"
+                        class="w-full h-full object-cover"
+                        class:opacity-40={item.status === 'completed'}
+                      />
+                    {:else}
+                      <div class="w-full h-full flex items-center justify-center text-4xl text-slate-300">
+                        {item.type === 'game' ? '🎮' : item.type === 'tv' ? '📺' : '🎬'}
+                      </div>
+                    {/if}
+                    {#if item.status === 'completed'}
+                      <div class="absolute inset-0 flex items-center justify-center">
+                        <div class="w-12 h-12 rounded-full bg-emerald-500/90 flex items-center justify-center">
+                          <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    {/if}
+                  </div>
+                </button>
+
+                <!-- Info -->
+                <div class="p-3">
+                  <h3 class="font-medium text-sm truncate mb-1" class:line-through={item.status === 'dropped'} class:text-slate-400={item.status === 'dropped'}>
+                    {item.title}
+                  </h3>
+
+                  <!-- Release year & collection badge -->
+                  {#if item.releaseDate || item.collection}
+                    <div class="flex items-center gap-1.5 mb-1 text-[10px] text-slate-400">
+                      {#if item.releaseDate}
+                        <span>{item.releaseDate.split('-')[0]}</span>
+                      {/if}
+                      {#if item.collection}
+                        <span class="px-1 py-0.5 bg-accent/10 text-accent rounded text-[9px] truncate max-w-[80px]" title={item.collection.name}>
+                          {item.collection.name}
+                        </span>
+                      {/if}
+                    </div>
+                  {/if}
+
+                  <!-- Rating -->
+                  <div class="flex items-center gap-0.5">
+                    {#each [1, 2, 3, 4, 5] as star}
+                      {@const displayRating = getDisplayRating(item)}
+                      <button
+                        class="text-base transition-colors {(displayRating ?? 0) >= star ? 'text-amber-400' : 'text-slate-200 dark:text-slate-700 hover:text-amber-300'}"
+                        onclick={() => quickRate(item, star)}
+                      >
+                        ★
+                      </button>
+                    {/each}
+                  </div>
+
+                  <!-- Quick status buttons -->
+                  <div class="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {#if item.status !== 'watching'}
+                      <button
+                        class="flex-1 py-1 text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+                        onclick={() => quickStatusChange(item, 'watching')}
+                      >
+                        Start
+                      </button>
+                    {/if}
+                    {#if item.status !== 'completed'}
+                      <button
+                        class="flex-1 py-1 text-[10px] font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors"
+                        onclick={() => quickStatusChange(item, 'completed')}
+                      >
+                        Done
+                      </button>
+                    {/if}
+                  </div>
+                </div>
+              </article>
+            {/each}
+          </div>
+        {/snippet}
+      </SvelteVirtualList>
     {/if}
   </div>
 </div>
+
+<style>
+  :global(.virtual-grid-viewport) {
+    height: calc(100vh - 280px);
+    min-height: 400px;
+  }
+</style>

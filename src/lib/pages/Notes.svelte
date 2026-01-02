@@ -2,6 +2,7 @@
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
   import { activeUser, displayNames } from '$lib/stores/app'
   import type { Note, UserId } from '$lib/types'
+  import { toast } from 'svelte-sonner'
   import { Timestamp, type Timestamp as TimestampType } from 'firebase/firestore'
   import { onMount } from 'svelte'
 
@@ -24,20 +25,25 @@
   async function addNote(): Promise<void> {
     if (!newNote.title.trim() && !newNote.content.trim()) return;
 
-    await addDocument<Note>(
-      'notes',
-      {
-        type: 'note',
-        title: newNote.title,
-        content: newNote.content,
-        tags: [],
-        read: false,
-        archived: false
-      },
-      $activeUser
-    );
-
-    newNote = { title: '', content: '' };
+    try {
+      await addDocument<Note>(
+        'notes',
+        {
+          type: 'note',
+          title: newNote.title,
+          content: newNote.content,
+          tags: [],
+          read: false,
+          archived: false
+        },
+        $activeUser
+      );
+      newNote = { title: '', content: '' };
+      toast.success('Note sent');
+    } catch (e) {
+      console.error('Failed to send note:', e);
+      toast.error('Failed to send note');
+    }
   }
 
   async function markAsRead(note: Note): Promise<void> {
@@ -57,7 +63,13 @@
 
   async function removeNote(id: string): Promise<void> {
     if (confirm('Delete this note permanently?')) {
-      await deleteDocument('notes', id);
+      try {
+        await deleteDocument('notes', id);
+        toast.success('Note deleted');
+      } catch (e) {
+        console.error('Failed to delete:', e);
+        toast.error('Failed to delete note');
+      }
     }
   }
 

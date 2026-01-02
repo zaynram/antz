@@ -149,6 +149,7 @@
           <img
             src={posterUrl(media.posterPath)}
             alt={media.title}
+            loading="lazy"
             class="w-full h-48 object-cover rounded-t-xl"
           />
           <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent rounded-t-xl"></div>

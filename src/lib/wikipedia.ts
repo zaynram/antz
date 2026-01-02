@@ -18,11 +18,19 @@ export interface WikiGameResult {
 
 const WIKI_API = 'https://en.wikipedia.org/w/api.php';
 
+// Cache for game search results
+const searchCache = new Map<string, WikiGameResult[]>();
+
 /**
  * Search Wikipedia for video games
  */
 export async function searchGames(query: string): Promise<WikiGameResult[]> {
   if (!query.trim()) return [];
+
+  // Check cache first
+  const cacheKey = query.trim().toLowerCase();
+  const cached = searchCache.get(cacheKey);
+  if (cached) return cached;
   
   // Search with "video game" suffix for better results
   const searchQuery = `${query} video game`;
@@ -62,14 +70,14 @@ export async function searchGames(query: string): Promise<WikiGameResult[]> {
     const pages = imageData.query?.pages || {};
     
     // Map results with thumbnails
-    return results.map(r => {
+    const gameResults = results.map(r => {
       const page = Object.values(pages).find((p: unknown) => (p as { title: string }).title === r.title) as {
         pageid: number;
         title: string;
         thumbnail?: { source: string };
         extract?: string;
       } | undefined;
-      
+
       return {
         pageid: r.pageid,
         title: r.title.replace(/ \(video game\)$/i, '').replace(/ \(\d{4} video game\)$/i, ''),
@@ -77,6 +85,10 @@ export async function searchGames(query: string): Promise<WikiGameResult[]> {
         thumbnail: page?.thumbnail?.source || null
       };
     });
+
+    // Cache and return
+    searchCache.set(cacheKey, gameResults);
+    return gameResults;
   } catch (e) {
     console.error('Wikipedia search failed:', e);
     return [];

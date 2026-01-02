@@ -47,6 +47,10 @@ export interface TMDBTVDetails {
 let movieGenreCache: Map<number, string> | null = null
 let tvGenreCache: Map<number, string> | null = null
 
+// Details cache for movie/TV info
+const movieDetailsCache = new Map<number, TMDBMovieDetails>()
+const tvDetailsCache = new Map<number, TMDBTVDetails>()
+
 async function fetchGenreList(type: 'movie' | 'tv'): Promise<Map<number, string>> {
     const res = await fetch(
         `${tmdbConfig.baseUrl}/genre/${type}/list?api_key=${tmdbConfig.apiKey}`
@@ -79,23 +83,35 @@ export async function resolveGenreIds(ids: number[], type: 'movie' | 'tv'): Prom
 }
 
 export async function fetchMovieDetails(tmdbId: number): Promise<TMDBMovieDetails> {
+    // Return cached if available
+    const cached = movieDetailsCache.get(tmdbId)
+    if (cached) return cached
+
     const res = await fetch(
         `${tmdbConfig.baseUrl}/movie/${tmdbId}?api_key=${tmdbConfig.apiKey}`
     )
     if (!res.ok) {
         throw new Error(`Failed to fetch movie details: ${res.status}`)
     }
-    return res.json()
+    const data = await res.json()
+    movieDetailsCache.set(tmdbId, data)
+    return data
 }
 
 export async function fetchTVDetails(tmdbId: number): Promise<TMDBTVDetails> {
+    // Return cached if available
+    const cached = tvDetailsCache.get(tmdbId)
+    if (cached) return cached
+
     const res = await fetch(
         `${tmdbConfig.baseUrl}/tv/${tmdbId}?api_key=${tmdbConfig.apiKey}`
     )
     if (!res.ok) {
         throw new Error(`Failed to fetch TV details: ${res.status}`)
     }
-    return res.json()
+    const data = await res.json()
+    tvDetailsCache.set(tmdbId, data)
+    return data
 }
 
 export interface ProductionCompany {
