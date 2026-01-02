@@ -446,7 +446,7 @@
       <!-- Grid size toggle -->
       <button
         type="button"
-        class="min-w-[44px] min-h-[44px] p-2.5 rounded-lg bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700 transition-colors text-xs font-mono select-none cursor-pointer"
+        class="min-w-[44px] min-h-[44px] p-2.5 rounded-lg bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700 transition-colors text-xs font-mono cursor-pointer touch-manipulation"
         onclick={cycleGridSize}
         aria-label="Change grid size: {$mediaGridSize}"
       >
@@ -456,8 +456,8 @@
       <!-- Filter toggle -->
       <button
         type="button"
-        class="relative min-w-[44px] min-h-[44px] p-2.5 rounded-lg transition-colors select-none cursor-pointer {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700'}"
-        onclick={() => { showFilters = !showFilters; }}
+        class="relative min-w-[44px] min-h-[44px] p-2.5 rounded-lg transition-colors cursor-pointer touch-manipulation {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700'}"
+        onclick={() => showFilters = !showFilters}
         aria-label="Filters & Sort"
         aria-expanded={showFilters}
       >

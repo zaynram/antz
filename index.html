@@ -22,27 +22,27 @@
 
     <!-- Mobile-optimized styles -->
     <style>
-      html, body {
-        -webkit-touch-callout: none;
+      html {
         height: 100%;
-        /* Use dvh for PWA - falls back to vh */
         height: 100dvh;
+        overflow: hidden;
       }
       body {
+        height: 100%;
+        margin: 0;
         overflow: hidden;
-        position: fixed;
-        width: 100%;
       }
       #app {
         height: 100%;
-        overflow: hidden;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
       }
       /* Allow text selection in inputs and textareas */
       input, textarea, [contenteditable="true"] {
         -webkit-user-select: text;
         user-select: text;
+        -webkit-touch-callout: default;
       }
     </style>
   </head>
