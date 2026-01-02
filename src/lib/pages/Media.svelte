@@ -783,7 +783,8 @@
 
             <!-- Poster (clickable) -->
             <button
-              class="w-full text-left"
+              type="button"
+              class="w-full text-left cursor-pointer touch-manipulation"
               onclick={() => selectedMedia = item}
             >
               <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 relative">
