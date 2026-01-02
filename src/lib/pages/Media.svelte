@@ -508,7 +508,7 @@
 
   <!-- Filters Panel (collapsible) -->
   {#if showFilters}
-    <div class="p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl mb-4 space-y-4">
+    <div class="p-4 bg-red-500 text-white rounded-xl mb-4 space-y-4">
       <!-- Row 1: Status, Added By, Sort -->
       <div class="flex flex-wrap gap-4">
         <div class="flex-1 min-w-[120px]">
