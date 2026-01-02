@@ -506,9 +506,8 @@
     {/each}
   </div>
 
-  <!-- Filters Panel (collapsible) -->
-  {#if showFilters}
-    <div class="p-4 bg-red-500 text-white rounded-xl mb-4 space-y-4">
+  <!-- Filters Panel (always visible for debug) -->
+  <div class="p-4 bg-red-500 text-white rounded-xl mb-4 space-y-4">
       <!-- Row 1: Status, Added By, Sort -->
       <div class="flex flex-wrap gap-4">
         <div class="flex-1 min-w-[120px]">
@@ -628,7 +627,6 @@
         </div>
       {/if}
     </div>
-  {/if}
 
   <!-- Quick filter summary (when collapsed but active) -->
   {#if !showFilters && activeFilterCount > 0}
