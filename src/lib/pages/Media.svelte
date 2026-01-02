@@ -438,7 +438,7 @@
 
 <MediaDetailModal media={selectedMedia} onClose={() => selectedMedia = null} />
 
-<div class="max-w-6xl mx-auto h-full flex flex-col" class:filters-open={showFilters}>
+<div class="max-w-6xl mx-auto">
   <!-- Header -->
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold">Media</h1>
@@ -740,7 +740,7 @@
   {/if}
 
   <!-- Library -->
-  <div bind:this={gridContainer} class="flex-1 min-h-0">
+  <div bind:this={gridContainer}>
     {#if isSearching}
       <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">
         In your collection ({filteredMedia.length})
@@ -906,18 +906,23 @@
 
 <style>
   :global(.virtual-grid-viewport) {
-    /* Fill available flex space */
-    height: 100%;
-    min-height: 200px;
+    /* Use dvh for proper mobile viewport handling */
+    height: calc(100dvh - 280px);
+    min-height: 300px;
+    max-height: calc(100dvh - 200px);
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    /* Ensure touch scrolling works on mobile */
     touch-action: pan-y;
-    /* Prevent text selection during scroll */
-    -webkit-user-select: none;
-    user-select: none;
+  }
+
+  /* Fallback for browsers without dvh support */
+  @supports not (height: 100dvh) {
+    :global(.virtual-grid-viewport) {
+      height: calc(100vh - 280px);
+      max-height: calc(100vh - 200px);
+    }
   }
 
   /* On touch devices, show hover elements when the article is focused/active */

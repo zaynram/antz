@@ -30,7 +30,7 @@
 
   // Long-press for debug access
   let longPressTimer: ReturnType<typeof setTimeout> | null = null;
-  let isLongPress = $state(false);
+  let longPressTriggered = false;
   const LONG_PRESS_DURATION = 2000; // 2 seconds
 
   // Track previous user to detect switches
@@ -162,8 +162,8 @@
 
   async function reloadApp(): Promise<void> {
     // Don't reload if this was a long-press (going to debug instead)
-    if (isLongPress) {
-      isLongPress = false;
+    if (longPressTriggered) {
+      longPressTriggered = false;
       return;
     }
 
@@ -197,9 +197,11 @@
     }
   }
 
-  function startLongPress(): void {
+  function startLongPress(e: Event): void {
+    longPressTriggered = false;
     longPressTimer = setTimeout(() => {
-      isLongPress = true;
+      longPressTriggered = true;
+      longPressTimer = null;
       toast.success('Entering debug mode...');
       navigate('/debug');
     }, LONG_PRESS_DURATION);
@@ -210,6 +212,7 @@
       clearTimeout(longPressTimer);
       longPressTimer = null;
     }
+    // Don't reset longPressTriggered here - let reloadApp check it
   }
 
   async function handleLogout(): Promise<void> {
