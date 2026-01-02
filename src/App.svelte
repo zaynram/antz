@@ -3,7 +3,7 @@
   import { authLoading, authUser, currentPreferences, initPreferencesSync, cleanupPreferencesSync } from '$lib/stores/app'
   import { onMount } from 'svelte'
   import { Toaster } from 'svelte-sonner'
-  import { Home as HomeIcon, StickyNote, Film, MapPin, SearchX, Settings as SettingsIcon } from 'lucide-svelte'
+  import { Home as HomeIcon, StickyNote, Film, MapPin, SearchX } from 'lucide-svelte'
 
   import UserToggle from '$lib/components/UserToggle.svelte'
   import Home from '$lib/pages/Home.svelte'
