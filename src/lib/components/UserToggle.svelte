@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { activeUser, currentPreferences, userPreferences } from '$lib/stores/app';
+  import { activeUser, userPreferences } from '$lib/stores/app';
   import PreferencesModal from './PreferencesModal.svelte';
   import { Settings } from 'lucide-svelte';
 

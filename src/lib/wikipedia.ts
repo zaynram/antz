@@ -67,7 +67,7 @@ function isLikelyGame(title: string, snippet: string): boolean {
 }
 
 // Calculate relevance score for sorting
-function getRelevanceScore(query: string, title: string, snippet: string): number {
+function getRelevanceScore(query: string, title: string, _snippet: string): number {
   const queryLower = query.toLowerCase();
   const titleLower = title.toLowerCase();
   const cleanTitle = titleLower.replace(/\s*\(.*\)\s*$/, ''); // Remove parenthetical suffix
