@@ -6,9 +6,12 @@
   import { onMount } from 'svelte'
   import { parseQuery, matchesQuery, hasSearchCriteria, getFilterSummary, type SearchableItem } from '$lib/queryParser'
   import { tmdbConfig } from '$lib/config'
-  import { Film, Tv, Gamepad2, StickyNote, MapPin, Search as SearchIcon, HelpCircle, ChevronDown, ChevronUp, X } from 'lucide-svelte'
+  import { Film, Tv, Gamepad2, StickyNote, MapPin, Search as SearchIcon, HelpCircle, ChevronDown, ChevronUp, X, Check } from 'lucide-svelte'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
+  import PlaceDetailModal from '$lib/components/PlaceDetailModal.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
+  import { updateDocument } from '$lib/firebase'
+  import { Timestamp } from 'firebase/firestore'
 
   interface Props {
     navigate: (path: string) => void
@@ -31,8 +34,10 @@
   // Tips toggle (persisted)
   let showTips = $state(true)
 
-  // Selected media for detail modal
+  // Selected items for detail views
   let selectedMedia = $state<Media | null>(null)
+  let selectedPlace = $state<Place | null>(null)
+  let expandedNoteId = $state<string | null>(null)
 
   // Subscriptions
   let unsubMedia: (() => void) | undefined
@@ -197,13 +202,62 @@
     selectedMedia = null
   }
 
-  // Keep selected media in sync with real-time updates
+  // Keep selected items in sync with real-time updates
   $effect(() => {
     if (selectedMedia) {
       const updated = media.find(m => m.id === selectedMedia!.id)
       if (updated) selectedMedia = updated
     }
   })
+
+  $effect(() => {
+    if (selectedPlace) {
+      const updated = places.find(p => p.id === selectedPlace!.id)
+      if (updated) selectedPlace = updated
+    }
+  })
+
+  // Place modal handlers
+  function openPlaceDetail(place: Place) {
+    selectedPlace = place
+  }
+
+  function closePlaceDetail() {
+    selectedPlace = null
+  }
+
+  // Note expansion handler
+  function toggleNoteExpand(note: Note) {
+    if (expandedNoteId === note.id) {
+      expandedNoteId = null
+    } else {
+      expandedNoteId = note.id || null
+      // Mark as read if unread and from other user
+      if (!note.read && note.createdBy !== $activeUser && note.id) {
+        updateDocument<Note>('notes', note.id, {
+          read: true,
+          readAt: Timestamp.now()
+        }, $activeUser)
+      }
+    }
+  }
+
+  // Format relative time for notes
+  function getRelativeTime(timestamp: { toDate: () => Date } | undefined): string {
+    if (!timestamp) return ''
+    const date = timestamp.toDate()
+    const now = Date.now()
+    const diffMs = now - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
 
   // Quick filter buttons
   const quickFilters = [
@@ -375,22 +429,40 @@
             </button>
           {:else if item.type === 'note'}
             {@const n = original as Note}
+            {@const isExpanded = expandedNoteId === n.id}
+            {@const isUnread = !n.read && n.createdBy !== $activeUser}
             <button
               type="button"
-              class="w-full flex items-center gap-4 p-4 card hover:border-accent transition-colors text-left touch-manipulation"
-              onclick={() => navigate('/notes')}
+              class="w-full p-4 card hover:border-accent transition-colors text-left touch-manipulation {isUnread ? 'border-accent/50 bg-accent/5' : ''}"
+              onclick={() => toggleNoteExpand(n)}
             >
-              <div class="shrink-0 w-11 h-11 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
-                <StickyNote size={20} />
-              </div>
-              <div class="flex-1 min-w-0">
-                <h3 class="font-medium truncate">{n.title || '(No subject)'}</h3>
-                <p class="text-xs text-slate-400 truncate mt-0.5">
-                  From {$displayNames[n.createdBy]}
-                  {#if !n.read && n.createdBy !== $activeUser}
-                    · <span class="text-accent font-medium">Unread</span>
+              <div class="flex items-start gap-4">
+                <div class="shrink-0 w-11 h-11 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                  <StickyNote size={20} />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <h3 class="font-medium {isExpanded ? '' : 'truncate'} {isUnread ? 'font-semibold' : ''}">{n.title || '(No subject)'}</h3>
+                  <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                    <span class="{n.createdBy === $activeUser ? '' : 'text-accent'}">
+                      {n.createdBy === $activeUser ? 'You' : $displayNames[n.createdBy]}
+                    </span>
+                    <span>·</span>
+                    <span>{getRelativeTime(n.createdAt)}</span>
+                    {#if n.read && n.readAt && n.createdBy === $activeUser}
+                      <span>·</span>
+                      <span class="text-emerald-500 flex items-center gap-0.5"><Check size={12} /> Read</span>
+                    {/if}
+                    {#if isUnread}
+                      <span>·</span>
+                      <span class="text-accent font-medium">Unread</span>
+                    {/if}
+                  </div>
+                  {#if n.content}
+                    <p class="mt-2 text-sm text-slate-600 dark:text-slate-300 {isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-2'}">
+                      {n.content}
+                    </p>
                   {/if}
-                </p>
+                </div>
               </div>
             </button>
           {:else if item.type === 'place'}
@@ -398,7 +470,7 @@
             <button
               type="button"
               class="w-full flex items-center gap-4 p-4 card hover:border-accent transition-colors text-left touch-manipulation"
-              onclick={() => navigate('/places')}
+              onclick={() => openPlaceDetail(p)}
             >
               <div class="shrink-0 w-11 h-11 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
                 <MapPin size={20} />
@@ -536,3 +608,6 @@
 
 <!-- Media Detail Modal -->
 <MediaDetailModal media={selectedMedia} onClose={closeMediaDetail} />
+
+<!-- Place Detail Modal -->
+<PlaceDetailModal place={selectedPlace} onClose={closePlaceDetail} />
