@@ -410,6 +410,46 @@
     }
   })
 
+  // Keyboard navigation for media grid
+  function handleGridKeydown(e: KeyboardEvent, index: number): void {
+    const total = filteredMedia.length
+    if (total === 0) return
+
+    let newIndex = index
+
+    switch (e.key) {
+      case 'ArrowRight':
+        newIndex = (index + 1) % total
+        e.preventDefault()
+        break
+      case 'ArrowLeft':
+        newIndex = (index - 1 + total) % total
+        e.preventDefault()
+        break
+      case 'ArrowDown':
+        newIndex = Math.min(index + columns, total - 1)
+        e.preventDefault()
+        break
+      case 'ArrowUp':
+        newIndex = Math.max(index - columns, 0)
+        e.preventDefault()
+        break
+      case 'Enter':
+      case ' ':
+        selectedMedia = filteredMedia[index]
+        e.preventDefault()
+        return
+      default:
+        return
+    }
+
+    // Focus the new item
+    const gridItems = gridContainer?.querySelectorAll('[data-grid-item]')
+    if (gridItems && gridItems[newIndex]) {
+      (gridItems[newIndex] as HTMLElement).focus()
+    }
+  }
+
 </script>
 
 <MediaDetailModal media={selectedMedia} onClose={() => selectedMedia = null} />
@@ -658,9 +698,16 @@
         onAction={activeFilterCount > 0 ? undefined : toggleAddPanel}
       />
     {:else}
-      <div class="grid gap-4" style="grid-template-columns: repeat({columns}, minmax(0, 1fr));">
-        {#each filteredMedia as item (item.id)}
-          <article class="group relative bg-surface border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden hover:shadow-lg transition-all">
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->
+      <div class="grid gap-4" style="grid-template-columns: repeat({columns}, minmax(0, 1fr));" role="grid">
+        {#each filteredMedia as item, index (item.id)}
+          <div
+            class="group relative bg-surface border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden hover:shadow-lg focus:ring-2 focus:ring-accent focus:outline-none transition-all"
+            tabindex="0"
+            role="gridcell"
+            data-grid-item
+            onkeydown={(e) => handleGridKeydown(e, index)}
+          >
             <!-- Delete button -->
             <button
               type="button"
@@ -752,7 +799,7 @@
                 {/if}
               </div>
             </div>
-          </article>
+          </div>
         {/each}
       </div>
     {/if}
