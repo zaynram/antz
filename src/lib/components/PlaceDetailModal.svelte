@@ -158,6 +158,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if place}
+  {@const CategoryIcon = categoryIcons[place.category]}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -179,7 +180,7 @@
 
         <div class="flex items-center gap-4">
           <div class="w-14 h-14 rounded-2xl bg-accent flex items-center justify-center text-white shrink-0">
-            <svelte:component this={categoryIcons[place.category]} size={28} />
+            <CategoryIcon size={28} />
           </div>
           <div class="flex-1 min-w-0">
             <h2 class="text-xl font-bold truncate">{place.name}</h2>

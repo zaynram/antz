@@ -55,7 +55,8 @@
   aria-label={label}
 >
   {#if icon}
-    <svelte:component this={icon} size={iconSizes[size]} />
+    {@const Icon = icon}
+    <Icon size={iconSizes[size]} />
   {:else if children}
     {@render children()}
   {/if}

@@ -531,8 +531,9 @@
                   {#if result.poster_path}
                     <img src={posterUrl(result.poster_path)} alt={result.title || result.name} loading="lazy" class="w-full h-full object-cover" />
                   {:else}
+                    {@const TypeIcon = typeInfo[type].icon}
                     <div class="w-full h-full flex items-center justify-center text-slate-300">
-                      <svelte:component this={typeInfo[type].icon} size={24} />
+                      <TypeIcon size={24} />
                     </div>
                   {/if}
                 </div>
@@ -680,8 +681,9 @@
                     class:opacity-40={item.status === 'completed'}
                   />
                 {:else}
+                  {@const TypeIcon = typeInfo[type].icon}
                   <div class="w-full h-full flex items-center justify-center text-slate-300">
-                    <svelte:component this={typeInfo[type].icon} size={48} />
+                    <TypeIcon size={48} />
                   </div>
                 {/if}
                 {#if item.status === 'completed'}

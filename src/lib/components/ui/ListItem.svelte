@@ -39,8 +39,9 @@
   onkeydown={onclick ? (e) => e.key === 'Enter' && onclick() : undefined}
 >
   {#if icon}
+    {@const Icon = icon}
     <div class="shrink-0 w-10 h-10 rounded-full flex items-center justify-center {iconBg}">
-      <svelte:component this={icon} size={20} />
+      <Icon size={20} />
     </div>
   {/if}
 

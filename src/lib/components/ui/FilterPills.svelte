@@ -30,7 +30,8 @@
       onclick={() => onchange(option.key)}
     >
       {#if option.icon}
-        <svelte:component this={option.icon} size={size === 'sm' ? 14 : 16} />
+        {@const Icon = option.icon}
+        <Icon size={size === 'sm' ? 14 : 16} />
       {/if}
       <span>{option.label}</span>
     </button>

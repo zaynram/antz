@@ -21,7 +21,8 @@
 <header class="mb-6">
   <div class="flex items-center justify-center gap-3 mb-1">
     {#if icon}
-      <svelte:component this={icon} size={iconSize} class="text-accent" />
+      {@const Icon = icon}
+      <Icon size={iconSize} class="text-accent" />
     {/if}
     <h1 class="text-2xl font-bold">{title}</h1>
   </div>

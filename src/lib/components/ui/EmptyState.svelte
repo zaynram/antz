@@ -12,7 +12,7 @@
   }
 
   let {
-    icon,
+    icon: Icon,
     title,
     description,
     actionLabel,
@@ -23,7 +23,7 @@
 
 <div class="text-center py-16">
   <div class="flex justify-center mb-4 text-slate-300 dark:text-slate-600">
-    <svelte:component this={icon} size={48} />
+    <Icon size={48} />
   </div>
   <h3 class="text-lg font-medium mb-2">{title}</h3>
   {#if description}
