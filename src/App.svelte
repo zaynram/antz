@@ -6,6 +6,7 @@
   import { SearchX, WifiOff } from 'lucide-svelte'
 
   import Sidebar from '$lib/components/Sidebar.svelte'
+  import BackToTop from '$lib/components/ui/BackToTop.svelte'
   import Search from '$lib/pages/Search.svelte'
   import Login from '$lib/pages/Login.svelte'
   import Library from '$lib/pages/Library.svelte'
@@ -139,4 +140,6 @@
       {/if}
     </div>
   </main>
+
+  <BackToTop />
 {/if}
