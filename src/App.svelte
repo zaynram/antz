@@ -3,10 +3,10 @@
   import { authLoading, authUser, currentPreferences, initPreferencesSync, cleanupPreferencesSync } from '$lib/stores/app'
   import { onMount } from 'svelte'
   import { Toaster } from 'svelte-sonner'
-  import { Home as HomeIcon, StickyNote, Film, MapPin, SearchX, WifiOff } from 'lucide-svelte'
+  import { Search as SearchIcon, StickyNote, Film, MapPin, SearchX, WifiOff } from 'lucide-svelte'
 
   import UserToggle from '$lib/components/UserToggle.svelte'
-  import Home from '$lib/pages/Home.svelte'
+  import Search from '$lib/pages/Search.svelte'
   import Login from '$lib/pages/Login.svelte'
   import Media from '$lib/pages/Media.svelte'
   import Debug from '$lib/pages/Debug.svelte'
@@ -104,8 +104,8 @@
           class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium hover:text-accent transition-colors"
           class:text-accent={currentPath === '/'}
         >
-          <HomeIcon size={18} />
-          <span class="hidden sm:inline">Home</span>
+          <SearchIcon size={18} />
+          <span class="hidden sm:inline">Search</span>
         </button>
         <button
           onclick={() => navigate('/notes')}
@@ -137,7 +137,7 @@
 
     <main class="flex-1 overflow-y-auto overflow-x-hidden p-6 max-w-5xl mx-auto w-full">
       {#if currentPath === '/'}
-        <Home {navigate} />
+        <Search {navigate} />
       {:else if currentPath === '/notes'}
         <Notes />
       {:else if currentPath === '/media'}
