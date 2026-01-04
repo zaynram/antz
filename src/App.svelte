@@ -105,10 +105,10 @@
   <Sidebar {currentPath} {navigate} />
 
   <main
-    class="min-h-screen pt-4 pb-8 px-4 sm:px-6 transition-all"
+    class="min-h-screen pt-4 pb-24 px-4 sm:pb-8 sm:px-6 transition-all"
     class:pt-12={isOffline}
   >
-    <div class="max-w-5xl mx-auto pt-14">
+    <div class="max-w-5xl mx-auto sm:pt-14">
       {#if currentPath === '/'}
         <Search {navigate} />
       {:else if currentPath === '/notes'}

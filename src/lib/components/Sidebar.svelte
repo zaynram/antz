@@ -79,18 +79,20 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<!-- Hamburger button (fixed position) -->
+<!-- Hamburger button - bottom-right on mobile, top-left on desktop -->
 <button
   type="button"
-  class="fixed top-4 left-4 z-50 w-11 h-11 flex items-center justify-center rounded-xl bg-surface border border-slate-200 dark:border-slate-700 shadow-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all touch-manipulation"
+  class="fixed z-50 flex items-center justify-center shadow-lg transition-all touch-manipulation
+    bottom-6 right-6 w-14 h-14 rounded-full bg-accent text-white
+    sm:top-4 sm:left-4 sm:bottom-auto sm:right-auto sm:w-11 sm:h-11 sm:rounded-xl sm:bg-surface sm:text-slate-600 sm:dark:text-slate-300 sm:border sm:border-slate-200 sm:dark:border-slate-700 sm:hover:bg-slate-50 sm:dark:hover:bg-slate-800"
   onclick={toggleSidebar}
   aria-label={isOpen ? 'Close menu' : 'Open menu'}
   aria-expanded={isOpen}
 >
   {#if isOpen}
-    <X size={22} class="text-slate-600 dark:text-slate-300" />
+    <X size={24} class="sm:w-[22px] sm:h-[22px]" />
   {:else}
-    <Menu size={22} class="text-slate-600 dark:text-slate-300" />
+    <Menu size={24} class="sm:w-[22px] sm:h-[22px]" />
   {/if}
 </button>
 
