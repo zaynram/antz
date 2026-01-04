@@ -93,6 +93,21 @@
     filters = { ...filters, type: tab };
   }
 
+  // Force repaint on iOS Safari PWA (fixes rendering bug with conditional content)
+  function forceRepaint() {
+    requestAnimationFrame(() => {
+      document.body.style.transform = 'translateZ(0)';
+      requestAnimationFrame(() => {
+        document.body.style.transform = '';
+      });
+    });
+  }
+
+  function toggleFilters() {
+    showFilters = !showFilters;
+    forceRepaint();
+  }
+
   // Live search effect
   $effect(() => {
     const query = searchQuery.trim();
@@ -429,8 +444,8 @@
       <!-- Filter toggle -->
       <button
         type="button"
-        class="relative min-w-[44px] min-h-[44px] p-2.5 rounded-lg transition-colors cursor-pointer select-none {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700'}"
-        onclick={() => showFilters = !showFilters}
+        class="relative min-w-[44px] min-h-[44px] p-2.5 rounded-lg transition-colors cursor-pointer select-none touch-manipulation {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:bg-slate-200 dark:active:bg-slate-700'}"
+        onclick={toggleFilters}
         aria-label="Filters & Sort"
         aria-expanded={showFilters}
       >
@@ -496,7 +511,7 @@
 
   <!-- Filters Panel (collapsible) -->
   {#if showFilters}
-    <div class="p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl mb-4 space-y-4">
+    <div class="p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl mb-4 space-y-4" style="transform: translateZ(0);">
       <!-- Row 1: Status, Added By, Sort -->
       <div class="flex flex-wrap gap-4">
         <div class="flex-1 min-w-[120px]">
@@ -625,8 +640,8 @@
       <span>·</span>
       <span>{getSortLabel(sort)}</span>
       <button
-        class="text-accent hover:underline"
-        onclick={() => showFilters = true}
+        class="text-accent hover:underline touch-manipulation"
+        onclick={() => { showFilters = true; forceRepaint(); }}
       >
         Edit
       </button>
