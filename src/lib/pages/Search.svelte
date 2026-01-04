@@ -16,7 +16,7 @@
   import { updateDocument } from '$lib/firebase'
   import { Timestamp } from 'firebase/firestore'
   import { searchMovies, searchTV, type TMDBSearchResult } from '$lib/tmdb'
-  import { searchGames, type WikiGameResult } from '$lib/wikipedia'
+  import { searchGames, type WikiGameResult, fetchGameThumbnail } from '$lib/wikipedia'
 
   interface Props {
     navigate: (path: string) => void
@@ -181,10 +181,19 @@
     addingItems = new Set([...addingItems, itemKey])
 
     try {
+      // For games without posters, try to fetch from Wikipedia
+      let finalPosterPath = posterPath
+      if (type === 'game' && !posterPath) {
+        const thumbnail = await fetchGameThumbnail(title)
+        if (thumbnail) {
+          finalPosterPath = thumbnail
+        }
+      }
+
       await addDocument<Media>('media', {
         type,
         title,
-        posterPath,
+        posterPath: finalPosterPath,
         releaseDate,
         overview,
         tmdbId,

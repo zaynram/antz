@@ -305,3 +305,28 @@ async function fetchPageImage(pageid: number): Promise<string | null> {
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 }
+
+/**
+ * Fetch a game thumbnail by title (for games added without images)
+ * Returns the thumbnail URL or null if not found
+ */
+export async function fetchGameThumbnail(title: string): Promise<string | null> {
+  if (!title.trim()) return null;
+
+  try {
+    // First search for the game to get its page ID
+    const results = await searchGames(title);
+    if (results.length === 0) return null;
+
+    // Find exact or closest match
+    const exactMatch = results.find(r =>
+      r.title.toLowerCase() === title.toLowerCase()
+    );
+    const bestMatch = exactMatch || results[0];
+
+    return bestMatch.thumbnail;
+  } catch (e) {
+    console.warn('Failed to fetch game thumbnail:', e);
+    return null;
+  }
+}
