@@ -96,8 +96,7 @@
 {:else}
   <div class="h-full flex flex-col overflow-hidden">
     <header
-      class="flex items-center justify-between px-6 py-4 bg-surface border-b border-slate-200 dark:border-slate-700 shrink-0 safe-area-x"
-      class:pt-[calc(1rem+env(safe-area-inset-top))]={isOffline}
+      class="flex items-center justify-between px-6 py-4 bg-surface border-b border-slate-200 dark:border-slate-700 shrink-0"
     >
       <nav class="flex gap-4 sm:gap-6">
         <button
@@ -136,7 +135,7 @@
       <UserToggle {navigate} />
     </header>
 
-    <main class="flex-1 overflow-y-auto overflow-x-hidden p-6 max-w-5xl mx-auto w-full safe-area-x safe-area-bottom">
+    <main class="flex-1 overflow-y-auto overflow-x-hidden p-6 max-w-5xl mx-auto w-full">
       {#if currentPath === '/'}
         <Home {navigate} />
       {:else if currentPath === '/notes'}
