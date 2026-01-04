@@ -289,27 +289,12 @@
     }
   }
 
-  // Memoization caches
-  let genreCache = $state<{ key: string; genres: string[] } | null>(null);
-  let decadeCache = $state<{ key: string; decades: number[] } | null>(null);
+  // Search result cache (for fuzzy search across different queries)
   let searchCache = $state<Map<string, Media[]>>(new Map());
 
-  // Derived data from media with memoization
-  let availableGenres = $derived.by(() => {
-    const key = media.map(m => m.id).join(',');
-    if (genreCache?.key === key) return genreCache.genres;
-    const genres = extractGenres(media);
-    genreCache = { key, genres };
-    return genres;
-  });
-
-  let availableDecades = $derived.by(() => {
-    const key = media.map(m => m.id).join(',');
-    if (decadeCache?.key === key) return decadeCache.decades;
-    const decades = extractDecades(media);
-    decadeCache = { key, decades };
-    return decades;
-  });
+  // Derived data from media (Svelte 5 $derived automatically memoizes)
+  let availableGenres = $derived(extractGenres(media));
+  let availableDecades = $derived(extractDecades(media));
 
   let activeFilterCount = $derived(countActiveFilters({ ...filters, type: 'all' })); // Don't count type tab
 
@@ -323,7 +308,8 @@
 
     // Search filter with fuzzy matching (cached)
     if (query) {
-      const cacheKey = `${query}|${result.map(m => m.id).join(',')}`;
+      // Use count + first/last IDs as cache key (faster than joining all IDs)
+      const cacheKey = `${query}|${result.length}|${result[0]?.id}|${result[result.length - 1]?.id}`;
       const cached = searchCache.get(cacheKey);
       if (cached) return cached;
 
@@ -358,14 +344,16 @@
     return `${tmdbConfig.imageBaseUrl}/${w}${path}`;
   }
 
+  // Status colors defined once (not recreated on each render)
+  const STATUS_COLORS: Record<MediaStatus, string> = {
+    queued: 'bg-slate-500',
+    watching: 'bg-amber-500',
+    completed: 'bg-emerald-500',
+    dropped: 'bg-red-500',
+  };
+
   function getStatusColor(status: MediaStatus): string {
-    const colors: Record<MediaStatus, string> = {
-      queued: 'bg-slate-500',
-      watching: 'bg-amber-500',
-      completed: 'bg-emerald-500',
-      dropped: 'bg-red-500',
-    };
-    return colors[status];
+    return STATUS_COLORS[status];
   }
 
   let isSearching = $derived(searchQuery.trim().length > 0);
