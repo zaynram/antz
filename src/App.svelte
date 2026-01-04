@@ -3,145 +3,118 @@
   import { authLoading, authUser, currentPreferences, initPreferencesSync, cleanupPreferencesSync } from '$lib/stores/app'
   import { onMount } from 'svelte'
   import { Toaster } from 'svelte-sonner'
-  import { Search as SearchIcon, StickyNote, Film, MapPin, SearchX, WifiOff } from 'lucide-svelte'
+  import { SearchX, WifiOff } from 'lucide-svelte'
 
-  import UserToggle from '$lib/components/UserToggle.svelte'
+  import Sidebar from '$lib/components/Sidebar.svelte'
   import Search from '$lib/pages/Search.svelte'
   import Login from '$lib/pages/Login.svelte'
-  import Media from '$lib/pages/Media.svelte'
+  import Library from '$lib/pages/Library.svelte'
   import Debug from '$lib/pages/Debug.svelte'
   import Notes from '$lib/pages/Notes.svelte'
   import Places from '$lib/pages/Places.svelte'
   import Settings from '$lib/pages/Settings.svelte'
 
-  let currentPath = $state(window.location.pathname);
-  let isOffline = $state(!navigator.onLine);
+  let currentPath = $state(window.location.pathname)
+  let isOffline = $state(!navigator.onLine)
 
   onMount(() => {
-    // Track online/offline status
-    const handleOnline = () => { isOffline = false; };
-    const handleOffline = () => { isOffline = true; };
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    const handleOnline = () => { isOffline = false }
+    const handleOffline = () => { isOffline = true }
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
 
     const unsubscribe = onAuthChange((user) => {
-      authUser.set(user);
-      authLoading.set(false);
+      authUser.set(user)
+      authLoading.set(false)
 
       if (user) {
-        // Initialize preference sync when authenticated
-        initPreferencesSync();
+        initPreferencesSync()
       } else {
-        // Cleanup sync on logout
-        cleanupPreferencesSync();
+        cleanupPreferencesSync()
       }
-    });
+    })
 
     const handlePopState = () => {
-      currentPath = window.location.pathname;
-    };
-    window.addEventListener('popstate', handlePopState);
+      currentPath = window.location.pathname
+    }
+    window.addEventListener('popstate', handlePopState)
 
     return () => {
-      unsubscribe();
-      cleanupPreferencesSync();
-      window.removeEventListener('popstate', handlePopState);
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  });
+      unsubscribe()
+      cleanupPreferencesSync()
+      window.removeEventListener('popstate', handlePopState)
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  })
 
   function navigate(path: string) {
-    window.history.pushState({}, '', path);
-    currentPath = path;
+    window.history.pushState({}, '', path)
+    currentPath = path
   }
 
   // Non-reactive tracking to prevent effect double-runs
-  let prevTheme: string | undefined = undefined;
-  let prevAccentColor: string | undefined = undefined;
+  let prevTheme: string | undefined = undefined
+  let prevAccentColor: string | undefined = undefined
 
   $effect(() => {
     if ($currentPreferences) {
-      const root = document.documentElement;
-      const { theme, accentColor } = $currentPreferences;
+      const root = document.documentElement
+      const { theme, accentColor } = $currentPreferences
 
       if (prevTheme !== theme) {
-        root.classList.toggle('dark', theme === 'dark');
-        prevTheme = theme;
+        root.classList.toggle('dark', theme === 'dark')
+        prevTheme = theme
       }
 
       if (prevAccentColor !== accentColor) {
-        root.style.setProperty('--color-accent', accentColor);
-        prevAccentColor = accentColor;
+        root.style.setProperty('--color-accent', accentColor)
+        prevAccentColor = accentColor
       }
     }
-  });
+  })
+
+  // Determine library type from path
+  let libraryType = $derived.by(() => {
+    if (currentPath === '/library/movies') return 'movie' as const
+    if (currentPath === '/library/tv') return 'tv' as const
+    if (currentPath === '/library/games') return 'game' as const
+    return null
+  })
 </script>
 
 <Toaster richColors position="bottom-center" />
 
 {#if isOffline}
-  <div class="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-amber-950 text-sm font-medium py-2 px-4 flex items-center justify-center gap-2 safe-area-top">
+  <div class="fixed top-0 left-0 right-0 z-40 bg-amber-500 text-amber-950 text-sm font-medium py-2 px-4 flex items-center justify-center gap-2">
     <WifiOff size={16} />
-    <span>You're offline - some features may be unavailable</span>
+    <span>You're offline</span>
   </div>
 {/if}
 
 {#if $authLoading}
-  <div class="flex items-center justify-center h-screen text-xl text-slate-500">
-    Loading...
+  <div class="flex items-center justify-center h-screen">
+    <div class="flex flex-col items-center gap-3">
+      <div class="w-10 h-10 border-3 border-accent border-t-transparent rounded-full animate-spin"></div>
+      <span class="text-slate-500 dark:text-slate-400">Loading...</span>
+    </div>
   </div>
 {:else if !$authUser}
   <Login />
 {:else}
-  <div class="h-full flex flex-col overflow-hidden">
-    <header
-      class="flex items-center justify-between px-6 py-4 bg-surface border-b border-slate-200 dark:border-slate-700 shrink-0"
-    >
-      <nav class="flex gap-4 sm:gap-6">
-        <button
-          onclick={() => navigate('/')}
-          class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium hover:text-accent transition-colors"
-          class:text-accent={currentPath === '/'}
-        >
-          <SearchIcon size={18} />
-          <span class="hidden sm:inline">Search</span>
-        </button>
-        <button
-          onclick={() => navigate('/notes')}
-          class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium hover:text-accent transition-colors"
-          class:text-accent={currentPath === '/notes'}
-        >
-          <StickyNote size={18} />
-          <span class="hidden sm:inline">Notes</span>
-        </button>
-        <button
-          onclick={() => navigate('/media')}
-          class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium hover:text-accent transition-colors"
-          class:text-accent={currentPath === '/media'}
-        >
-          <Film size={18} />
-          <span class="hidden sm:inline">Media</span>
-        </button>
-        <button
-          onclick={() => navigate('/places')}
-          class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium hover:text-accent transition-colors"
-          class:text-accent={currentPath === '/places'}
-        >
-          <MapPin size={18} />
-          <span class="hidden sm:inline">Places</span>
-        </button>
-      </nav>
-      <UserToggle {navigate} />
-    </header>
+  <Sidebar {currentPath} {navigate} />
 
-    <main class="flex-1 overflow-y-auto overflow-x-hidden p-6 max-w-5xl mx-auto w-full">
+  <main
+    class="min-h-screen pt-4 pb-8 px-4 sm:px-6 transition-all"
+    class:pt-12={isOffline}
+  >
+    <div class="max-w-5xl mx-auto pt-14">
       {#if currentPath === '/'}
         <Search {navigate} />
       {:else if currentPath === '/notes'}
         <Notes />
-      {:else if currentPath === '/media'}
-        <Media />
+      {:else if libraryType}
+        <Library type={libraryType} {navigate} />
       {:else if currentPath === '/places'}
         <Places />
       {:else if currentPath === '/debug'}
@@ -160,10 +133,10 @@
             onclick={() => navigate('/')}
             class="px-6 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90"
           >
-            Go Home
+            Go to Search
           </button>
         </div>
       {/if}
-    </main>
-  </div>
+    </div>
+  </main>
 {/if}
