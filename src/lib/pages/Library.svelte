@@ -20,7 +20,8 @@
   } from '$lib/filters'
   import { onMount } from 'svelte'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
-  import { Film, Tv, Gamepad2, Filter, ChevronLeft, ChevronRight, Plus, Search, X } from 'lucide-svelte'
+  import { Film, Tv, Gamepad2, Filter, Plus, Search, X } from 'lucide-svelte'
+  import { hapticSuccess } from '$lib/haptics'
 
   interface Props {
     type: MediaType
@@ -226,6 +227,7 @@
       }, $activeUser)
 
       discoverResults = discoverResults.filter(r => r.id !== item.id)
+      hapticSuccess()
       toast.success(`Added "${item.title || item.name}"`)
     } catch (e) {
       console.error('Failed to add:', e)
@@ -252,6 +254,7 @@
       }, $activeUser)
 
       gameResults = gameResults.filter(g => g.pageid !== game.pageid)
+      hapticSuccess()
       toast.success(`Added "${game.title}"`)
     } catch (e) {
       console.error('Failed to add game:', e)
@@ -379,9 +382,6 @@
     return () => resizeObserver.disconnect()
   })
 
-  let currentTypeIndex = $derived(libraryTypes.indexOf(type))
-  let prevType = $derived(libraryTypes[(currentTypeIndex - 1 + 3) % 3])
-  let nextType = $derived(libraryTypes[(currentTypeIndex + 1) % 3])
 </script>
 
 <MediaDetailModal media={selectedMedia} onClose={() => selectedMedia = null} />
@@ -389,34 +389,14 @@
 <div class="max-w-6xl mx-auto">
   <!-- Header with type navigation -->
   <header class="mb-6">
-    <!-- Type switcher -->
-    <div class="flex items-center justify-between mb-4">
-      <button
-        type="button"
-        class="flex items-center gap-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors touch-manipulation"
-        onclick={() => navigate(`/library/${prevType === 'tv' ? 'tv' : prevType + 's'}`)}
-      >
-        <ChevronLeft size={20} />
-        <span class="text-sm hidden sm:inline">{typeInfo[prevType].plural}</span>
-      </button>
-
-      <div class="flex items-center gap-3">
-        <svelte:component this={typeInfo[type].icon} size={28} class="text-accent" />
-        <h1 class="text-2xl font-bold">{typeInfo[type].plural}</h1>
-        <span class="text-slate-400 text-sm">({typeMedia.length})</span>
-      </div>
-
-      <button
-        type="button"
-        class="flex items-center gap-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors touch-manipulation"
-        onclick={() => navigate(`/library/${nextType === 'tv' ? 'tv' : nextType + 's'}`)}
-      >
-        <span class="text-sm hidden sm:inline">{typeInfo[nextType].plural}</span>
-        <ChevronRight size={20} />
-      </button>
+    <!-- Title -->
+    <div class="flex items-center justify-center gap-3 mb-4">
+      <svelte:component this={typeInfo[type].icon} size={28} class="text-accent" />
+      <h1 class="text-2xl font-bold">{typeInfo[type].plural}</h1>
+      <span class="text-slate-400 text-sm">({typeMedia.length})</span>
     </div>
 
-    <!-- Quick type pills (mobile-friendly) -->
+    <!-- Type pills -->
     <div class="flex justify-center gap-2 mb-4">
       {#each libraryTypes as t (t)}
         <button
@@ -448,6 +428,15 @@
       </button>
 
       <div class="flex items-center gap-1">
+        <button
+          type="button"
+          class="min-w-[44px] min-h-[44px] p-2.5 rounded-lg bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors touch-manipulation"
+          onclick={() => navigate('/')}
+          aria-label="Search"
+        >
+          <Search size={20} />
+        </button>
+
         <button
           type="button"
           class="min-w-[44px] min-h-[44px] p-2.5 rounded-lg bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors text-xs font-mono touch-manipulation"

@@ -29,6 +29,54 @@
   }
 }
 
+/* Touch device enhancements */
+@layer utilities {
+  /* Active state feedback for touch - subtle scale down on tap */
+  .touch-feedback {
+    @apply transition-transform duration-75;
+  }
+  .touch-feedback:active {
+    @apply scale-[0.97];
+  }
+
+  /* Touch-friendly minimum tap target */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+}
+
+/* Automatic touch enhancements for coarse pointer devices (touch screens) */
+@media (pointer: coarse) {
+  /* Larger touch targets for buttons and interactive elements */
+  button:not(.touch-sm),
+  [role="button"]:not(.touch-sm) {
+    min-height: 44px;
+  }
+
+  /* Ensure inputs are comfortable to tap */
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  /* Add active feedback to all buttons */
+  button,
+  [role="button"] {
+    transition: transform 75ms ease-out;
+  }
+  button:active,
+  [role="button"]:active {
+    transform: scale(0.97);
+  }
+
+  /* Increase spacing in navigation and lists for easier tapping */
+  nav button,
+  nav a {
+    min-height: 48px;
+  }
+}
+
 /* Safe area utilities for notched devices */
 @layer utilities {
   .safe-area-top {

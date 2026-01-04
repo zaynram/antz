@@ -1,6 +1,7 @@
 <script lang="ts">
   import { activeUser, currentPreferences } from '$lib/stores/app'
   import { logOut } from '$lib/firebase'
+  import { hapticLight } from '$lib/haptics'
   import {
     Search,
     Library,
@@ -25,6 +26,12 @@
 
   let isOpen = $state(false)
   let libraryExpanded = $state(false)
+
+  // Swipe gesture state
+  let touchStartX = $state(0)
+  let touchCurrentX = $state(0)
+  let isSwiping = $state(false)
+  const SWIPE_THRESHOLD = 50
 
   // Check if current path is a library path
   let isLibraryPath = $derived(currentPath.startsWith('/library'))
@@ -61,8 +68,47 @@
 
   // Toggle active user
   function toggleUser() {
+    hapticLight()
     $activeUser = $activeUser === 'Z' ? 'T' : 'Z'
   }
+
+  // Swipe gesture handlers
+  function handleTouchStart(e: TouchEvent) {
+    touchStartX = e.touches[0].clientX
+    touchCurrentX = touchStartX
+    isSwiping = true
+  }
+
+  function handleTouchMove(e: TouchEvent) {
+    if (!isSwiping) return
+    touchCurrentX = e.touches[0].clientX
+  }
+
+  function handleTouchEnd() {
+    if (!isSwiping) return
+
+    const swipeDistance = touchStartX - touchCurrentX
+
+    // If swiped left beyond threshold, close sidebar
+    if (swipeDistance > SWIPE_THRESHOLD) {
+      hapticLight()
+      closeSidebar()
+    }
+
+    isSwiping = false
+    touchStartX = 0
+    touchCurrentX = 0
+  }
+
+  // Calculate sidebar transform during swipe
+  let swipeTransform = $derived.by(() => {
+    if (!isSwiping || !isOpen) return ''
+    const diff = touchStartX - touchCurrentX
+    if (diff <= 0) return ''
+    // Limit drag to sidebar width
+    const clampedDiff = Math.min(diff, 288) // w-72 = 288px
+    return `translateX(-${clampedDiff}px)`
+  })
 
   const navItems = [
     { path: '/', label: 'Search', icon: Search },
@@ -108,13 +154,21 @@
 {/if}
 
 <!-- Sidebar -->
+<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
 <aside
-  class="fixed top-0 left-0 z-50 h-full w-72 bg-surface border-r border-slate-200 dark:border-slate-700 shadow-2xl transform transition-transform duration-300 ease-out flex flex-col"
-  class:-translate-x-full={!isOpen}
-  class:translate-x-0={isOpen}
+  class="fixed top-0 left-0 z-50 h-full w-72 bg-surface border-r border-slate-200 dark:border-slate-700 shadow-2xl transform flex flex-col"
+  class:-translate-x-full={!isOpen && !isSwiping}
+  class:translate-x-0={isOpen && !isSwiping}
+  class:transition-transform={!isSwiping}
+  class:duration-300={!isSwiping}
+  class:ease-out={!isSwiping}
+  style={swipeTransform ? `transform: ${swipeTransform}` : ''}
   role="dialog"
   aria-modal="true"
   aria-label="Navigation menu"
+  ontouchstart={handleTouchStart}
+  ontouchmove={handleTouchMove}
+  ontouchend={handleTouchEnd}
 >
   <!-- Header with user info -->
   <header class="p-4 pt-6 border-b border-slate-200 dark:border-slate-700">

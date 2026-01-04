@@ -7,6 +7,7 @@
   import { parseQuery, matchesQuery, hasSearchCriteria, getFilterSummary, type SearchableItem } from '$lib/queryParser'
   import { tmdbConfig } from '$lib/config'
   import { Film, Tv, Gamepad2, StickyNote, MapPin, Search as SearchIcon, HelpCircle, ChevronDown, ChevronUp, X } from 'lucide-svelte'
+  import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
 
   interface Props {
     navigate: (path: string) => void
@@ -25,6 +26,9 @@
 
   // Tips toggle (persisted)
   let showTips = $state(true)
+
+  // Selected media for detail modal
+  let selectedMedia = $state<Media | null>(null)
 
   // Subscriptions
   let unsubMedia: (() => void) | undefined
@@ -158,11 +162,22 @@
     searchInput?.focus()
   }
 
-  // Navigate to appropriate library page for media
-  function navigateToMedia(item: Media) {
-    const type = item.type === 'tv' ? 'tv' : item.type + 's'
-    navigate(`/library/${type}`)
+  // Open media detail modal
+  function openMediaDetail(item: Media) {
+    selectedMedia = item
   }
+
+  function closeMediaDetail() {
+    selectedMedia = null
+  }
+
+  // Keep selected media in sync with real-time updates
+  $effect(() => {
+    if (selectedMedia) {
+      const updated = media.find(m => m.id === selectedMedia!.id)
+      if (updated) selectedMedia = updated
+    }
+  })
 
   // Quick filter buttons
   const quickFilters = [
@@ -266,7 +281,7 @@
             <button
               type="button"
               class="w-full flex items-center gap-3 p-3 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl hover:border-accent transition-colors text-left touch-manipulation"
-              onclick={() => navigateToMedia(m)}
+              onclick={() => openMediaDetail(m)}
             >
               <div class="shrink-0 w-12 h-18 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
                 {#if m.posterPath}
@@ -463,3 +478,6 @@
     </div>
   {/if}
 </div>
+
+<!-- Media Detail Modal -->
+<MediaDetailModal media={selectedMedia} onClose={closeMediaDetail} />

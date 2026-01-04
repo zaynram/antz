@@ -1,7 +1,29 @@
-import { writable, derived, get } from 'svelte/store';
+import { writable, derived, get, readable } from 'svelte/store';
 import type { User } from 'firebase/auth';
 import type { UserId, UserPreferences, UserPreferencesMap } from '../types';
 import { loadPreferencesFromFirestore, savePreferencesToFirestore, subscribeToPreferences } from '../firebase';
+
+// Touch device detection store
+// Uses pointer: coarse media query which is more reliable than touch event detection
+export const isTouchDevice = readable(false, (set) => {
+  if (typeof window === 'undefined') return;
+
+  const mediaQuery = window.matchMedia('(pointer: coarse)');
+
+  // Set initial value
+  set(mediaQuery.matches);
+
+  // Listen for changes (e.g., laptop with touchscreen switching modes)
+  const handleChange = (e: MediaQueryListEvent) => {
+    set(e.matches);
+  };
+
+  mediaQuery.addEventListener('change', handleChange);
+
+  return () => {
+    mediaQuery.removeEventListener('change', handleChange);
+  };
+});
 
 const DEFAULT_PREFERENCES: UserPreferencesMap = {
   Z: {

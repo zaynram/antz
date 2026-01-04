@@ -6,6 +6,7 @@
   import { getUserRating, getAverageRating } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
   import { Film, Tv, Gamepad2 } from 'lucide-svelte'
+  import { hapticLight } from '$lib/haptics'
 
   interface Props {
     media: Media | null;
@@ -67,16 +68,18 @@
 
   async function updateStatus(status: MediaStatus): Promise<void> {
     if (!media?.id) return;
+    hapticLight();
     await updateDocument<Media>('media', media.id, { status }, $activeUser);
   }
 
   async function updateRating(userId: UserId, rating: number | null): Promise<void> {
     if (!media?.id) return;
-    
+    hapticLight();
+
     // Create or update the ratings object
     const currentRatings = media.ratings || { Z: null, T: null };
     const updatedRatings = { ...currentRatings, [userId]: rating };
-    
+
     await updateDocument<Media>('media', media.id, { ratings: updatedRatings }, $activeUser);
   }
 
