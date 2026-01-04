@@ -131,15 +131,53 @@ export function getDisplayRating(media: Media): number | null {
 
 export type PlaceCategory = "restaurant" | "cafe" | "bar" | "attraction" | "park" | "other"
 
+export interface PlaceComment {
+    id: string
+    text: string
+    createdBy: UserId
+    createdAt: Timestamp
+}
+
 export interface Place extends BaseDocument {
     name: string
     category: PlaceCategory
     notes: string
     visited: boolean
     visitDates: Timestamp[]
-    rating: number | null
+    rating: number | null // Legacy single rating
+    ratings?: Record<UserId, number | null> // Per-user ratings
+    comments?: PlaceComment[]
     location?: GeoLocation
     placeId?: string // Google Places ID for richer data
+    tags?: string[] // User-defined tags
+}
+
+// Place rating helpers (mirror Media rating helpers)
+export function getPlaceUserRating(place: Place, userId: UserId): number | null {
+    if (place.ratings && userId in place.ratings) {
+        return place.ratings[userId];
+    }
+    return place.rating ?? null;
+}
+
+export function getPlaceAverageRating(place: Place): number | null {
+    if (place.ratings) {
+        const ratingZ = place.ratings.Z;
+        const ratingT = place.ratings.T;
+
+        if (ratingZ !== null && ratingZ !== undefined &&
+            ratingT !== null && ratingT !== undefined) {
+            return (ratingZ + ratingT) / 2;
+        }
+
+        if (ratingZ !== null && ratingZ !== undefined) return ratingZ;
+        if (ratingT !== null && ratingT !== undefined) return ratingT;
+    }
+    return place.rating ?? null;
+}
+
+export function getPlaceDisplayRating(place: Place): number | null {
+    return getPlaceAverageRating(place);
 }
 
 // Helper to calculate distance between two coordinates (Haversine formula)

@@ -8,6 +8,7 @@
   import { tmdbConfig } from '$lib/config'
   import { Film, Tv, Gamepad2, StickyNote, MapPin, Search as SearchIcon, HelpCircle, ChevronDown, ChevronUp, X } from 'lucide-svelte'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
+  import EmptyState from '$lib/components/ui/EmptyState.svelte'
 
   interface Props {
     navigate: (path: string) => void
@@ -236,8 +237,9 @@
     {#if searchQuery}
       <button
         type="button"
-        class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 touch-manipulation"
+        class="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 touch-manipulation"
         onclick={clearSearch}
+        aria-label="Clear search"
       >
         <X size={20} />
       </button>
@@ -245,14 +247,14 @@
   </div>
 
   <!-- Quick filters -->
-  <div class="flex flex-wrap gap-2 mb-6 justify-center">
+  <div class="flex gap-1.5 sm:gap-2 mb-6 justify-center overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible scrollbar-none">
     {#each quickFilters as filter}
       <button
         type="button"
-        class="flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-accent hover:text-white transition-colors touch-manipulation"
+        class="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg sm:rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-accent hover:text-white transition-colors touch-manipulation whitespace-nowrap shrink-0"
         onclick={() => applyQuickFilter(filter.query)}
       >
-        <filter.icon size={16} />
+        <filter.icon size={14} class="sm:w-4 sm:h-4" />
         <span>{filter.label}</span>
       </button>
     {/each}
@@ -280,7 +282,7 @@
             {@const m = original as Media}
             <button
               type="button"
-              class="w-full flex items-center gap-3 p-3 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl hover:border-accent transition-colors text-left touch-manipulation"
+              class="w-full flex items-center gap-4 p-4 card hover:border-accent transition-colors text-left touch-manipulation"
               onclick={() => openMediaDetail(m)}
             >
               <div class="shrink-0 w-12 h-18 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
@@ -301,7 +303,7 @@
 
               <div class="flex-1 min-w-0">
                 <h3 class="font-medium truncate">{m.title}</h3>
-                <div class="flex items-center gap-2 text-xs text-slate-400">
+                <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
                   <span class="uppercase">{item.type}</span>
                   {#if m.releaseDate}
                     <span>·</span>
@@ -314,7 +316,7 @@
                 </div>
               </div>
 
-              <span class="shrink-0 text-xs px-2 py-1 rounded-full {m.status === 'completed' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : m.status === 'watching' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}">
+              <span class="shrink-0 badge badge-{m.status}">
                 {m.status}
               </span>
             </button>
@@ -322,18 +324,18 @@
             {@const n = original as Note}
             <button
               type="button"
-              class="w-full flex items-center gap-3 p-3 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl hover:border-accent transition-colors text-left touch-manipulation"
+              class="w-full flex items-center gap-4 p-4 card hover:border-accent transition-colors text-left touch-manipulation"
               onclick={() => navigate('/notes')}
             >
-              <div class="shrink-0 w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent">
-                <StickyNote size={18} />
+              <div class="shrink-0 w-11 h-11 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                <StickyNote size={20} />
               </div>
               <div class="flex-1 min-w-0">
                 <h3 class="font-medium truncate">{n.title || '(No subject)'}</h3>
-                <p class="text-xs text-slate-400 truncate">
+                <p class="text-xs text-slate-400 truncate mt-0.5">
                   From {$displayNames[n.createdBy]}
                   {#if !n.read && n.createdBy !== $activeUser}
-                    · <span class="text-accent">Unread</span>
+                    · <span class="text-accent font-medium">Unread</span>
                   {/if}
                 </p>
               </div>
@@ -342,17 +344,17 @@
             {@const p = original as Place}
             <button
               type="button"
-              class="w-full flex items-center gap-3 p-3 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl hover:border-accent transition-colors text-left touch-manipulation"
+              class="w-full flex items-center gap-4 p-4 card hover:border-accent transition-colors text-left touch-manipulation"
               onclick={() => navigate('/places')}
             >
-              <div class="shrink-0 w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent">
-                <MapPin size={18} />
+              <div class="shrink-0 w-11 h-11 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                <MapPin size={20} />
               </div>
               <div class="flex-1 min-w-0">
                 <h3 class="font-medium truncate">{p.name}</h3>
-                <p class="text-xs text-slate-400 truncate capitalize">{p.category}</p>
+                <p class="text-xs text-slate-400 truncate capitalize mt-0.5">{p.category}</p>
               </div>
-              <span class="shrink-0 text-xs px-2 py-1 rounded-full {p.visited ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}">
+              <span class="shrink-0 badge {p.visited ? 'badge-completed' : 'badge-queued'}">
                 {p.visited ? 'Visited' : 'To visit'}
               </span>
             </button>
@@ -360,11 +362,11 @@
         {/each}
       </div>
     {:else}
-      <div class="text-center py-12">
-        <SearchIcon size={48} class="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-        <p class="text-slate-500 dark:text-slate-400 mb-2">No results found</p>
-        <p class="text-sm text-slate-400">Try different keywords or filters</p>
-      </div>
+      <EmptyState
+        icon={SearchIcon}
+        title="No results found"
+        description="Try different keywords or filters"
+      />
     {/if}
   {:else}
     <!-- Empty state -->
@@ -373,7 +375,7 @@
       <div class="grid grid-cols-5 gap-2 text-center">
         <button
           type="button"
-          class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors touch-manipulation"
+          class="p-3 min-h-[72px] bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors touch-manipulation"
           onclick={() => navigate('/library/movies')}
         >
           <Film size={20} class="mx-auto text-slate-400 mb-1" />
@@ -382,7 +384,7 @@
         </button>
         <button
           type="button"
-          class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors touch-manipulation"
+          class="p-3 min-h-[72px] bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors touch-manipulation"
           onclick={() => navigate('/library/tv')}
         >
           <Tv size={20} class="mx-auto text-slate-400 mb-1" />
@@ -391,7 +393,7 @@
         </button>
         <button
           type="button"
-          class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors touch-manipulation"
+          class="p-3 min-h-[72px] bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors touch-manipulation"
           onclick={() => navigate('/library/games')}
         >
           <Gamepad2 size={20} class="mx-auto text-slate-400 mb-1" />
@@ -400,7 +402,7 @@
         </button>
         <button
           type="button"
-          class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors touch-manipulation"
+          class="p-3 min-h-[72px] bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors touch-manipulation"
           onclick={() => navigate('/notes')}
         >
           <StickyNote size={20} class="mx-auto text-slate-400 mb-1" />
@@ -409,7 +411,7 @@
         </button>
         <button
           type="button"
-          class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors touch-manipulation"
+          class="p-3 min-h-[72px] bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors touch-manipulation"
           onclick={() => navigate('/places')}
         >
           <MapPin size={20} class="mx-auto text-slate-400 mb-1" />
@@ -463,7 +465,7 @@
                 {#each exampleSearches as example}
                   <button
                     type="button"
-                    class="px-2 py-1 text-xs bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-accent hover:text-white transition-colors touch-manipulation"
+                    class="px-3 py-2 text-xs bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-accent hover:text-white transition-colors touch-manipulation min-h-[44px]"
                     onclick={() => { searchQuery = example.query }}
                     title={example.desc}
                   >

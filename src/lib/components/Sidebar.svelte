@@ -27,11 +27,17 @@
   let isOpen = $state(false)
   let libraryExpanded = $state(false)
 
-  // Swipe gesture state
+  // Swipe gesture state (for closing sidebar)
   let touchStartX = $state(0)
   let touchCurrentX = $state(0)
   let isSwiping = $state(false)
   const SWIPE_THRESHOLD = 50
+
+  // Edge swipe state (for opening sidebar)
+  let edgeTouchStartX = $state(0)
+  let edgeTouchCurrentX = $state(0)
+  let isEdgeSwiping = $state(false)
+  const EDGE_ZONE_WIDTH = 24 // pixels from left edge
 
   // Check if current path is a library path
   let isLibraryPath = $derived(currentPath.startsWith('/library'))
@@ -100,7 +106,7 @@
     touchCurrentX = 0
   }
 
-  // Calculate sidebar transform during swipe
+  // Calculate sidebar transform during swipe (closing)
   let swipeTransform = $derived.by(() => {
     if (!isSwiping || !isOpen) return ''
     const diff = touchStartX - touchCurrentX
@@ -109,6 +115,48 @@
     const clampedDiff = Math.min(diff, 288) // w-72 = 288px
     return `translateX(-${clampedDiff}px)`
   })
+
+  // Calculate sidebar transform during edge swipe (opening)
+  let edgeSwipeTransform = $derived.by(() => {
+    if (!isEdgeSwiping || isOpen) return ''
+    const diff = edgeTouchCurrentX - edgeTouchStartX
+    if (diff <= 0) return ''
+    // Sidebar slides in from -288px (fully hidden) towards 0
+    const clampedDiff = Math.min(diff, 288)
+    return `translateX(${-288 + clampedDiff}px)`
+  })
+
+  // Edge swipe handlers (for opening sidebar from left edge)
+  function handleEdgeTouchStart(e: TouchEvent) {
+    const touchX = e.touches[0].clientX
+    // Only trigger if touch starts near left edge
+    if (touchX <= EDGE_ZONE_WIDTH && !isOpen) {
+      edgeTouchStartX = touchX
+      edgeTouchCurrentX = touchX
+      isEdgeSwiping = true
+    }
+  }
+
+  function handleEdgeTouchMove(e: TouchEvent) {
+    if (!isEdgeSwiping) return
+    edgeTouchCurrentX = e.touches[0].clientX
+  }
+
+  function handleEdgeTouchEnd() {
+    if (!isEdgeSwiping) return
+
+    const swipeDistance = edgeTouchCurrentX - edgeTouchStartX
+
+    // If swiped right beyond threshold, open sidebar
+    if (swipeDistance > SWIPE_THRESHOLD) {
+      hapticLight()
+      isOpen = true
+    }
+
+    isEdgeSwiping = false
+    edgeTouchStartX = 0
+    edgeTouchCurrentX = 0
+  }
 
   const navItems = [
     { path: '/', label: 'Search', icon: Search },
@@ -123,30 +171,47 @@
   ]
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window
+  onkeydown={handleKeydown}
+  ontouchstart={handleEdgeTouchStart}
+  ontouchmove={handleEdgeTouchMove}
+  ontouchend={handleEdgeTouchEnd}
+/>
 
-<!-- Hamburger button - bottom-right on mobile, top-left on desktop -->
-<button
-  type="button"
-  class="fixed z-50 flex items-center justify-center shadow-lg transition-all touch-manipulation
-    bottom-6 right-6 w-14 h-14 rounded-full bg-accent text-white
-    sm:top-4 sm:left-4 sm:bottom-auto sm:right-auto sm:w-11 sm:h-11 sm:rounded-xl sm:bg-surface sm:text-slate-600 sm:dark:text-slate-300 sm:border sm:border-slate-200 sm:dark:border-slate-700 sm:hover:bg-slate-50 sm:dark:hover:bg-slate-800"
-  onclick={toggleSidebar}
-  aria-label={isOpen ? 'Close menu' : 'Open menu'}
-  aria-expanded={isOpen}
->
-  {#if isOpen}
-    <X size={24} class="sm:w-[22px] sm:h-[22px]" />
-  {:else}
-    <Menu size={24} class="sm:w-[22px] sm:h-[22px]" />
-  {/if}
-</button>
+<!-- Top navigation bar -->
+<nav class="fixed top-0 left-0 right-0 z-50 h-14 flex items-center justify-between px-3 safe-area-top">
+  <!-- Hamburger button - top left -->
+  <button
+    type="button"
+    class="flex items-center justify-center w-11 h-11 rounded-xl bg-surface border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all touch-manipulation"
+    onclick={toggleSidebar}
+    aria-label={isOpen ? 'Close menu' : 'Open menu'}
+    aria-expanded={isOpen}
+  >
+    {#if isOpen}
+      <X size={22} />
+    {:else}
+      <Menu size={22} />
+    {/if}
+  </button>
+
+  <!-- Home/Search button - top right -->
+  <button
+    type="button"
+    class="flex items-center justify-center w-11 h-11 rounded-xl bg-surface border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all touch-manipulation {currentPath === '/' ? 'bg-accent text-white border-accent hover:bg-accent/90' : ''}"
+    onclick={() => handleNavigate('/')}
+    aria-label="Go to search"
+  >
+    <Search size={20} />
+  </button>
+</nav>
 
 <!-- Backdrop -->
-{#if isOpen}
+{#if isOpen || isEdgeSwiping}
   <button
     type="button"
     class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity"
+    style={isEdgeSwiping ? `opacity: ${Math.min((edgeTouchCurrentX - edgeTouchStartX) / 288, 1)}` : ''}
     onclick={closeSidebar}
     aria-label="Close menu"
     tabindex="-1"
@@ -157,12 +222,12 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
 <aside
   class="fixed top-0 left-0 z-50 h-full w-72 bg-surface border-r border-slate-200 dark:border-slate-700 shadow-2xl transform flex flex-col"
-  class:-translate-x-full={!isOpen && !isSwiping}
+  class:-translate-x-full={!isOpen && !isSwiping && !isEdgeSwiping}
   class:translate-x-0={isOpen && !isSwiping}
-  class:transition-transform={!isSwiping}
-  class:duration-300={!isSwiping}
-  class:ease-out={!isSwiping}
-  style={swipeTransform ? `transform: ${swipeTransform}` : ''}
+  class:transition-transform={!isSwiping && !isEdgeSwiping}
+  class:duration-300={!isSwiping && !isEdgeSwiping}
+  class:ease-out={!isSwiping && !isEdgeSwiping}
+  style={swipeTransform ? `transform: ${swipeTransform}` : (edgeSwipeTransform ? `transform: ${edgeSwipeTransform}` : '')}
   role="dialog"
   aria-modal="true"
   aria-label="Navigation menu"

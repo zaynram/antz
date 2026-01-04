@@ -20,7 +20,10 @@
   } from '$lib/filters'
   import { onMount } from 'svelte'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
-  import { Film, Tv, Gamepad2, Filter, Plus, Search, X } from 'lucide-svelte'
+  import PageHeader from '$lib/components/ui/PageHeader.svelte'
+  import IconButton from '$lib/components/ui/IconButton.svelte'
+  import EmptyState from '$lib/components/ui/EmptyState.svelte'
+    import { Film, Tv, Gamepad2, Filter, Plus, Search, X } from 'lucide-svelte'
   import { hapticSuccess } from '$lib/haptics'
 
   interface Props {
@@ -388,89 +391,76 @@
 
 <div class="max-w-6xl mx-auto">
   <!-- Header with type navigation -->
-  <header class="mb-6">
-    <!-- Title -->
-    <div class="flex items-center justify-center gap-3 mb-4">
-      <svelte:component this={typeInfo[type].icon} size={28} class="text-accent" />
-      <h1 class="text-2xl font-bold">{typeInfo[type].plural}</h1>
-      <span class="text-slate-400 text-sm">({typeMedia.length})</span>
-    </div>
-
-    <!-- Type pills -->
-    <div class="flex justify-center gap-2 mb-4">
-      {#each libraryTypes as t (t)}
-        <button
-          type="button"
-          class="px-4 py-2 rounded-full text-sm font-medium transition-colors touch-manipulation {t === type
-            ? 'bg-accent text-white'
-            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}"
-          onclick={() => navigate(`/library/${t === 'tv' ? 'tv' : t + 's'}`)}
-        >
-          {typeInfo[t].plural}
-        </button>
-      {/each}
-    </div>
-
-    <!-- Action bar -->
-    <div class="flex items-center justify-between gap-2">
-      <button
-        type="button"
-        class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent text-white font-medium hover:opacity-90 transition-opacity touch-manipulation"
-        onclick={toggleAddPanel}
-      >
-        {#if showAddPanel}
-          <X size={18} />
-          <span>Cancel</span>
-        {:else}
-          <Plus size={18} />
-          <span>Add {typeInfo[type].label}</span>
-        {/if}
-      </button>
-
-      <div class="flex items-center gap-1">
-        <button
-          type="button"
-          class="min-w-[44px] min-h-[44px] p-2.5 rounded-lg bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors touch-manipulation"
-          onclick={() => navigate('/')}
-          aria-label="Search"
-        >
-          <Search size={20} />
-        </button>
-
-        <button
-          type="button"
-          class="min-w-[44px] min-h-[44px] p-2.5 rounded-lg bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors text-xs font-mono touch-manipulation"
-          onclick={cycleGridSize}
-          aria-label="Change grid size"
-        >
-          {gridSizeIcons[$mediaGridSize]}
-        </button>
-
-        <button
-          type="button"
-          class="relative min-w-[44px] min-h-[44px] p-2.5 rounded-lg transition-colors touch-manipulation {showFilters ? 'bg-accent text-white' : 'bg-surface-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}"
-          onclick={toggleFilters}
-          aria-label="Filters"
-        >
-          <Filter size={20} />
-          {#if activeFilterCount > 0}
-            <span class="absolute -top-1 -right-1 w-4 h-4 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-              {activeFilterCount}
-            </span>
-          {/if}
-        </button>
+  <PageHeader
+    title={typeInfo[type].plural}
+    icon={typeInfo[type].icon}
+    subtitle="{typeMedia.length} item{typeMedia.length === 1 ? '' : 's'}"
+  >
+    {#snippet children()}
+      <!-- Type pills -->
+      <div class="flex justify-center gap-2">
+        {#each libraryTypes as t (t)}
+          <button
+            type="button"
+            class="px-4 py-2.5 rounded-full text-sm font-medium transition-colors touch-manipulation {t === type
+              ? 'bg-accent text-white'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}"
+            onclick={() => navigate(`/library/${t === 'tv' ? 'tv' : t + 's'}`)}
+          >
+            {typeInfo[t].plural}
+          </button>
+        {/each}
       </div>
+    {/snippet}
+  </PageHeader>
+
+  <!-- Action bar -->
+  <div class="flex items-center justify-between gap-2 mb-4">
+    <button
+      type="button"
+      class="btn-primary"
+      onclick={toggleAddPanel}
+    >
+      {#if showAddPanel}
+        <X size={18} />
+        <span>Cancel</span>
+      {:else}
+        <Plus size={18} />
+        <span>Add {typeInfo[type].label}</span>
+      {/if}
+    </button>
+
+    <div class="flex items-center gap-1">
+      <IconButton
+        icon={Search}
+        label="Search"
+        onclick={() => navigate('/')}
+      />
+
+      <IconButton label="Change grid size" onclick={cycleGridSize}>
+        {#snippet children()}
+          <span class="text-xs font-mono">{gridSizeIcons[$mediaGridSize]}</span>
+        {/snippet}
+      </IconButton>
+
+      <IconButton
+        icon={Filter}
+        label="Filters"
+        active={showFilters}
+        badge={activeFilterCount > 0 ? activeFilterCount : undefined}
+        onclick={toggleFilters}
+      />
     </div>
-  </header>
+  </div>
 
   <!-- Add panel -->
   {#if showAddPanel}
-    <div class="p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl mb-6" style="transform: translateZ(0);">
+    <div class="card p-4 mb-6" style="transform: translateZ(0);">
       <div class="relative mb-4">
         <input
           type="text"
           placeholder="Search for {typeInfo[type].plural.toLowerCase()} to add..."
-          class="w-full px-4 py-3 pl-11 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:border-accent"
+          class="input pl-11"
           bind:value={searchQuery}
         />
         <Search size={18} class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -551,13 +541,13 @@
 
   <!-- Filters panel -->
   {#if showFilters}
-    <div class="p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl mb-4 space-y-4" style="transform: translateZ(0);">
+    <div class="card p-4 mb-4 space-y-4" style="transform: translateZ(0);">
       <div class="flex flex-wrap gap-4">
         <div class="flex-1 min-w-[120px]">
           <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Status</label>
           <select
             bind:value={filters.status}
-            class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
+            class="input-sm"
           >
             {#each statusOptions as opt}
               <option value={opt.key}>{opt.label}</option>
@@ -569,7 +559,7 @@
           <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Added By</label>
           <select
             bind:value={filters.addedBy}
-            class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
+            class="input-sm"
           >
             <option value="all">Anyone</option>
             <option value="Z">{$displayNames.Z}</option>
@@ -583,7 +573,7 @@
             {#each sortOptions as opt}
               <button
                 type="button"
-                class="px-2 py-1.5 text-xs rounded-lg transition-colors touch-manipulation {sort.field === opt.field
+                class="px-3 py-2 text-xs rounded-lg transition-colors touch-manipulation min-h-[44px] {sort.field === opt.field
                   ? 'bg-accent text-white'
                   : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}"
                 onclick={() => toggleSort(opt.field)}
@@ -601,11 +591,11 @@
       {#if availableGenres.length > 0}
         <div>
           <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Genres</label>
-          <div class="flex flex-wrap gap-1.5">
+          <div class="flex flex-wrap gap-2">
             {#each availableGenres as genre}
               <button
                 type="button"
-                class="px-2.5 py-1 text-xs rounded-full transition-colors touch-manipulation {filters.genres.includes(genre)
+                class="px-3 py-2 text-xs rounded-full transition-colors touch-manipulation min-h-[44px] {filters.genres.includes(genre)
                   ? 'bg-accent text-white'
                   : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}"
                 onclick={() => toggleGenre(genre)}
@@ -632,30 +622,13 @@
   <!-- Grid -->
   <div bind:this={gridContainer}>
     {#if filteredMedia.length === 0}
-      <div class="text-center py-16">
-        <div class="text-slate-300 dark:text-slate-600 mb-4 flex justify-center">
-          <svelte:component this={typeInfo[type].icon} size={64} />
-        </div>
-        {#if activeFilterCount > 0}
-          <p class="text-slate-500 dark:text-slate-400">No {typeInfo[type].plural.toLowerCase()} match your filters</p>
-          <button
-            type="button"
-            class="mt-2 text-accent hover:underline"
-            onclick={clearFilters}
-          >
-            Clear filters
-          </button>
-        {:else}
-          <p class="text-slate-500 dark:text-slate-400">No {typeInfo[type].plural.toLowerCase()} in your library</p>
-          <button
-            type="button"
-            class="mt-2 text-accent hover:underline"
-            onclick={toggleAddPanel}
-          >
-            Add your first {typeInfo[type].label.toLowerCase()}
-          </button>
-        {/if}
-      </div>
+      <EmptyState
+        icon={typeInfo[type].icon}
+        title={activeFilterCount > 0 ? `No ${typeInfo[type].plural.toLowerCase()} match your filters` : `No ${typeInfo[type].plural.toLowerCase()} in your library`}
+        description={activeFilterCount > 0 ? 'Try adjusting your filters' : `Add your first ${typeInfo[type].label.toLowerCase()}`}
+        actionLabel={activeFilterCount > 0 ? undefined : `Add ${typeInfo[type].label}`}
+        onAction={activeFilterCount > 0 ? undefined : toggleAddPanel}
+      />
     {:else}
       <div class="grid gap-4" style="grid-template-columns: repeat({columns}, minmax(0, 1fr));">
         {#each filteredMedia as item (item.id)}
@@ -663,10 +636,10 @@
             <!-- Delete button -->
             <button
               type="button"
-              class="absolute top-2 right-2 z-20 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-red-500 transition-all touch-manipulation"
+              class="absolute top-1 right-1 z-20 w-11 h-11 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-red-500 transition-all touch-manipulation"
               onclick={(e) => { e.stopPropagation(); item.id && removeItem(item.id); }}
             >
-              <X size={16} />
+              <X size={18} />
             </button>
 
             <!-- Status indicator -->
@@ -716,12 +689,12 @@
                 <p class="text-xs text-slate-400 mb-1">{item.releaseDate.split('-')[0]}</p>
               {/if}
 
-              <div class="flex items-center gap-0.5">
+              <div class="flex items-center">
                 {#each [1, 2, 3, 4, 5] as star}
                   {@const displayRating = getDisplayRating(item)}
                   <button
                     type="button"
-                    class="text-base transition-colors touch-manipulation {(displayRating ?? 0) >= star ? 'text-amber-400' : 'text-slate-200 dark:text-slate-700 hover:text-amber-300'}"
+                    class="w-7 h-7 text-lg flex items-center justify-center transition-colors touch-manipulation {(displayRating ?? 0) >= star ? 'text-amber-400' : 'text-slate-200 dark:text-slate-700 hover:text-amber-300'}"
                     onclick={() => quickRate(item, star)}
                   >
                     ★
@@ -729,11 +702,11 @@
                 {/each}
               </div>
 
-              <div class="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+              <div class="flex gap-1.5 mt-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                 {#if item.status !== 'watching'}
                   <button
                     type="button"
-                    class="flex-1 py-1.5 text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded touch-manipulation"
+                    class="flex-1 py-2.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-lg touch-manipulation"
                     onclick={() => quickStatusChange(item, 'watching')}
                   >
                     Start
@@ -742,7 +715,7 @@
                 {#if item.status !== 'completed'}
                   <button
                     type="button"
-                    class="flex-1 py-1.5 text-[10px] font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded touch-manipulation"
+                    class="flex-1 py-2.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-lg touch-manipulation"
                     onclick={() => quickStatusChange(item, 'completed')}
                   >
                     Done

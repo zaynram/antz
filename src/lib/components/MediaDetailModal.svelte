@@ -170,7 +170,7 @@
         {/if}
         
         <button
-          class="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+          class="absolute top-2 right-2 w-11 h-11 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors touch-manipulation"
           onclick={onClose}
         >
           ×
@@ -214,10 +214,10 @@
             <!-- User Z Rating -->
             <div class="mb-2">
               <div class="text-xs text-slate-400 mb-0.5">{getDisplayNameForUser('Z')}'s Rating</div>
-              <div class="flex gap-1">
+              <div class="flex">
                 {#each [1, 2, 3, 4, 5] as star}
                   <button
-                    class="text-lg transition-colors {(getUserRating(media, 'Z') ?? 0) >= star ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600 hover:text-amber-300'}"
+                    class="w-9 h-9 text-xl flex items-center justify-center transition-colors touch-manipulation {(getUserRating(media, 'Z') ?? 0) >= star ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600 hover:text-amber-300'}"
                     onclick={() => updateRating('Z', getUserRating(media, 'Z') === star ? null : star)}
                   >
                     ★
@@ -225,14 +225,14 @@
                 {/each}
               </div>
             </div>
-            
+
             <!-- User T Rating -->
             <div class="mb-2">
               <div class="text-xs text-slate-400 mb-0.5">{getDisplayNameForUser('T')}'s Rating</div>
-              <div class="flex gap-1">
+              <div class="flex">
                 {#each [1, 2, 3, 4, 5] as star}
                   <button
-                    class="text-lg transition-colors {(getUserRating(media, 'T') ?? 0) >= star ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600 hover:text-amber-300'}"
+                    class="w-9 h-9 text-xl flex items-center justify-center transition-colors touch-manipulation {(getUserRating(media, 'T') ?? 0) >= star ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600 hover:text-amber-300'}"
                     onclick={() => updateRating('T', getUserRating(media, 'T') === star ? null : star)}
                   >
                     ★
@@ -341,7 +341,7 @@
                     </span>
                   </div>
                   <button
-                    class="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 md:opacity-100 transition-opacity"
+                    class="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 md:opacity-100 transition-opacity touch-manipulation"
                     onclick={() => removeComment(comment.id)}
                   >
                     ×
@@ -356,12 +356,12 @@
               type="text"
               bind:value={newComment}
               placeholder="Add a comment..."
-              class="flex-1 p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent"
+              class="flex-1 px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent"
             />
             <button
               type="submit"
               disabled={!newComment.trim()}
-              class="px-3 py-2 bg-accent text-white rounded-lg text-sm font-medium disabled:opacity-50"
+              class="px-4 py-2.5 min-h-[44px] bg-accent text-white rounded-lg text-sm font-medium disabled:opacity-50 touch-manipulation"
             >
               Add
             </button>
