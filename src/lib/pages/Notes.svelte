@@ -1,19 +1,21 @@
 <script lang="ts">
+  import EmptyState from '$lib/components/ui/EmptyState.svelte'
+  import PageHeader from '$lib/components/ui/PageHeader.svelte'
+  import PhotoGallery from '$lib/components/ui/PhotoGallery.svelte'
+  import Tabs from '$lib/components/ui/Tabs.svelte'
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
+  import { hapticLight, hapticSuccess } from '$lib/haptics'
   import { activeUser, displayNames } from '$lib/stores/app'
   import type { Note, UserId } from '$lib/types'
-  import { toast } from 'svelte-sonner'
   import { Timestamp, type Timestamp as TimestampType } from 'firebase/firestore'
+  import { Archive, ArchiveRestore, Check, Image as ImageIcon, Mail, MailOpen, Package, Send, StickyNote, X } from 'lucide-svelte'
   import { onMount } from 'svelte'
-  import { Mail, Send, Check, Archive, ArchiveRestore, MailOpen, Package, X, StickyNote } from 'lucide-svelte'
-  import PageHeader from '$lib/components/ui/PageHeader.svelte'
-  import Tabs from '$lib/components/ui/Tabs.svelte'
-  import EmptyState from '$lib/components/ui/EmptyState.svelte'
-  import { hapticLight, hapticSuccess } from '$lib/haptics'
+  import { toast } from 'svelte-sonner'
 
   let notes = $state<Note[]>([])
   let newNote = $state({ title: '', content: '' })
   let unsubscribe: (() => void) | undefined
+  let selectedNote = $state<Note | null>(null)
 
   type TabKey = 'inbox' | 'sent' | 'archive'
   let activeTab = $state<TabKey>('inbox')
@@ -124,6 +126,19 @@
     return $displayNames[userId]
   }
 
+  async function updatePhotos(noteId: string, photos: string[]): Promise<void> {
+    await updateDocument<Note>('notes', noteId, { photos }, $activeUser)
+  }
+
+  function openNoteDetail(note: Note): void {
+    selectedNote = note
+    markAsRead(note)
+  }
+
+  function closeNoteDetail(): void {
+    selectedNote = null
+  }
+
   // Filter notes based on active tab
   let filteredNotes = $derived.by(() => {
     switch (activeTab) {
@@ -212,10 +227,10 @@
       {@const isUnread = !note.read && note.createdBy !== $activeUser}
       <div
         class="group relative card p-4 transition-all cursor-pointer hover:border-accent {isUnread ? 'border-accent/50 bg-accent/5' : ''}"
-        onclick={() => markAsRead(note)}
+        onclick={() => openNoteDetail(note)}
         role="button"
         tabindex="0"
-        onkeydown={(e) => e.key === 'Enter' && markAsRead(note)}
+        onkeydown={(e) => e.key === 'Enter' && openNoteDetail(note)}
       >
         <!-- Unread indicator -->
         {#if isUnread}
@@ -270,6 +285,13 @@
         {#if note.content}
           <p class="whitespace-pre-wrap text-slate-700 dark:text-slate-300 {isUnread ? '' : 'opacity-90'}">{note.content}</p>
         {/if}
+
+        {#if note.photos?.length}
+          <div class="mt-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <ImageIcon size={14} />
+            <span>{note.photos.length} photo{note.photos.length === 1 ? '' : 's'}</span>
+          </div>
+        {/if}
       </div>
     {:else}
       <EmptyState
@@ -280,6 +302,85 @@
     {/each}
   </div>
 </div>
+
+<!-- Note Detail Modal -->
+{#if selectedNote}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    onclick={(e) => e.target === e.currentTarget && closeNoteDetail()}
+    onkeydown={(e) => e.key === 'Escape' && closeNoteDetail()}
+    role="dialog"
+    aria-modal="true"
+    tabindex="-1"
+  >
+    <div class="bg-surface rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+      <!-- Header -->
+      <div class="relative bg-accent/10 p-6">
+        <button
+          class="absolute top-2 right-2 w-11 h-11 rounded-full bg-black/20 text-white flex items-center justify-center hover:bg-black/40 transition-colors touch-manipulation"
+          onclick={closeNoteDetail}
+        >
+          <X size={20} />
+        </button>
+
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-accent flex items-center justify-center text-white shrink-0">
+            <StickyNote size={28} />
+          </div>
+          <div class="flex-1 min-w-0">
+            {#if selectedNote.title}
+              <h2 class="text-xl font-bold truncate">{selectedNote.title}</h2>
+            {:else}
+              <h2 class="text-xl font-bold text-slate-400">Note</h2>
+            {/if}
+            <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+              <span class="font-medium {selectedNote.createdBy === $activeUser ? 'text-slate-400' : 'text-accent'}">
+                {selectedNote.createdBy === $activeUser ? 'You' : getDisplayNameForUser(selectedNote.createdBy)}
+              </span>
+              <span>·</span>
+              <span>{formatDate(selectedNote.createdAt)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 space-y-5">
+        <!-- Content -->
+        {#if selectedNote.content}
+          <div>
+            <p class="whitespace-pre-wrap text-slate-700 dark:text-slate-300">{selectedNote.content}</p>
+          </div>
+        {/if}
+
+        <!-- Photos -->
+        {#if selectedNote.id}
+          <div>
+            <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Photos</span>
+            <PhotoGallery
+              photos={selectedNote.photos}
+              folderPath={['notes']}
+              onUpdate={async (photos) => {
+                if (selectedNote?.id) {
+                  await updatePhotos(selectedNote.id, photos)
+                }
+              }}
+              maxPhotos={20}
+            />
+          </div>
+        {/if}
+
+        <!-- Metadata -->
+        <div class="text-xs text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
+          {getDisplayNameForUser(selectedNote.createdBy)} · {formatDate(selectedNote.createdAt)}
+          {#if selectedNote.read && selectedNote.readAt}
+            · Read {formatDate(selectedNote.readAt)}
+          {/if}
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   /* Safari SVG rendering fix - force GPU layer for icons */

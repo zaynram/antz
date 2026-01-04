@@ -21,13 +21,7 @@ import {
     updateDoc,
     type DocumentData,
 } from "firebase/firestore"
-import {
-    getStorage,
-    ref,
-    uploadBytes,
-    getDownloadURL,
-    deleteObject,
-} from "firebase/storage"
+import { getStorage } from "firebase/storage"
 import { firebaseConfig } from "./config"
 import type { UserId, UserPreferencesMap } from "./types"
 
@@ -37,12 +31,21 @@ export const db = getFirestore(app)
 export const storage = getStorage(app)
 
 const googleProvider = new GoogleAuthProvider()
+// Add Google Drive API scopes for file storage
+googleProvider.addScope("https://www.googleapis.com/auth/drive.file")
 
 export async function signInWithGoogle(): Promise<void> {
-    await signInWithPopup(auth, googleProvider)
+    const result = await signInWithPopup(auth, googleProvider)
+
+    // Store the Google access token for Drive API access
+    const credential = GoogleAuthProvider.credentialFromResult(result)
+    if (credential?.accessToken) {
+        sessionStorage.setItem("google_access_token", credential.accessToken)
+    }
 }
 
 export async function logOut(): Promise<void> {
+    sessionStorage.removeItem("google_access_token")
     await signOut(auth)
 }
 
@@ -98,31 +101,17 @@ export async function deleteDocument(collectionName: string, docId: string): Pro
     await deleteDoc(doc(db, collectionName, docId))
 }
 
-// Storage functions for profile pictures
-export async function uploadProfilePicture(userId: UserId, file: File): Promise<string> {
-    const storageRef = ref(storage, `profile-pictures/${userId}`)
-    await uploadBytes(storageRef, file)
-    return getDownloadURL(storageRef)
-}
-
-export async function deleteProfilePicture(userId: UserId): Promise<void> {
-    const storageRef = ref(storage, `profile-pictures/${userId}`)
-    try {
-        await deleteObject(storageRef)
-    } catch (e) {
-        // Ignore if file doesn't exist
-        console.warn('Profile picture not found:', e)
-    }
-}
+// Storage functions for profile pictures (using Google Drive)
+export { deleteProfilePicture, uploadProfilePicture } from "./drive"
 
 // Preferences sync functions
-const PREFERENCES_DOC = 'preferences/shared'
+const PREFERENCES_DOC = "preferences/shared"
 
 export async function savePreferencesToFirestore(prefs: UserPreferencesMap): Promise<void> {
     const docRef = doc(db, PREFERENCES_DOC)
     await setDoc(docRef, {
         ...prefs,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
     })
 }
 
@@ -138,11 +127,9 @@ export async function loadPreferencesFromFirestore(): Promise<UserPreferencesMap
     return null
 }
 
-export function subscribeToPreferences(
-    callback: (prefs: UserPreferencesMap) => void
-): () => void {
+export function subscribeToPreferences(callback: (prefs: UserPreferencesMap) => void): () => void {
     const docRef = doc(db, PREFERENCES_DOC)
-    return onSnapshot(docRef, (snapshot) => {
+    return onSnapshot(docRef, snapshot => {
         if (snapshot.exists()) {
             const data = snapshot.data()
             const { updatedAt: _, ...prefs } = data

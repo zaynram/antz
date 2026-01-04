@@ -1,12 +1,13 @@
 <script lang="ts">
+  import LocationPicker from '$lib/components/LocationPicker.svelte'
+  import PhotoGallery from '$lib/components/ui/PhotoGallery.svelte'
   import { updateDocument } from '$lib/firebase'
+  import { hapticLight } from '$lib/haptics'
   import { activeUser, displayNames } from '$lib/stores/app'
   import type { Place, PlaceCategory, PlaceComment, UserId } from '$lib/types'
-  import { getPlaceUserRating, getPlaceAverageRating } from '$lib/types'
+  import { getPlaceAverageRating, getPlaceUserRating } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
-  import { UtensilsCrossed, Coffee, Wine, Sparkles, Trees, MapPin, X, Check, Calendar, ExternalLink } from 'lucide-svelte'
-  import { hapticLight } from '$lib/haptics'
-  import LocationPicker from '$lib/components/LocationPicker.svelte'
+  import { Calendar, Check, Coffee, ExternalLink, MapPin, Sparkles, Trees, UtensilsCrossed, Wine, X } from 'lucide-svelte'
   import type { ComponentType } from 'svelte'
 
   interface Props {
@@ -191,6 +192,11 @@
     if (!place?.id) return
     const comments = (place.comments || []).filter(c => c.id !== commentId)
     await updateDocument<Place>('places', place.id, { comments }, $activeUser)
+  }
+
+  async function updatePhotos(photos: string[]): Promise<void> {
+    if (!place?.id) return
+    await updateDocument<Place>('places', place.id, { photos }, $activeUser)
   }
 
   function formatDate(timestamp: Timestamp | undefined): string {
@@ -486,6 +492,17 @@
             rows="3"
             class="input resize-y"
           ></textarea>
+        </div>
+
+        <!-- Photos -->
+        <div>
+          <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Photos</span>
+          <PhotoGallery
+            photos={place.photos}
+            folderPath={['places']}
+            onUpdate={updatePhotos}
+            maxPhotos={20}
+          />
         </div>
 
         <!-- Comments section -->

@@ -16,7 +16,7 @@ export interface UserPreferences {
     theme: Theme
     accentColor: string
     name: string
-    profilePicture?: string // URL to profile picture in Firebase Storage
+    profilePicture?: string // URL to profile picture in Google Drive
     // Location settings
     locationMode: LocationMode
     currentLocation?: GeoLocation // Auto-detected or manually set
@@ -42,6 +42,7 @@ export interface Note extends BaseDocument {
     read?: boolean
     readAt?: Timestamp
     archived?: boolean
+    photos?: string[] // URLs to photos in Google Drive
 }
 
 export type MediaType = "tv" | "movie" | "game"
@@ -92,41 +93,46 @@ export interface Media extends BaseDocument {
     // Custom grouping (user-defined)
     customGroupId?: string
     customGroupName?: string
+    photos?: string[] // URLs to photos in Google Drive
 }
 
 // Helper functions for ratings
 export function getUserRating(media: Media, userId: UserId): number | null {
     // First check new ratings structure
     if (media.ratings && userId in media.ratings) {
-        return media.ratings[userId];
+        return media.ratings[userId]
     }
     // Fallback to legacy rating field
-    return media.rating ?? null;
+    return media.rating ?? null
 }
 
 export function getAverageRating(media: Media): number | null {
     if (media.ratings) {
-        const ratingZ = media.ratings.Z;
-        const ratingT = media.ratings.T;
-        
+        const ratingZ = media.ratings.Z
+        const ratingT = media.ratings.T
+
         // Both users have rated
-        if (ratingZ !== null && ratingZ !== undefined && 
-            ratingT !== null && ratingT !== undefined) {
-            return (ratingZ + ratingT) / 2;
+        if (
+            ratingZ !== null &&
+            ratingZ !== undefined &&
+            ratingT !== null &&
+            ratingT !== undefined
+        ) {
+            return (ratingZ + ratingT) / 2
         }
-        
+
         // Only one user has rated
-        if (ratingZ !== null && ratingZ !== undefined) return ratingZ;
-        if (ratingT !== null && ratingT !== undefined) return ratingT;
+        if (ratingZ !== null && ratingZ !== undefined) return ratingZ
+        if (ratingT !== null && ratingT !== undefined) return ratingT
     }
-    
+
     // Fallback to legacy rating
-    return media.rating ?? null;
+    return media.rating ?? null
 }
 
 export function getDisplayRating(media: Media): number | null {
     // Priority: average of both ratings > individual rating > legacy rating
-    return getAverageRating(media);
+    return getAverageRating(media)
 }
 
 export type PlaceCategory = "restaurant" | "cafe" | "bar" | "attraction" | "park" | "other"
@@ -150,48 +156,52 @@ export interface Place extends BaseDocument {
     location?: GeoLocation
     placeId?: string // Google Places ID for richer data
     tags?: string[] // User-defined tags
+    photos?: string[] // URLs to photos in Google Drive
 }
 
 // Place rating helpers (mirror Media rating helpers)
 export function getPlaceUserRating(place: Place, userId: UserId): number | null {
     if (place.ratings && userId in place.ratings) {
-        return place.ratings[userId];
+        return place.ratings[userId]
     }
-    return place.rating ?? null;
+    return place.rating ?? null
 }
 
 export function getPlaceAverageRating(place: Place): number | null {
     if (place.ratings) {
-        const ratingZ = place.ratings.Z;
-        const ratingT = place.ratings.T;
+        const ratingZ = place.ratings.Z
+        const ratingT = place.ratings.T
 
-        if (ratingZ !== null && ratingZ !== undefined &&
-            ratingT !== null && ratingT !== undefined) {
-            return (ratingZ + ratingT) / 2;
+        if (
+            ratingZ !== null &&
+            ratingZ !== undefined &&
+            ratingT !== null &&
+            ratingT !== undefined
+        ) {
+            return (ratingZ + ratingT) / 2
         }
 
-        if (ratingZ !== null && ratingZ !== undefined) return ratingZ;
-        if (ratingT !== null && ratingT !== undefined) return ratingT;
+        if (ratingZ !== null && ratingZ !== undefined) return ratingZ
+        if (ratingT !== null && ratingT !== undefined) return ratingT
     }
-    return place.rating ?? null;
+    return place.rating ?? null
 }
 
 export function getPlaceDisplayRating(place: Place): number | null {
-    return getPlaceAverageRating(place);
+    return getPlaceAverageRating(place)
 }
 
 // Helper to calculate distance between two coordinates (Haversine formula)
-export function calculateDistance(
-    loc1: GeoLocation,
-    loc2: GeoLocation
-): number {
+export function calculateDistance(loc1: GeoLocation, loc2: GeoLocation): number {
     const R = 6371 // Earth's radius in km
-    const dLat = (loc2.lat - loc1.lat) * Math.PI / 180
-    const dLng = (loc2.lng - loc1.lng) * Math.PI / 180
-    const a = 
+    const dLat = ((loc2.lat - loc1.lat) * Math.PI) / 180
+    const dLng = ((loc2.lng - loc1.lng) * Math.PI) / 180
+    const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(loc1.lat * Math.PI / 180) * Math.cos(loc2.lat * Math.PI / 180) *
-        Math.sin(dLng / 2) * Math.sin(dLng / 2)
+        Math.cos((loc1.lat * Math.PI) / 180) *
+            Math.cos((loc2.lat * Math.PI) / 180) *
+            Math.sin(dLng / 2) *
+            Math.sin(dLng / 2)
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     return R * c // Distance in km
 }
