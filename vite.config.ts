@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Us - Couples App',
-        short_name: 'Us',
+        name: 'us',
+        short_name: 'us',
         description: 'Track shared media, notes, and places together',
         theme_color: '#6366f1',
         background_color: '#0f172a',
