@@ -1,5 +1,25 @@
 import { tmdbConfig } from './config'
 
+// Search result interfaces
+export interface TMDBSearchResult {
+    id: number
+    title?: string // movies
+    name?: string // TV shows
+    overview: string
+    poster_path: string | null
+    release_date?: string // movies
+    first_air_date?: string // TV shows
+    genre_ids: number[]
+    media_type?: 'movie' | 'tv'
+}
+
+export interface TMDBSearchResponse {
+    page: number
+    results: TMDBSearchResult[]
+    total_pages: number
+    total_results: number
+}
+
 export interface TMDBGenre {
     id: number
     name: string
@@ -161,5 +181,92 @@ export async function enrichMediaData(
             collection: null, // TV shows don't have collections in TMDB
             productionCompanies: companies.filter(c => c?.id && c?.name).map(c => ({ id: c.id, name: c.name }))
         }
+    }
+}
+
+/**
+ * Search TMDB for movies
+ */
+export async function searchMovies(query: string, limit = 10): Promise<TMDBSearchResult[]> {
+    if (!query.trim()) return []
+
+    const params = new URLSearchParams({
+        api_key: tmdbConfig.apiKey,
+        query: query.trim(),
+        include_adult: 'false',
+        language: 'en-US',
+        page: '1'
+    })
+
+    try {
+        const res = await fetch(`${tmdbConfig.baseUrl}/search/movie?${params}`)
+        if (res.ok === false) {
+            console.warn(`TMDB movie search failed: ${res.status}`)
+            return []
+        }
+        const data: TMDBSearchResponse = await res.json()
+        return data.results.slice(0, limit).map(r => ({ ...r, media_type: 'movie' as const }))
+    } catch (e) {
+        console.error('TMDB movie search error:', e)
+        return []
+    }
+}
+
+/**
+ * Search TMDB for TV shows
+ */
+export async function searchTV(query: string, limit = 10): Promise<TMDBSearchResult[]> {
+    if (!query.trim()) return []
+
+    const params = new URLSearchParams({
+        api_key: tmdbConfig.apiKey,
+        query: query.trim(),
+        include_adult: 'false',
+        language: 'en-US',
+        page: '1'
+    })
+
+    try {
+        const res = await fetch(`${tmdbConfig.baseUrl}/search/tv?${params}`)
+        if (res.ok === false) {
+            console.warn(`TMDB TV search failed: ${res.status}`)
+            return []
+        }
+        const data: TMDBSearchResponse = await res.json()
+        return data.results.slice(0, limit).map(r => ({ ...r, media_type: 'tv' as const }))
+    } catch (e) {
+        console.error('TMDB TV search error:', e)
+        return []
+    }
+}
+
+/**
+ * Search TMDB multi-search (movies and TV combined)
+ */
+export async function searchMulti(query: string, limit = 20): Promise<TMDBSearchResult[]> {
+    if (!query.trim()) return []
+
+    const params = new URLSearchParams({
+        api_key: tmdbConfig.apiKey,
+        query: query.trim(),
+        include_adult: 'false',
+        language: 'en-US',
+        page: '1'
+    })
+
+    try {
+        const res = await fetch(`${tmdbConfig.baseUrl}/search/multi?${params}`)
+        if (res.ok === false) {
+            console.warn(`TMDB multi search failed: ${res.status}`)
+            return []
+        }
+        const data: TMDBSearchResponse = await res.json()
+        // Filter to only movies and TV, exclude people
+        return data.results
+            .filter(r => r.media_type === 'movie' || r.media_type === 'tv')
+            .slice(0, limit)
+    } catch (e) {
+        console.error('TMDB multi search error:', e)
+        return []
     }
 }
