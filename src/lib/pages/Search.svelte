@@ -124,17 +124,6 @@
     return allItems.sort((a, b) => b.score - a.score)
   })
 
-  // Group results by type for display
-  let groupedResults = $derived.by(() => {
-    const groups: Record<string, typeof results> = {}
-    for (const r of results) {
-      const type = r.item.type
-      if (!groups[type]) groups[type] = []
-      groups[type].push(r)
-    }
-    return groups
-  })
-
   function posterUrl(path: string | null | undefined): string | null {
     if (!path) return null
     if (path.startsWith('http')) return path
