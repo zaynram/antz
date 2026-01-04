@@ -7,15 +7,11 @@
   import { getDisplayRating } from '$lib/types'
   import { enrichMediaData } from '$lib/tmdb'
   import { searchGames, type WikiGameResult } from '$lib/wikipedia'
-  import { fuzzyScoreMulti } from '$lib/fuzzy'
   import {
     applyFilters,
     applySort,
     extractGenres,
-    extractDecades,
     countActiveFilters,
-    formatDecade,
-    getSortLabel,
     DEFAULT_FILTERS,
     DEFAULT_SORT,
     type MediaFilters,
@@ -24,7 +20,7 @@
   } from '$lib/filters'
   import { onMount } from 'svelte'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
-  import { Film, Tv, Gamepad2, FolderOpen, Filter, ChevronLeft, ChevronRight, Plus, Search } from 'lucide-svelte'
+  import { Film, Tv, Gamepad2, Filter, ChevronLeft, ChevronRight, Plus, Search, X } from 'lucide-svelte'
 
   interface Props {
     type: MediaType
@@ -55,7 +51,6 @@
   let searchTimer: ReturnType<typeof setTimeout> | null = null
   let searchAbortController: AbortController | null = null
   const DEBOUNCE_MS = 300
-  const FUZZY_THRESHOLD = 25
 
   // Type info
   const typeInfo: Record<MediaType, { label: string; plural: string; icon: typeof Film }> = {
@@ -319,7 +314,6 @@
   // Filtered media for this type only
   let typeMedia = $derived(media.filter(m => m.type === type))
   let availableGenres = $derived(extractGenres(typeMedia))
-  let availableDecades = $derived(extractDecades(typeMedia))
   let activeFilterCount = $derived(countActiveFilters({ ...filters, type: 'all' }))
 
   let filteredMedia = $derived.by(() => {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { activeUser, currentPreferences, displayNames } from '$lib/stores/app'
+  import { activeUser, currentPreferences } from '$lib/stores/app'
   import { logOut } from '$lib/firebase'
   import {
     Search,
@@ -13,8 +13,7 @@
     Menu,
     X,
     LogOut,
-    ChevronRight,
-    User
+    ChevronRight
   } from 'lucide-svelte'
 
   interface Props {
