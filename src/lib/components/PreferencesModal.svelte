@@ -174,7 +174,7 @@
       <div class="p-4 space-y-5 overflow-y-auto flex-1">
         <!-- Profile Picture -->
         <div>
-          <label class="block text-sm font-medium mb-2">Profile Picture</label>
+          <span class="block text-sm font-medium mb-2">Profile Picture</span>
           <div class="flex items-center gap-4">
             <div class="relative">
               {#if localProfilePicture}
@@ -229,8 +229,9 @@
 
         <!-- Display Name -->
         <div>
-          <label class="block text-sm font-medium mb-2">Display Name</label>
+          <label for="prefs-display-name" class="block text-sm font-medium mb-2">Display Name</label>
           <input
+            id="prefs-display-name"
             type="text"
             bind:value={localName}
             class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent"
@@ -240,7 +241,7 @@
 
         <!-- Theme -->
         <div>
-          <label class="block text-sm font-medium mb-2">Theme</label>
+          <span class="block text-sm font-medium mb-2">Theme</span>
           <div class="flex gap-3">
             <button
               class="flex-1 py-3 px-4 rounded-lg border-2 transition-all flex items-center justify-center gap-2 {localTheme === 'light' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
@@ -261,7 +262,7 @@
         
         <!-- Accent Color -->
         <div>
-          <label class="block text-sm font-medium mb-2">Accent Color</label>
+          <span class="block text-sm font-medium mb-2">Accent Color</span>
           <div class="flex flex-wrap gap-2 mb-3">
             {#each presetColors as color}
               <button
@@ -278,8 +279,9 @@
             {/each}
           </div>
           <div class="flex items-center gap-3">
-            <label class="text-sm text-slate-500 dark:text-slate-400">Custom:</label>
+            <label for="prefs-custom-color" class="text-sm text-slate-500 dark:text-slate-400">Custom:</label>
             <input
+              id="prefs-custom-color"
               type="color"
               bind:value={localAccentColor}
               class="w-10 h-10 rounded cursor-pointer border-0"
@@ -289,20 +291,21 @@
               bind:value={localAccentColor}
               class="flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg font-mono"
               pattern="^#[0-9A-Fa-f]{6}$"
+              aria-label="Custom color hex value"
             />
           </div>
         </div>
         
         <!-- Location Settings -->
         <div class="pt-2 border-t border-slate-200 dark:border-slate-700">
-          <label class="flex items-center gap-2 text-sm font-medium mb-3">
+          <span class="flex items-center gap-2 text-sm font-medium mb-3">
             <MapPin size={16} />
             Location Settings
-          </label>
-          
+          </span>
+
           <!-- Location Mode -->
           <div class="mb-4">
-            <label class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Location Mode</label>
+            <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Location Mode</span>
             <div class="flex gap-2">
               <button
                 class="flex-1 py-2 px-3 rounded-lg border-2 text-sm transition-all {localLocationMode === 'off' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
@@ -337,21 +340,21 @@
           {#if localLocationMode !== 'off'}
             <!-- Current Location -->
             <div class="mb-4">
-              <label class="block text-xs text-slate-500 dark:text-slate-400 mb-2">
+              <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">
                 {localLocationMode === 'manual' ? 'Your Location' : 'Default Location (fallback)'}
-              </label>
+              </span>
               <LocationPicker
                 value={localCurrentLocation}
                 onChange={(loc) => localCurrentLocation = loc}
                 placeholder="Search or detect location..."
               />
             </div>
-            
+
             <!-- Reference Location -->
             <div class="mb-4">
-              <label class="block text-xs text-slate-500 dark:text-slate-400 mb-2">
+              <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">
                 Reference Point <span class="text-slate-400">(for suggestions)</span>
-              </label>
+              </span>
               <LocationPicker
                 value={localReferenceLocation}
                 onChange={(loc) => localReferenceLocation = loc}
@@ -361,11 +364,12 @@
                 Place suggestions will be relative to this point
               </p>
             </div>
-            
+
             <!-- Search Radius -->
             <div>
-              <label class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Search Radius</label>
+              <label for="prefs-search-radius" class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Search Radius</label>
               <select
+                id="prefs-search-radius"
                 bind:value={localSearchRadius}
                 class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
               >
@@ -379,7 +383,7 @@
         
         <!-- Preview -->
         <div class="p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Preview</label>
+          <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Preview</span>
           <div class="flex items-center gap-3">
             {#if localProfilePicture}
               <img

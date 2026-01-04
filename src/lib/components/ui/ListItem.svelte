@@ -28,13 +28,14 @@
   }: Props = $props()
 </script>
 
-<article
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div
   class="group flex items-start gap-4 p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl transition-all"
   class:opacity-70={dimmed}
   class:cursor-pointer={onclick}
   class:hover:border-accent={onclick}
   role={onclick ? 'button' : undefined}
-  tabindex={onclick ? 0 : undefined}
+  tabindex={onclick ? 0 : -1}
   onclick={onclick}
   onkeydown={onclick ? (e) => e.key === 'Enter' && onclick() : undefined}
 >
@@ -70,4 +71,4 @@
       {@render actions()}
     </div>
   {/if}
-</article>
+</div>

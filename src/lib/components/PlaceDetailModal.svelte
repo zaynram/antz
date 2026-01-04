@@ -241,7 +241,7 @@
         <!-- Visit history -->
         {#if place.visitDates?.length}
           <div>
-            <label class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Visit History</label>
+            <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Visit History</span>
             <div class="flex flex-wrap gap-2">
               {#each place.visitDates as date}
                 <span class="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs">
@@ -255,8 +255,9 @@
         <!-- Category & Rating row -->
         <div class="flex flex-wrap gap-4 items-start">
           <div class="flex-1 min-w-[120px]">
-            <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Category</label>
+            <label for="place-category" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Category</label>
             <select
+              id="place-category"
               bind:value={editedCategory}
               onchange={updateCategory}
               class="input-sm"
@@ -268,7 +269,7 @@
           </div>
 
           <div class="flex-1 min-w-[200px]">
-            <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Ratings</label>
+            <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Ratings</span>
 
             <!-- User Z Rating -->
             <div class="mb-2">
@@ -327,7 +328,7 @@
 
         <!-- Location picker -->
         <div>
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Location</label>
+          <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Location</span>
           <LocationPicker
             value={place.location}
             onChange={updateLocation}
@@ -337,8 +338,9 @@
 
         <!-- Notes -->
         <div>
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Notes</label>
+          <label for="place-notes" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Notes</label>
           <textarea
+            id="place-notes"
             bind:value={editedNotes}
             onblur={updateNotes}
             placeholder="Add notes about this place..."
@@ -349,7 +351,7 @@
 
         <!-- Comments section -->
         <div>
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Comments</label>
+          <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Comments</span>
 
           {#if place.comments?.length}
             <div class="space-y-2 mb-3">

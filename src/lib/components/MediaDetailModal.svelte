@@ -196,8 +196,9 @@
         <!-- Status & Rating row -->
         <div class="flex flex-wrap gap-4 items-start">
           <div class="flex-1 min-w-[120px]">
-            <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Status</label>
+            <label for="media-status" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Status</label>
             <select
+              id="media-status"
               value={media.status}
               onchange={(e) => updateStatus(e.currentTarget.value as MediaStatus)}
               class="w-full p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
@@ -209,7 +210,7 @@
           </div>
           
           <div class="flex-1 min-w-[200px]">
-            <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Ratings</label>
+            <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Ratings</span>
             
             <!-- User Z Rating -->
             <div class="mb-2">
@@ -264,9 +265,10 @@
           </div>
           
           <div class="flex-1 min-w-[140px]">
-            <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Watch Date</label>
+            <label for="media-watch-date" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Watch Date</label>
             <div class="flex gap-2">
               <input
+                id="media-watch-date"
                 type="date"
                 bind:value={watchDateInput}
                 onchange={updateWatchDate}
@@ -293,13 +295,13 @@
           <div class="flex flex-wrap gap-4">
             {#if media.collection}
               <div class="flex-1 min-w-[120px]">
-                <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Collection</label>
+                <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Collection</span>
                 <span class="text-sm font-medium text-accent">{media.collection.name}</span>
               </div>
             {/if}
             {#if media.productionCompanies?.length}
               <div class="flex-1 min-w-[120px]">
-                <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Studio</label>
+                <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Studio</span>
                 <span class="text-sm">{media.productionCompanies.map(c => c.name).join(', ')}</span>
               </div>
             {/if}
@@ -309,15 +311,16 @@
         <!-- Overview -->
         {#if media.overview}
           <div>
-            <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Overview</label>
+            <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Overview</span>
             <p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{media.overview}</p>
           </div>
         {/if}
         
         <!-- Notes -->
         <div>
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Personal Notes</label>
+          <label for="media-notes" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Personal Notes</label>
           <textarea
+            id="media-notes"
             bind:value={editedNotes}
             onblur={updateNotes}
             placeholder="Add your thoughts..."
@@ -328,7 +331,7 @@
         
         <!-- Comments section -->
         <div>
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Comments</label>
+          <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Comments</span>
           
           {#if media.comments?.length}
             <div class="space-y-2 mb-3">

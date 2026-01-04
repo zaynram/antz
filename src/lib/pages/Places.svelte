@@ -382,8 +382,8 @@
     <div class="card p-4 mb-4 space-y-4" style="transform: translateZ(0)">
       <div class="flex flex-wrap gap-4">
         <div class="flex-1 min-w-[140px]">
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Category</label>
-          <select bind:value={filterCategory} class="input-sm">
+          <label for="places-filter-category" class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Category</label>
+          <select id="places-filter-category" bind:value={filterCategory} class="input-sm">
             <option value="all">All Categories</option>
             {#each categories as cat}
               <option value={cat}>{categoryLabels[cat]}</option>
@@ -392,8 +392,8 @@
         </div>
 
         <div class="flex-1 min-w-[120px]">
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Added By</label>
-          <select bind:value={filterAddedBy} class="input-sm">
+          <label for="places-filter-added-by" class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Added By</label>
+          <select id="places-filter-added-by" bind:value={filterAddedBy} class="input-sm">
             <option value="all">Anyone</option>
             <option value="Z">{$displayNames.Z}</option>
             <option value="T">{$displayNames.T}</option>
@@ -401,7 +401,7 @@
         </div>
 
         <div class="flex-1 min-w-[180px]">
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Sort</label>
+          <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Sort</span>
           <div class="flex gap-1 flex-wrap">
             {#each sortOptions as opt}
               <button
@@ -442,7 +442,7 @@
       {@const distance = place.id ? distanceCache.get(place.id) ?? null : null}
       {@const Icon = categoryIcons[place.category]}
       {@const rating = getPlaceDisplayRating(place)}
-      <article
+      <div
         class="group card p-4 transition-all cursor-pointer hover:border-accent"
         class:opacity-70={place.visited}
         onclick={() => selectedPlace = place}
@@ -515,7 +515,7 @@
             </button>
           </div>
         </div>
-      </article>
+      </div>
     {:else}
       <EmptyState
         icon={MapPin}

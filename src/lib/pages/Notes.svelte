@@ -210,7 +210,7 @@
   <div class="flex flex-col gap-3">
     {#each filteredNotes as note (note.id)}
       {@const isUnread = !note.read && note.createdBy !== $activeUser}
-      <article
+      <div
         class="group relative card p-4 transition-all cursor-pointer hover:border-accent {isUnread ? 'border-accent/50 bg-accent/5' : ''}"
         onclick={() => markAsRead(note)}
         role="button"
@@ -270,7 +270,7 @@
         {#if note.content}
           <p class="whitespace-pre-wrap text-slate-700 dark:text-slate-300 {isUnread ? '' : 'opacity-90'}">{note.content}</p>
         {/if}
-      </article>
+      </div>
     {:else}
       <EmptyState
         icon={emptyConfig.icon}

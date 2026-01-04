@@ -305,7 +305,7 @@
 
       <!-- Profile Picture -->
       <div>
-        <label class="block text-sm font-medium mb-2">Profile Picture</label>
+        <span class="block text-sm font-medium mb-2">Profile Picture</span>
         <div class="flex items-center gap-4">
           <div class="relative">
             {#if localProfilePicture}
@@ -356,8 +356,9 @@
 
       <!-- Display Name -->
       <div>
-        <label class="block text-sm font-medium mb-2">Display Name</label>
+        <label for="settings-display-name" class="block text-sm font-medium mb-2">Display Name</label>
         <input
+          id="settings-display-name"
           type="text"
           bind:value={localName}
           onblur={handleNameChange}
@@ -368,7 +369,7 @@
 
       <!-- Theme -->
       <div>
-        <label class="block text-sm font-medium mb-2">Theme</label>
+        <span class="block text-sm font-medium mb-2">Theme</span>
         <div class="flex gap-3">
           <button
             type="button"
@@ -391,7 +392,7 @@
 
       <!-- Accent Color -->
       <div>
-        <label class="block text-sm font-medium mb-2">Accent Color</label>
+        <span class="block text-sm font-medium mb-2">Accent Color</span>
         <div class="flex flex-wrap gap-2 mb-3">
           {#each presetColors as color}
             <button
@@ -404,12 +405,14 @@
               class:ring-offset-2={localAccentColor === color}
               class:ring-slate-400={localAccentColor === color}
               onclick={() => handleColorChange(color)}
+              aria-label="Select color {color}"
             ></button>
           {/each}
         </div>
         <div class="flex items-center gap-3">
-          <label class="text-sm text-slate-500">Custom:</label>
+          <label for="settings-custom-color" class="text-sm text-slate-500">Custom:</label>
           <input
+            id="settings-custom-color"
             type="color"
             bind:value={localAccentColor}
             onchange={() => handleColorChange(localAccentColor)}
@@ -421,6 +424,7 @@
             onblur={() => handleColorChange(localAccentColor)}
             class="input-sm flex-1 font-mono"
             pattern="^#[0-9A-Fa-f]{6}$"
+            aria-label="Custom color hex value"
           />
         </div>
       </div>
@@ -434,7 +438,7 @@
       </h2>
 
       <div>
-        <label class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Location Mode</label>
+        <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Location Mode</span>
         <div class="flex gap-2">
           <button
             type="button"
@@ -462,9 +466,9 @@
 
       {#if localLocationMode !== 'off'}
         <div>
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-2">
+          <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">
             {localLocationMode === 'manual' ? 'Your Location' : 'Default Location'}
-          </label>
+          </span>
           <LocationPicker
             value={localCurrentLocation}
             onChange={(loc) => { localCurrentLocation = loc; savePreferences(); }}
@@ -473,8 +477,9 @@
         </div>
 
         <div>
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Search Radius</label>
+          <label for="settings-search-radius" class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Search Radius</label>
           <select
+            id="settings-search-radius"
             bind:value={localSearchRadius}
             onchange={handleRadiusChange}
             class="input-sm"

@@ -48,6 +48,8 @@
 
   // Filter & Sort state
   let showFilters = $state(false)
+  // svelte-ignore state_referenced_locally
+  // Type prop is intentionally captured at init - component is recreated for different types
   let filters = $state<MediaFilters>({ ...DEFAULT_FILTERS, type })
   let sort = $state<SortConfig>({ ...DEFAULT_SORT })
 
@@ -568,8 +570,9 @@
     <div class="card p-4 mb-4 space-y-4" style="transform: translateZ(0);">
       <div class="flex flex-wrap gap-4">
         <div class="flex-1 min-w-[120px]">
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Status</label>
+          <label for="library-filter-status" class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Status</label>
           <select
+            id="library-filter-status"
             bind:value={filters.status}
             class="input-sm"
           >
@@ -580,8 +583,9 @@
         </div>
 
         <div class="flex-1 min-w-[120px]">
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Added By</label>
+          <label for="library-filter-added-by" class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Added By</label>
           <select
+            id="library-filter-added-by"
             bind:value={filters.addedBy}
             class="input-sm"
           >
@@ -592,7 +596,7 @@
         </div>
 
         <div class="flex-1 min-w-[140px]">
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Sort</label>
+          <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Sort</span>
           <div class="flex gap-1 flex-wrap">
             {#each sortOptions as opt}
               <button
@@ -614,7 +618,7 @@
 
       {#if availableGenres.length > 0}
         <div>
-          <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Genres</label>
+          <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Genres</span>
           <div class="flex flex-wrap gap-2">
             {#each availableGenres as genre}
               <button
