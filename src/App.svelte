@@ -3,7 +3,7 @@
   import { authLoading, authUser, currentPreferences, initPreferencesSync, cleanupPreferencesSync } from '$lib/stores/app'
   import { onMount } from 'svelte'
   import { Toaster } from 'svelte-sonner'
-  import { Home as HomeIcon, StickyNote, Film, MapPin, SearchX } from 'lucide-svelte'
+  import { Home as HomeIcon, StickyNote, Film, MapPin, SearchX, WifiOff } from 'lucide-svelte'
 
   import UserToggle from '$lib/components/UserToggle.svelte'
   import Home from '$lib/pages/Home.svelte'
@@ -15,8 +15,15 @@
   import Settings from '$lib/pages/Settings.svelte'
 
   let currentPath = $state(window.location.pathname);
+  let isOffline = $state(!navigator.onLine);
 
   onMount(() => {
+    // Track online/offline status
+    const handleOnline = () => { isOffline = false; };
+    const handleOffline = () => { isOffline = true; };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     const unsubscribe = onAuthChange((user) => {
       authUser.set(user);
       authLoading.set(false);
@@ -39,6 +46,8 @@
       unsubscribe();
       cleanupPreferencesSync();
       window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   });
 
@@ -71,6 +80,13 @@
 
 <Toaster richColors position="bottom-center" />
 
+{#if isOffline}
+  <div class="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-amber-950 text-sm font-medium py-2 px-4 flex items-center justify-center gap-2 safe-area-top">
+    <WifiOff size={16} />
+    <span>You're offline - some features may be unavailable</span>
+  </div>
+{/if}
+
 {#if $authLoading}
   <div class="flex items-center justify-center h-screen text-xl text-slate-500">
     Loading...
@@ -80,7 +96,8 @@
 {:else}
   <div class="h-full flex flex-col overflow-hidden">
     <header
-      class="flex items-center justify-between px-6 py-4 bg-surface border-b border-slate-200 dark:border-slate-700 shrink-0"
+      class="flex items-center justify-between px-6 py-4 bg-surface border-b border-slate-200 dark:border-slate-700 shrink-0 safe-area-x"
+      class:pt-[calc(1rem+env(safe-area-inset-top))]={isOffline}
     >
       <nav class="flex gap-4 sm:gap-6">
         <button
@@ -119,7 +136,7 @@
       <UserToggle {navigate} />
     </header>
 
-    <main class="flex-1 overflow-y-auto overflow-x-hidden p-6 max-w-5xl mx-auto w-full">
+    <main class="flex-1 overflow-y-auto overflow-x-hidden p-6 max-w-5xl mx-auto w-full safe-area-x safe-area-bottom">
       {#if currentPath === '/'}
         <Home {navigate} />
       {:else if currentPath === '/notes'}

@@ -164,6 +164,11 @@
   }
 
   function handleColorChange(color: string): void {
+    // Validate hex color format
+    if (!/^#[0-9A-Fa-f]{6}$/.test(color)) {
+      toast.error('Invalid color format');
+      return;
+    }
     localAccentColor = color;
     savePreferences();
   }
