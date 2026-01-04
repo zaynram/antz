@@ -105,8 +105,14 @@
     gameResults = []
   })
 
-  // Force repaint on iOS Safari PWA
+  // Force repaint on iOS Safari PWA (only runs on iOS in standalone mode)
+  const isIOSPWA = typeof navigator !== 'undefined' &&
+    /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+    typeof window !== 'undefined' &&
+    window.matchMedia('(display-mode: standalone)').matches
+
   function forceRepaint() {
+    if (!isIOSPWA) return
     requestAnimationFrame(() => {
       document.body.style.transform = 'translateZ(0)'
       requestAnimationFrame(() => {

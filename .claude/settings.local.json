@@ -6,7 +6,8 @@
       "Bash(bun test:run:*)",
       "Bash(gh run list:*)",
       "Bash(bun run build:*)",
-      "Bash(bun run:*)"
+      "Bash(bun run:*)",
+      "Bash(git config:*)"
     ]
   }
 }
