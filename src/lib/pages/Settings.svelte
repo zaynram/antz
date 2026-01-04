@@ -3,7 +3,7 @@
   import PageHeader from '$lib/components/ui/PageHeader.svelte'
   import { deleteProfilePicture, logOut, uploadProfilePicture } from '$lib/firebase'
   import { hapticLight } from '$lib/haptics'
-  import { activeUser, currentPreferences, displayAbbreviations, userPreferences } from '$lib/stores/app'
+  import { activeUser, currentPreferences, displayAbbreviations, immediateSavePreferences, userPreferences } from '$lib/stores/app'
   import type { GeoLocation, LocationMode, Theme } from '$lib/types'
   import { Camera, Info, Loader2, LogOut, MapPin, Moon, Palette, RefreshCw, Settings, Sun, User, X } from 'lucide-svelte'
   import { toast } from 'svelte-sonner'
@@ -131,6 +131,7 @@
       }
       localProfilePicture = url
       savePreferences()
+      await immediateSavePreferences()
       toast.success('Profile picture uploaded')
     } catch (err) {
       console.error('Upload failed:', err)
@@ -148,6 +149,7 @@
       await deleteProfilePicture($activeUser)
       localProfilePicture = undefined
       savePreferences()
+      await immediateSavePreferences()
       toast.success('Profile picture removed')
     } catch (err) {
       console.error('Delete failed:', err)
@@ -169,7 +171,8 @@
         locationMode: localLocationMode,
         currentLocation: localCurrentLocation,
         referenceLocation: localReferenceLocation,
-        searchRadius: localSearchRadius
+        searchRadius: localSearchRadius,
+        lastUpdated: Date.now()
       }
     }))
   }

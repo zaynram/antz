@@ -25,6 +25,7 @@ export interface UserPreferences {
     currentLocation?: GeoLocation // Auto-detected or manually set
     referenceLocation?: GeoLocation // For "suggest places near X"
     searchRadius: number // meters (default 5000)
+    lastUpdated?: number // Timestamp for conflict resolution
 }
 
 export type UserPreferencesMap = Record<UserId, UserPreferences>

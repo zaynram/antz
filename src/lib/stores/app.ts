@@ -37,6 +37,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         unitSystem: "metric",
         locationMode: "off",
         searchRadius: 5000,
+        lastUpdated: Date.now(),
     },
     T: {
         theme: "light",
@@ -45,6 +46,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         unitSystem: "metric",
         locationMode: "off",
         searchRadius: 5000,
+        lastUpdated: Date.now(),
     },
 }
 
@@ -86,6 +88,32 @@ let isRemoteUpdate = false
 let unsubscribeFirestore: (() => void) | null = null
 let unsubscribeLocalPrefs: (() => void) | null = null
 let isSyncInitializing = false // Guard against concurrent init calls
+
+// Merge preferences using last-write-wins based on timestamps
+function mergePreferencesWithTimestamp(
+    defaults: UserPreferences,
+    local: UserPreferences | undefined,
+    remote: UserPreferences | undefined
+): UserPreferences {
+    // Start with defaults
+    let result = { ...defaults }
+
+    // If only one source exists, use it
+    if (!local && remote) return { ...result, ...remote }
+    if (local && !remote) return { ...result, ...local }
+    if (!local && !remote) return result
+
+    // Both exist - use timestamps to determine which is newer
+    const localTime = local.lastUpdated || 0
+    const remoteTime = remote.lastUpdated || 0
+
+    // Merge with the newer one winning
+    if (remoteTime > localTime) {
+        return { ...result, ...local, ...remote, lastUpdated: remoteTime }
+    } else {
+        return { ...result, ...remote, ...local, lastUpdated: localTime }
+    }
+}
 
 // Shallow comparison for preferences (avoids expensive JSON.stringify)
 function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
@@ -154,6 +182,18 @@ function debouncedSaveToFirestore(prefs: UserPreferencesMap): void {
     }, 1000) // 1 second debounce
 }
 
+// Immediate save (no debounce) for critical updates like profile pictures
+export async function immediateSavePreferences(): Promise<void> {
+    if (isRemoteUpdate) return
+    
+    const prefs = get(userPreferences)
+    // Add timestamp to prevent stale writes
+    const activeUserId = get(activeUser)
+    prefs[activeUserId].lastUpdated = Date.now()
+    
+    await saveWithRetry(prefs)
+}
+
 // Initialize Firestore sync (call after auth)
 export async function initPreferencesSync(): Promise<void> {
     // Prevent concurrent initialization
@@ -170,11 +210,19 @@ export async function initPreferencesSync(): Promise<void> {
     try {
         const remotePrefs = await loadPreferencesFromFirestore()
         if (remotePrefs) {
-            // Merge with local - remote wins for each user's prefs
+            // Merge with local using last-write-wins based on timestamps
             const localPrefs = get(userPreferences)
             const merged: UserPreferencesMap = {
-                Z: { ...DEFAULT_PREFERENCES.Z, ...localPrefs.Z, ...remotePrefs.Z },
-                T: { ...DEFAULT_PREFERENCES.T, ...localPrefs.T, ...remotePrefs.T },
+                Z: mergePreferencesWithTimestamp(
+                    DEFAULT_PREFERENCES.Z,
+                    localPrefs.Z,
+                    remotePrefs.Z
+                ),
+                T: mergePreferencesWithTimestamp(
+                    DEFAULT_PREFERENCES.T,
+                    localPrefs.T,
+                    remotePrefs.T
+                ),
             }
             isRemoteUpdate = true
             userPreferences.set(merged)
@@ -195,8 +243,16 @@ export async function initPreferencesSync(): Promise<void> {
         if (!prefsEqual(remotePrefs, localPrefs)) {
             isRemoteUpdate = true
             userPreferences.set({
-                Z: { ...DEFAULT_PREFERENCES.Z, ...remotePrefs.Z },
-                T: { ...DEFAULT_PREFERENCES.T, ...remotePrefs.T },
+                Z: mergePreferencesWithTimestamp(
+                    DEFAULT_PREFERENCES.Z,
+                    localPrefs.Z,
+                    remotePrefs.Z
+                ),
+                T: mergePreferencesWithTimestamp(
+                    DEFAULT_PREFERENCES.T,
+                    localPrefs.T,
+                    remotePrefs.T
+                ),
             })
             isRemoteUpdate = false
         }
