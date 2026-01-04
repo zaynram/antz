@@ -6,7 +6,10 @@
   import { onMount } from 'svelte'
   import { parseQuery, matchesQuery, hasSearchCriteria, getFilterSummary, type SearchableItem } from '$lib/queryParser'
   import { tmdbConfig } from '$lib/config'
-  import { Film, Tv, Gamepad2, StickyNote, MapPin, Search as SearchIcon, HelpCircle, ChevronDown, ChevronUp, X, Check, ChevronRight } from 'lucide-svelte'
+  import { Film, Tv, Gamepad2, StickyNote, MapPin, Search as SearchIcon, HelpCircle, ChevronDown, ChevronUp, X, Check, ChevronRight, Archive, ArchiveRestore, Trash2 } from 'lucide-svelte'
+  import { deleteDocument } from '$lib/firebase'
+  import { toast } from 'svelte-sonner'
+  import { hapticLight } from '$lib/haptics'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
   import PlaceDetailModal from '$lib/components/PlaceDetailModal.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
@@ -242,6 +245,30 @@
     }
   }
 
+  // Note action handlers
+  async function toggleNoteArchive(note: Note) {
+    if (!note.id) return
+    hapticLight()
+    await updateDocument<Note>('notes', note.id, {
+      archived: !note.archived
+    }, $activeUser)
+    toast.success(note.archived ? 'Note unarchived' : 'Note archived')
+  }
+
+  async function deleteNote(note: Note) {
+    if (!note.id) return
+    if (confirm('Delete this note permanently?')) {
+      try {
+        await deleteDocument('notes', note.id)
+        expandedNoteId = null
+        toast.success('Note deleted')
+      } catch (e) {
+        console.error('Failed to delete note:', e)
+        toast.error('Failed to delete note')
+      }
+    }
+  }
+
   // Format relative time for notes
   function getRelativeTime(timestamp: { toDate: () => Date } | undefined): string {
     if (!timestamp) return ''
@@ -431,43 +458,73 @@
             {@const n = original as Note}
             {@const isExpanded = expandedNoteId === n.id}
             {@const isUnread = !n.read && n.createdBy !== $activeUser}
-            <button
-              type="button"
-              class="w-full p-4 card transition-colors text-left touch-manipulation {isExpanded ? 'border-accent bg-accent/5' : 'hover:border-accent'} {isUnread && !isExpanded ? 'border-accent/50 bg-accent/5' : ''}"
-              onclick={() => toggleNoteExpand(n)}
+            <div
+              class="card transition-colors {isExpanded ? 'border-accent bg-accent/5' : 'hover:border-accent'} {isUnread && !isExpanded ? 'border-accent/50 bg-accent/5' : ''}"
             >
-              <div class="flex items-start gap-3">
-                <div class="shrink-0 w-11 h-11 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
-                  <StickyNote size={20} />
-                </div>
-                <div class="flex-1 min-w-0">
-                  <h3 class="font-medium {isExpanded ? '' : 'truncate'} {isUnread ? 'font-semibold' : ''}">{n.title || '(No subject)'}</h3>
-                  <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                    <span class="{n.createdBy === $activeUser ? '' : 'text-accent'}">
-                      {n.createdBy === $activeUser ? 'You' : $displayNames[n.createdBy]}
-                    </span>
-                    <span>·</span>
-                    <span>{getRelativeTime(n.createdAt)}</span>
-                    {#if n.read && n.readAt && n.createdBy === $activeUser}
+              <button
+                type="button"
+                class="w-full p-4 text-left touch-manipulation"
+                onclick={() => toggleNoteExpand(n)}
+              >
+                <div class="flex items-start gap-3">
+                  <div class="shrink-0 w-11 h-11 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                    <StickyNote size={20} />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <h3 class="font-medium {isExpanded ? '' : 'truncate'} {isUnread ? 'font-semibold' : ''}">{n.title || '(No subject)'}</h3>
+                    <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                      <span class="{n.createdBy === $activeUser ? '' : 'text-accent'}">
+                        {n.createdBy === $activeUser ? 'You' : $displayNames[n.createdBy]}
+                      </span>
                       <span>·</span>
-                      <span class="text-emerald-500 flex items-center gap-0.5"><Check size={12} /> Read</span>
-                    {/if}
-                    {#if isUnread}
-                      <span>·</span>
-                      <span class="text-accent font-medium">Unread</span>
+                      <span>{getRelativeTime(n.createdAt)}</span>
+                      {#if n.read && n.readAt && n.createdBy === $activeUser}
+                        <span>·</span>
+                        <span class="text-emerald-500 flex items-center gap-0.5"><Check size={12} /> Read</span>
+                      {/if}
+                      {#if isUnread}
+                        <span>·</span>
+                        <span class="text-accent font-medium">Unread</span>
+                      {/if}
+                    </div>
+                    {#if n.content}
+                      <p class="mt-2 text-sm text-slate-600 dark:text-slate-300 {isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-2'}">
+                        {n.content}
+                      </p>
                     {/if}
                   </div>
-                  {#if n.content}
-                    <p class="mt-2 text-sm text-slate-600 dark:text-slate-300 {isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-2'}">
-                      {n.content}
-                    </p>
-                  {/if}
+                  <div class="shrink-0 text-slate-400 transition-transform {isExpanded ? 'rotate-90' : ''}">
+                    <ChevronRight size={18} />
+                  </div>
                 </div>
-                <div class="shrink-0 text-slate-400 transition-transform {isExpanded ? 'rotate-90' : ''}">
-                  <ChevronRight size={18} />
+              </button>
+
+              {#if isExpanded}
+                <div class="flex items-center gap-2 px-4 pb-4 pt-2 border-t border-slate-100 dark:border-slate-700/50 mt-2">
+                  <button
+                    type="button"
+                    class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors touch-manipulation"
+                    onclick={() => toggleNoteArchive(n)}
+                  >
+                    {#if n.archived}
+                      <ArchiveRestore size={16} />
+                      <span>Unarchive</span>
+                    {:else}
+                      <Archive size={16} />
+                      <span>Archive</span>
+                    {/if}
+                  </button>
+                  <button
+                    type="button"
+                    class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-slate-100 dark:bg-slate-700 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors touch-manipulation"
+                    onclick={() => deleteNote(n)}
+                  >
+                    <Trash2 size={16} />
+                    <span>Delete</span>
+                  </button>
                 </div>
-              </div>
-            </button>
+              {/if}
+            </div>
           {:else if item.type === 'place'}
             {@const p = original as Place}
             <button
