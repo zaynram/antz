@@ -37,6 +37,16 @@
   // Track previous user to detect switches
   let previousUser: 'Z' | 'T' | null = null;
 
+  // Cleanup timers on unmount
+  $effect(() => {
+    return () => {
+      if (tapTimer) {
+        clearTimeout(tapTimer);
+        tapTimer = null;
+      }
+    };
+  });
+
   const presetColors = [
     '#6366f1', '#ec4899', '#8b5cf6', '#06b6d4',
     '#10b981', '#f59e0b', '#ef4444', '#3b82f6',
@@ -68,13 +78,23 @@
 
   // Check for service worker updates
   $effect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.ready.then(registration => {
-        registration.addEventListener('updatefound', () => {
-          updateAvailable = true;
-        });
-      });
-    }
+    if (!('serviceWorker' in navigator)) return;
+
+    let registration: ServiceWorkerRegistration | null = null;
+    const handleUpdateFound = () => {
+      updateAvailable = true;
+    };
+
+    navigator.serviceWorker.ready.then(reg => {
+      registration = reg;
+      reg.addEventListener('updatefound', handleUpdateFound);
+    });
+
+    return () => {
+      if (registration) {
+        registration.removeEventListener('updatefound', handleUpdateFound);
+      }
+    };
   });
 
   async function handleFileSelect(e: Event): Promise<void> {

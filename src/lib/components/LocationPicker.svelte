@@ -20,6 +20,21 @@
 
   // Debounce search
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+  let blurTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // Cleanup timers on unmount
+  $effect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+        searchTimeout = null;
+      }
+      if (blurTimeout) {
+        clearTimeout(blurTimeout);
+        blurTimeout = null;
+      }
+    };
+  });
 
   function handleSearchInput(): void {
     error = null;
@@ -94,7 +109,10 @@
 
   function handleBlur(): void {
     // Delay to allow click on dropdown items
-    setTimeout(() => {
+    if (blurTimeout) {
+      clearTimeout(blurTimeout);
+    }
+    blurTimeout = setTimeout(() => {
       showDropdown = false;
     }, 200);
   }
