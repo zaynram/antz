@@ -185,12 +185,12 @@ function debouncedSaveToFirestore(prefs: UserPreferencesMap): void {
 // Immediate save (no debounce) for critical updates like profile pictures
 export async function immediateSavePreferences(): Promise<void> {
     if (isRemoteUpdate) return
-    
+
     const prefs = get(userPreferences)
     // Add timestamp to prevent stale writes
     const activeUserId = get(activeUser)
     prefs[activeUserId].lastUpdated = Date.now()
-    
+
     await saveWithRetry(prefs)
 }
 
