@@ -120,6 +120,10 @@ export async function searchGames(query: string): Promise<WikiGameResult[]> {
 
   try {
     const res = await fetch(`${WIKI_API}?${searchParams}`);
+    if (res.ok === false) {
+      console.warn(`Wikipedia search failed: ${res.status}`);
+      return [];
+    }
     const data = await res.json();
     const results = (data.query?.search || []) as WikiSearchResult[];
 
@@ -153,6 +157,10 @@ export async function searchGames(query: string): Promise<WikiGameResult[]> {
     });
 
     const imageRes = await fetch(`${WIKI_API}?${imageParams}`);
+    if (imageRes.ok === false) {
+      console.warn(`Wikipedia image fetch failed: ${imageRes.status}`);
+      return [];
+    }
     const imageData = await imageRes.json();
     const pages = imageData.query?.pages || {};
 
@@ -225,6 +233,7 @@ async function fetchPageImage(pageid: number): Promise<string | null> {
     });
 
     const res = await fetch(`${WIKI_API}?${params}`);
+    if (res.ok === false) return null;
     const data = await res.json();
     const page = data.query?.pages?.[pageid];
 
@@ -255,6 +264,7 @@ async function fetchPageImage(pageid: number): Promise<string | null> {
     });
 
     const urlRes = await fetch(`${WIKI_API}?${urlParams}`);
+    if (urlRes.ok === false) return null;
     const urlData = await urlRes.json();
     const imagePages = urlData.query?.pages || {};
     const imagePage = Object.values(imagePages)[0] as {

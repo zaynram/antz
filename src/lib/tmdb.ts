@@ -55,10 +55,17 @@ async function fetchGenreList(type: 'movie' | 'tv'): Promise<Map<number, string>
     const res = await fetch(
         `${tmdbConfig.baseUrl}/genre/${type}/list?api_key=${tmdbConfig.apiKey}`
     )
+    if (res.ok === false) {
+        console.warn(`Failed to fetch ${type} genres: ${res.status}`)
+        return new Map()
+    }
     const data = await res.json()
     const map = new Map<number, string>()
-    for (const genre of data.genres as TMDBGenre[]) {
-        map.set(genre.id, genre.name)
+    const genres = Array.isArray(data?.genres) ? data.genres : []
+    for (const genre of genres as TMDBGenre[]) {
+        if (genre?.id != null && genre?.name) {
+            map.set(genre.id, genre.name)
+        }
     }
     return map
 }
@@ -136,19 +143,23 @@ export async function enrichMediaData(
 ): Promise<EnrichedMediaData> {
     if (mediaType === 'movie') {
         const details = await fetchMovieDetails(tmdbId)
+        const genres = Array.isArray(details?.genres) ? details.genres : []
+        const companies = Array.isArray(details?.production_companies) ? details.production_companies : []
         return {
-            genres: details.genres.map(g => g.name),
-            collection: details.belongs_to_collection
+            genres: genres.filter(g => g?.name).map(g => g.name),
+            collection: details?.belongs_to_collection?.id && details?.belongs_to_collection?.name
                 ? { id: details.belongs_to_collection.id, name: details.belongs_to_collection.name }
                 : null,
-            productionCompanies: details.production_companies.map(c => ({ id: c.id, name: c.name }))
+            productionCompanies: companies.filter(c => c?.id && c?.name).map(c => ({ id: c.id, name: c.name }))
         }
     } else {
         const details = await fetchTVDetails(tmdbId)
+        const genres = Array.isArray(details?.genres) ? details.genres : []
+        const companies = Array.isArray(details?.production_companies) ? details.production_companies : []
         return {
-            genres: details.genres.map(g => g.name),
+            genres: genres.filter(g => g?.name).map(g => g.name),
             collection: null, // TV shows don't have collections in TMDB
-            productionCompanies: details.production_companies.map(c => ({ id: c.id, name: c.name }))
+            productionCompanies: companies.filter(c => c?.id && c?.name).map(c => ({ id: c.id, name: c.name }))
         }
     }
 }
