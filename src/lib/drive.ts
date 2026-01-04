@@ -149,9 +149,8 @@ export async function uploadFileToDrive(
     // Make the file publicly accessible (anyone with link can view)
     await makeFilePublic(uploadData.id)
 
-    // Use thumbnail URL for images - more reliable for embedding
-    // Size parameter: s220 for profile pics (220x220 max), can go up to s4096
-    const publicUrl = `https://lh3.googleusercontent.com/d/${uploadData.id}=s220?authuser=0`
+    // Use Drive's direct download URL - works best for public files in img tags
+    const publicUrl = `https://drive.google.com/thumbnail?id=${uploadData.id}&sz=w400`
 
     return {
         id: uploadData.id,
