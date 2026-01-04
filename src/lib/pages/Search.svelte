@@ -76,9 +76,10 @@
 
   // Debounce search query to prevent expensive recalculations on every keystroke
   $effect(() => {
+    const query = searchQuery // Read synchronously to track dependency
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
     searchDebounceTimer = setTimeout(() => {
-      debouncedQuery = searchQuery
+      debouncedQuery = query
     }, SEARCH_DEBOUNCE_MS)
     return () => {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
@@ -174,7 +175,17 @@
 
   function clearSearch() {
     searchQuery = ''
+    debouncedQuery = ''
     searchInput?.focus()
+  }
+
+  // Immediately execute search (flush debounce) - for Enter key and search button
+  function executeSearch() {
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer)
+      searchDebounceTimer = null
+    }
+    debouncedQuery = searchQuery
   }
 
   // Open media detail modal
@@ -203,8 +214,22 @@
     { label: 'Places', query: '@place', icon: MapPin },
   ]
 
+  // Check if a quick filter is active in the current search query
+  function isFilterActive(filterQuery: string): boolean {
+    // Match the filter term as a complete token (word boundary or end of string)
+    const regex = new RegExp(`${filterQuery}(?:\\s|$)`, 'i')
+    return regex.test(searchQuery)
+  }
+
   function applyQuickFilter(query: string) {
-    searchQuery = query + ' '
+    if (isFilterActive(query)) {
+      // Remove the filter from the query
+      const regex = new RegExp(`${query}\\s*`, 'gi')
+      searchQuery = searchQuery.replace(regex, '').trim()
+    } else {
+      // Add the filter to the beginning of the query
+      searchQuery = query + ' ' + searchQuery.trim()
+    }
     searchInput?.focus()
   }
 
@@ -239,34 +264,48 @@
   </section>
 
   <!-- Search input -->
-  <div class="relative mb-4">
-    <input
-      type="text"
-      bind:this={searchInput}
-      bind:value={searchQuery}
-      placeholder="Search everything..."
-      class="w-full px-5 py-4 pl-12 bg-surface border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-slate-100 text-lg focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
-    />
-    <SearchIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-    {#if searchQuery}
-      <button
-        type="button"
-        class="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 touch-manipulation"
-        onclick={clearSearch}
-        aria-label="Clear search"
-      >
-        <X size={20} />
-      </button>
-    {/if}
-  </div>
+  <form
+    class="relative mb-4 flex gap-2"
+    onsubmit={(e) => { e.preventDefault(); executeSearch(); }}
+  >
+    <div class="relative flex-1">
+      <input
+        type="text"
+        bind:this={searchInput}
+        bind:value={searchQuery}
+        placeholder="Search everything..."
+        class="w-full px-5 py-4 pl-12 pr-12 bg-surface border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-slate-100 text-lg focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
+      />
+      <SearchIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+      {#if searchQuery}
+        <button
+          type="button"
+          class="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 touch-manipulation"
+          onclick={clearSearch}
+          aria-label="Clear search"
+        >
+          <X size={20} />
+        </button>
+      {/if}
+    </div>
+    <button
+      type="submit"
+      class="shrink-0 w-14 h-14 flex items-center justify-center bg-accent text-white rounded-2xl hover:opacity-90 transition-opacity touch-manipulation"
+      aria-label="Search"
+    >
+      <SearchIcon size={22} />
+    </button>
+  </form>
 
   <!-- Quick filters -->
   <div class="flex gap-1.5 sm:gap-2 mb-6 justify-center overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible scrollbar-none">
     {#each quickFilters as filter}
+      {@const active = isFilterActive(filter.query)}
       <button
         type="button"
-        class="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg sm:rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-accent hover:text-white transition-colors touch-manipulation whitespace-nowrap shrink-0"
+        class="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg sm:rounded-xl transition-colors touch-manipulation whitespace-nowrap shrink-0 {active ? 'bg-accent text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-accent hover:text-white'}"
         onclick={() => applyQuickFilter(filter.query)}
+        aria-pressed={active}
       >
         <filter.icon size={14} class="sm:w-4 sm:h-4" />
         <span>{filter.label}</span>

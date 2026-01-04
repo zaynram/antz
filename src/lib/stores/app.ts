@@ -113,15 +113,31 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
   return true;
 }
 
-// Debounced save to Firestore
+// Save with exponential backoff retry
+async function saveWithRetry(prefs: UserPreferencesMap, retries = 3): Promise<void> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await savePreferencesToFirestore(prefs);
+      return;
+    } catch (err) {
+      if (i === retries - 1) {
+        // Final attempt failed, log and give up
+        console.warn('Failed to sync preferences after retries:', err);
+        return;
+      }
+      // Exponential backoff: 1s, 2s, 4s
+      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+    }
+  }
+}
+
+// Debounced save to Firestore with retry
 function debouncedSaveToFirestore(prefs: UserPreferencesMap): void {
   if (isRemoteUpdate) return; // Don't save if this was a remote update
 
   if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
   syncDebounceTimer = setTimeout(() => {
-    savePreferencesToFirestore(prefs).catch(err => {
-      console.warn('Failed to sync preferences to Firestore:', err);
-    });
+    saveWithRetry(prefs);
   }, 1000); // 1 second debounce
 }
 

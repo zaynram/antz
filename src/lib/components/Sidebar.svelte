@@ -127,14 +127,14 @@
   })
 
   // Edge swipe handlers (for opening sidebar from left edge)
+  // Early returns prevent unnecessary work when conditions aren't met
   function handleEdgeTouchStart(e: TouchEvent) {
+    if (isOpen) return // Already open, don't process edge swipe
     const touchX = e.touches[0].clientX
-    // Only trigger if touch starts near left edge
-    if (touchX <= EDGE_ZONE_WIDTH && !isOpen) {
-      edgeTouchStartX = touchX
-      edgeTouchCurrentX = touchX
-      isEdgeSwiping = true
-    }
+    if (touchX > EDGE_ZONE_WIDTH) return // Not near edge
+    edgeTouchStartX = touchX
+    edgeTouchCurrentX = touchX
+    isEdgeSwiping = true
   }
 
   function handleEdgeTouchMove(e: TouchEvent) {

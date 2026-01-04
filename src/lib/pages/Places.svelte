@@ -176,6 +176,17 @@
     return calculateDistance(ref, place.location)
   }
 
+  // Pre-compute distance cache to avoid recalculating during sort and render
+  let distanceCache = $derived.by(() => {
+    const map = new Map<string, number | null>()
+    for (const place of places) {
+      if (place.id) {
+        map.set(place.id, getDistanceFromReference(place))
+      }
+    }
+    return map
+  })
+
   function getDisplayNameForUser(userId: UserId): string {
     return $displayNames[userId]
   }
@@ -251,8 +262,8 @@
           cmp = a.name.localeCompare(b.name)
           break
         case 'distance':
-          const distA = getDistanceFromReference(a)
-          const distB = getDistanceFromReference(b)
+          const distA = a.id ? distanceCache.get(a.id) ?? null : null
+          const distB = b.id ? distanceCache.get(b.id) ?? null : null
           if (distA !== null && distB !== null) cmp = distA - distB
           else if (distA !== null) cmp = -1
           else if (distB !== null) cmp = 1
@@ -422,7 +433,7 @@
   <!-- Places list -->
   <div class="flex flex-col gap-3">
     {#each filteredPlaces as place (place.id)}
-      {@const distance = getDistanceFromReference(place)}
+      {@const distance = place.id ? distanceCache.get(place.id) ?? null : null}
       {@const Icon = categoryIcons[place.category]}
       {@const rating = getPlaceDisplayRating(place)}
       <article

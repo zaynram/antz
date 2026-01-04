@@ -18,6 +18,9 @@
   type TabKey = 'inbox' | 'sent' | 'archive'
   let activeTab = $state<TabKey>('inbox')
 
+  // Cached timestamp for relative time calculations - updates every 60 seconds
+  let now = $state(Date.now())
+
   // Get the other user's ID
   let otherUserId = $derived<UserId>($activeUser === 'Z' ? 'T' : 'Z')
 
@@ -26,7 +29,15 @@
       notes = items
     })
 
-    return () => unsubscribe?.()
+    // Update relative times every minute instead of every render
+    const timeInterval = setInterval(() => {
+      now = Date.now()
+    }, 60000)
+
+    return () => {
+      unsubscribe?.()
+      clearInterval(timeInterval)
+    }
   })
 
   async function addNote(): Promise<void> {
@@ -96,9 +107,8 @@
 
   function getRelativeTime(timestamp: TimestampType | undefined): string {
     if (!timestamp) return ''
-    const now = new Date()
     const date = timestamp.toDate()
-    const diffMs = now.getTime() - date.getTime()
+    const diffMs = now - date.getTime()
     const diffMins = Math.floor(diffMs / 60000)
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)

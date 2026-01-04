@@ -164,8 +164,16 @@ export async function searchGames(query: string): Promise<WikiGameResult[]> {
     const imageData = await imageRes.json();
     const pages = imageData.query?.pages || {};
 
-    // Map results with thumbnails
-    const gameResults: WikiGameResult[] = [];
+    // Map results with thumbnails - first pass: filter and collect
+    interface ProcessedResult {
+      pageid: number;
+      title: string;
+      description: string;
+      thumbnail: string | null;
+    }
+
+    const processedResults: ProcessedResult[] = [];
+    const needsImageFetch: number[] = []; // Indices of results needing image fetch
 
     for (const r of scoredResults) {
       const page = Object.values(pages).find((p: unknown) => (p as { title: string }).title === r.title) as {
@@ -193,12 +201,8 @@ export async function searchGames(query: string): Promise<WikiGameResult[]> {
         thumbnail = thumbnail.replace(/\/\d+px-/, '/300px-');
       }
 
-      // If no thumbnail, try to fetch the main page image
-      if (!thumbnail) {
-        thumbnail = await fetchPageImage(r.pageid);
-      }
-
-      gameResults.push({
+      const resultIndex = processedResults.length;
+      processedResults.push({
         pageid: r.pageid,
         title: r.title
           .replace(/ \(video game\)$/i, '')
@@ -207,7 +211,28 @@ export async function searchGames(query: string): Promise<WikiGameResult[]> {
         description: page?.extract || stripHtml(r.snippet),
         thumbnail
       });
+
+      // Track which results need image fetch (parallel later)
+      if (!thumbnail) {
+        needsImageFetch.push(resultIndex);
+      }
     }
+
+    // Batch fetch missing images in parallel (fixes N+1 problem)
+    if (needsImageFetch.length > 0) {
+      const imagePromises = needsImageFetch.map(idx =>
+        fetchPageImage(processedResults[idx].pageid)
+      );
+      const fetchedImages = await Promise.all(imagePromises);
+
+      // Apply fetched images to results
+      needsImageFetch.forEach((resultIdx, i) => {
+        processedResults[resultIdx].thumbnail = fetchedImages[i];
+      });
+    }
+
+    // Build final results
+    const gameResults: WikiGameResult[] = processedResults
 
     // Cache and return
     searchCache.set(cacheKey, gameResults);
