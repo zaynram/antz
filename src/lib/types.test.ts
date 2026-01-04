@@ -77,6 +77,7 @@ describe('Type definitions', () => {
         theme: 'dark',
         accentColor: '#6366f1',
         name: 'Test User',
+        unitSystem: 'metric',
         locationMode: 'off',
         searchRadius: 5000,
       };
@@ -91,6 +92,7 @@ describe('Type definitions', () => {
         theme: 'light',
         accentColor: '#000000',
         name: 'User',
+        unitSystem: 'metric',
         locationMode: 'off',
         searchRadius: 5000,
       };
@@ -99,6 +101,7 @@ describe('Type definitions', () => {
         theme: 'dark',
         accentColor: '#ffffff',
         name: 'User',
+        unitSystem: 'metric',
         locationMode: 'off',
         searchRadius: 5000,
       };

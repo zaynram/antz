@@ -6,6 +6,8 @@ export type Theme = "light" | "dark"
 
 export type LocationMode = "auto" | "manual" | "off"
 
+export type UnitSystem = "metric" | "imperial"
+
 export interface GeoLocation {
     lat: number
     lng: number
@@ -17,6 +19,7 @@ export interface UserPreferences {
     accentColor: string
     name: string
     profilePicture?: string // URL to profile picture in Google Drive
+    unitSystem: UnitSystem // metric or imperial
     // Location settings
     locationMode: LocationMode
     currentLocation?: GeoLocation // Auto-detected or manually set

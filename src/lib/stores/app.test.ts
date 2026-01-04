@@ -60,8 +60,8 @@ describe('Store: app.ts', () => {
     it('should persist preferences to localStorage', async () => {
       const { userPreferences } = await import('./app');
       const newPrefs = {
-        Z: { theme: 'light' as const, accentColor: '#000000', name: 'Zayn', locationMode: 'off' as const, searchRadius: 5000 },
-        T: { theme: 'dark' as const, accentColor: '#ffffff', name: 'Tara', locationMode: 'off' as const, searchRadius: 5000 },
+        Z: { theme: 'light' as const, accentColor: '#000000', name: 'Zayn', unitSystem: 'metric' as const, locationMode: 'off' as const, searchRadius: 5000 },
+        T: { theme: 'dark' as const, accentColor: '#ffffff', name: 'Tara', unitSystem: 'metric' as const, locationMode: 'off' as const, searchRadius: 5000 },
       };
       userPreferences.set(newPrefs);
       

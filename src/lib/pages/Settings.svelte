@@ -21,6 +21,7 @@
   let localProfilePicture = $state<string | undefined>(undefined)
   let uploadingPicture = $state(false)
   let fileInput = $state<HTMLInputElement | null>(null)
+  let localUnitSystem = $state<'metric' | 'imperial'>('metric')
   let localLocationMode = $state<LocationMode>('off')
   let localCurrentLocation = $state<GeoLocation | undefined>(undefined)
   let localReferenceLocation = $state<GeoLocation | undefined>(undefined)
@@ -54,14 +55,22 @@
     '#10b981', '#f59e0b', '#ef4444', '#3b82f6',
   ]
 
-  const radiusOptions = [
+  // Dynamic radius options based on unit system
+  const radiusOptions = $derived(localUnitSystem === 'imperial' ? [
+    { value: 1609, label: '1 mi' },
+    { value: 3219, label: '2 mi' },
+    { value: 8047, label: '5 mi' },
+    { value: 16093, label: '10 mi' },
+    { value: 40234, label: '25 mi' },
+    { value: 80467, label: '50 mi' },
+  ] : [
     { value: 1000, label: '1 km' },
     { value: 2500, label: '2.5 km' },
     { value: 5000, label: '5 km' },
     { value: 10000, label: '10 km' },
     { value: 25000, label: '25 km' },
     { value: 50000, label: '50 km' },
-  ]
+  ])
 
   // Sync local state when user changes
   $effect(() => {
@@ -70,6 +79,7 @@
       localAccentColor = $currentPreferences.accentColor
       localName = $currentPreferences.name
       localProfilePicture = $currentPreferences.profilePicture
+      localUnitSystem = $currentPreferences.unitSystem
       localLocationMode = $currentPreferences.locationMode
       localCurrentLocation = $currentPreferences.currentLocation
       localReferenceLocation = $currentPreferences.referenceLocation
@@ -155,6 +165,7 @@
         accentColor: localAccentColor,
         name: localName,
         profilePicture: localProfilePicture,
+        unitSystem: localUnitSystem,
         locationMode: localLocationMode,
         currentLocation: localCurrentLocation,
         referenceLocation: localReferenceLocation,
@@ -180,6 +191,30 @@
   }
 
   function handleNameChange(): void {
+    savePreferences()
+  }
+
+  function handleUnitSystemChange(system: 'metric' | 'imperial'): void {
+    hapticLight()
+    localUnitSystem = system
+    // Convert radius to closest equivalent in new unit system
+    if (system === 'imperial') {
+      // Convert meters to closest mile option
+      if (localSearchRadius <= 1804) localSearchRadius = 1609 // 1 mi
+      else if (localSearchRadius <= 5633) localSearchRadius = 3219 // 2 mi
+      else if (localSearchRadius <= 12070) localSearchRadius = 8047 // 5 mi
+      else if (localSearchRadius <= 28163) localSearchRadius = 16093 // 10 mi
+      else if (localSearchRadius <= 60350) localSearchRadius = 40234 // 25 mi
+      else localSearchRadius = 80467 // 50 mi
+    } else {
+      // Convert to closest km option
+      if (localSearchRadius <= 1750) localSearchRadius = 1000 // 1 km
+      else if (localSearchRadius <= 3750) localSearchRadius = 2500 // 2.5 km
+      else if (localSearchRadius <= 7500) localSearchRadius = 5000 // 5 km
+      else if (localSearchRadius <= 17500) localSearchRadius = 10000 // 10 km
+      else if (localSearchRadius <= 37500) localSearchRadius = 25000 // 25 km
+      else localSearchRadius = 50000 // 50 km
+    }
     savePreferences()
   }
 
@@ -430,6 +465,34 @@
             pattern="^#[0-9A-Fa-f]{6}$"
             aria-label="Custom color hex value"
           />
+        </div>
+      </div>
+    </section>
+
+    <!-- Unit System -->
+    <section class="card p-4 space-y-4">
+      <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-2">
+        <Settings size={16} />
+        Unit System
+      </h2>
+
+      <div>
+        <span class="block text-sm font-medium mb-2">Distance Units</span>
+        <div class="flex gap-3">
+          <button
+            type="button"
+            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 touch-manipulation {localUnitSystem === 'metric' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            onclick={() => handleUnitSystemChange('metric')}
+          >
+            <span>Metric (km)</span>
+          </button>
+          <button
+            type="button"
+            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 touch-manipulation {localUnitSystem === 'imperial' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            onclick={() => handleUnitSystemChange('imperial')}
+          >
+            <span>Imperial (mi)</span>
+          </button>
         </div>
       </div>
     </section>

@@ -30,6 +30,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
     theme: 'dark',
     accentColor: '#6366f1',
     name: 'Z',
+    unitSystem: 'metric',
     locationMode: 'off',
     searchRadius: 5000
   },
@@ -37,6 +38,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
     theme: 'light',
     accentColor: '#ec4899',
     name: 'T',
+    unitSystem: 'metric',
     locationMode: 'off',
     searchRadius: 5000
   }
@@ -84,7 +86,7 @@ let isSyncInitializing = false; // Guard against concurrent init calls
 // Shallow comparison for preferences (avoids expensive JSON.stringify)
 function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
   const keysToCompare: (keyof UserPreferences)[] = [
-    'theme', 'accentColor', 'name', 'profilePicture',
+    'theme', 'accentColor', 'name', 'profilePicture', 'unitSystem',
     'locationMode', 'currentLocation', 'referenceLocation', 'searchRadius'
   ];
 
