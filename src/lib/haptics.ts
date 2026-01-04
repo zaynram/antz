@@ -3,14 +3,18 @@
  * Uses the Vibration API when available
  */
 
-// Check if vibration is supported
-const canVibrate = typeof navigator !== 'undefined' && 'vibrate' in navigator
+/**
+ * Check if vibration is supported (runtime check for testability)
+ */
+function canVibrate(): boolean {
+  return typeof navigator !== 'undefined' && 'vibrate' in navigator
+}
 
 /**
  * Light haptic feedback - for small interactions like toggles
  */
 export function hapticLight(): void {
-  if (canVibrate) {
+  if (canVibrate()) {
     navigator.vibrate(10)
   }
 }
@@ -19,7 +23,7 @@ export function hapticLight(): void {
  * Medium haptic feedback - for meaningful actions like adding/removing items
  */
 export function hapticMedium(): void {
-  if (canVibrate) {
+  if (canVibrate()) {
     navigator.vibrate(25)
   }
 }
@@ -28,7 +32,7 @@ export function hapticMedium(): void {
  * Success haptic feedback - for completed actions
  */
 export function hapticSuccess(): void {
-  if (canVibrate) {
+  if (canVibrate()) {
     navigator.vibrate([15, 50, 15])
   }
 }
@@ -37,7 +41,7 @@ export function hapticSuccess(): void {
  * Error/warning haptic feedback
  */
 export function hapticError(): void {
-  if (canVibrate) {
+  if (canVibrate()) {
     navigator.vibrate([50, 30, 50])
   }
 }

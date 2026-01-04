@@ -1,6 +1,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { get } from 'svelte/store';
 
+// Mock matchMedia before importing the module
+const mockMatchMedia = vi.fn()
+
+beforeEach(() => {
+  mockMatchMedia.mockReturnValue({
+    matches: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  })
+  Object.defineProperty(window, 'matchMedia', {
+    value: mockMatchMedia,
+    writable: true,
+    configurable: true,
+  })
+})
+
 describe('Store: app.ts', () => {
   beforeEach(() => {
     // Clear localStorage before each test
@@ -220,6 +236,35 @@ describe('Store: app.ts', () => {
       const { mediaSearchHistory } = await import('./app');
       const history = get(mediaSearchHistory);
       expect(history).toContain('Saved Movie');
+    });
+  });
+
+  describe('isTouchDevice store', () => {
+    it('should initialize based on matchMedia query', async () => {
+      mockMatchMedia.mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      });
+      const { isTouchDevice } = await import('./app');
+      const value = get(isTouchDevice);
+      expect(value).toBe(true);
+    });
+
+    it('should return false when pointer is not coarse', async () => {
+      mockMatchMedia.mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      });
+      const { isTouchDevice } = await import('./app');
+      const value = get(isTouchDevice);
+      expect(value).toBe(false);
+    });
+
+    it('should query for pointer: coarse media', async () => {
+      await import('./app');
+      expect(mockMatchMedia).toHaveBeenCalledWith('(pointer: coarse)');
     });
   });
 });

@@ -44,7 +44,8 @@ bun run deploy       # Build + Firebase deploy
 - `src/lib/wikipedia.ts` - Wikipedia API for game search with relevance scoring
 - `src/lib/types.ts` - TypeScript interfaces for all data models
 - `src/lib/filters.ts` - Media filtering/sorting pure functions
-- `src/lib/stores/app.ts` - Central Svelte stores (auth, preferences, search)
+- `src/lib/haptics.ts` - Haptic feedback utility (Vibration API)
+- `src/lib/stores/app.ts` - Central Svelte stores (auth, preferences, search, touch detection)
 - `src/App.svelte` - Root component with manual client-side routing
 
 ### Routing
@@ -192,9 +193,37 @@ Utilities in `src/app.css` for notched devices (use sparingly - they override ex
 
 | Path | Component | Description |
 |------|-----------|-------------|
-| `/` | Home | Dashboard with recent activity |
+| `/` | Search | Universal search across all content |
+| `/library/movies` | Library | Movies collection |
+| `/library/tv` | Library | TV shows collection |
+| `/library/games` | Library | Games collection |
 | `/notes` | Notes | Free-form notes with tags |
-| `/media` | Media | Movies, TV shows, games tracker |
 | `/places` | Places | Location/venue tracking |
 | `/settings` | Settings | Profile, theme, PWA updates |
 | `/debug` | Debug | Development tools |
+
+## Touch Device Support
+
+The app detects touch devices and provides enhanced UX:
+
+### Touch Detection
+- `isTouchDevice` store in `src/lib/stores/app.ts` uses `(pointer: coarse)` media query
+- Reactively updates when device mode changes
+
+### Haptic Feedback
+Utility functions in `src/lib/haptics.ts`:
+```typescript
+hapticLight()   // 10ms - toggles, selections
+hapticMedium()  // 25ms - meaningful actions
+hapticSuccess() // pattern - completed actions
+hapticError()   // pattern - errors/warnings
+```
+
+### Touch CSS Utilities
+In `src/app.css`:
+- `.touch-feedback` - Scale effect on tap (0.97)
+- `.touch-target` - Minimum 44x44px tap target
+- `@media (pointer: coarse)` - Auto-enhances buttons/inputs on touch devices
+
+### Swipe Gestures
+- Sidebar supports swipe-to-close (50px threshold)
