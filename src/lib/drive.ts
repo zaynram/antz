@@ -147,11 +147,18 @@ export async function uploadFileToDrive(
     const uploadData = await uploadResponse.json()
 
     // Make the file publicly accessible (anyone with link can view)
-    await makeFilePublic(uploadData.id)
+    const publicSuccess = await makeFilePublic(uploadData.id)
 
-    // Use direct view URL - works for public images in img tags
-    // This format bypasses download prompts and displays images directly
-    const publicUrl = `https://drive.google.com/uc?export=view&id=${uploadData.id}`
+    if (!publicSuccess) {
+        console.warn("File uploaded but may not be publicly accessible")
+    }
+
+    // Get the file with thumbnail link
+    const fileDetails = await getFileDetails(uploadData.id)
+
+    // Use thumbnailLink if available (more reliable), fallback to uc export
+    const publicUrl =
+        fileDetails.thumbnailLink || `https://drive.google.com/uc?export=view&id=${uploadData.id}`
 
     return {
         id: uploadData.id,
@@ -161,9 +168,29 @@ export async function uploadFileToDrive(
 }
 
 /**
+ * Get file details including thumbnail link
+ */
+async function getFileDetails(fileId: string): Promise<{ thumbnailLink?: string }> {
+    const token = await getAccessToken()
+
+    const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}?fields=thumbnailLink`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    })
+
+    if (!response.ok) {
+        console.warn("Failed to get file details")
+        return {}
+    }
+
+    return await response.json()
+}
+
+/**
  * Make a file publicly accessible (anyone with link can view)
  */
-async function makeFilePublic(fileId: string): Promise<void> {
+async function makeFilePublic(fileId: string): Promise<boolean> {
     const token = await getAccessToken()
 
     const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}/permissions`, {
@@ -179,9 +206,11 @@ async function makeFilePublic(fileId: string): Promise<void> {
     })
 
     if (!response.ok) {
-        console.warn("Failed to make file public:", response.statusText)
-        // Don't throw - file is uploaded, just not public
+        console.error("Failed to make file public:", response.statusText, await response.text())
+        return false
     }
+
+    return true
 }
 
 /**
