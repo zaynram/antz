@@ -22,21 +22,13 @@
 
     <!-- Mobile-optimized styles -->
     <style>
-      html {
-        height: 100%;
-        height: 100dvh;
-        overflow: hidden;
-      }
-      body {
+      html, body {
         height: 100%;
         margin: 0;
-        overflow: hidden;
       }
       #app {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
+        min-height: 100%;
+        min-height: 100dvh;
       }
       /* Allow text selection in inputs and textareas */
       input, textarea, [contenteditable="true"] {
