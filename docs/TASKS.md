@@ -14,20 +14,6 @@ This document contains prioritized task sets for future development work on the 
 
 ### LOW Priority
 
-#### 7. Detect iOS Safari PWA for Conditional Repaints
-**File:** `src/lib/pages/Library.svelte` (Lines 109-116)
-**Issue:** `forceRepaint()` runs unconditionally on all platforms
-**Fix:**
-```typescript
-const isIOSPWA = /iPad|iPhone|iPod/.test(navigator.userAgent) &&
-  window.matchMedia('(display-mode: standalone)').matches
-
-function forceRepaint() {
-  if (!isIOSPWA) return
-  // ... repaint logic
-}
-```
-
 #### 8. Tree-shake Unused Icon Imports
 **Files:** Multiple Svelte components
 **Issue:** Importing icons that may not be used
@@ -78,7 +64,7 @@ function forceRepaint() {
 
 ### Code Quality
 - [ ] Fix all a11y warnings (52 currently)
-- [ ] Replace deprecated `<svelte:component>` with dynamic component syntax
+- [x] Replace deprecated `<svelte:component>` with dynamic component syntax
 - [ ] Add proper form label associations
 - [ ] Convert `article` elements with button role to actual buttons
 
@@ -119,6 +105,14 @@ Last updated: 2026-01-04
 ## Completed Tasks
 
 ### 2026-01-04
+- [x] **Library/Discover Search Modes** - Added mode toggle to Search page for discovering new content from TMDB and Wikipedia APIs
+- [x] **Auto Game Thumbnail Fetch** - Games added without images automatically fetch from Wikipedia
+- [x] **Image Migration Tool** - Debug page tool to fix missing images for all media types
+- [x] **Rebrand to "us"** - Updated app name, favicon, and PWA manifest to lowercase "us"
+- [x] **Replace svelte:component** - Updated all 8 occurrences to use Svelte 5 dynamic component syntax
+- [x] **iOS PWA Detection** - forceRepaint() now only runs on iOS in standalone mode
+- [x] **Line Ending Config** - Added .gitattributes for consistent LF line endings
+- [x] **Remove Global Edge Swipe** - Removed sidebar edge swipe gesture (conflicted with system gestures)
 - [x] **Fix Auto-Search Debounce Tracking** - Fixed `$effect` in Search.svelte to properly track `searchQuery` as a dependency by reading it synchronously before the setTimeout callback
 - [x] **Batch Wikipedia Image Fetches** - Fixed N+1 API calls in `src/lib/wikipedia.ts` by collecting results needing image fetch, then using `Promise.all()` for parallel fetches
 - [x] **Cache Genre Extraction** - Already optimized via Svelte 5 `$derived` memoization in Library.svelte

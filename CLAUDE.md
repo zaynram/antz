@@ -100,6 +100,19 @@ let genres = $derived.by(() => {
 });
 ```
 
+**Dynamic Components (Svelte 5)** - Replace deprecated `<svelte:component>` with direct usage:
+```svelte
+<!-- Props: Rename during destructuring -->
+let { icon: Icon }: Props = $props()
+<Icon size={48} />
+
+<!-- Inside blocks: Use @const -->
+{#if item}
+  {@const ItemIcon = icons[item.type]}
+  <ItemIcon size={24} />
+{/if}
+```
+
 ### User Identity System
 Two identities ("Z" and "T") with independent preferences stored per-user in localStorage and synced to Firestore for cross-device access. Per-identity settings include:
 - Theme (light/dark)
@@ -158,14 +171,23 @@ bun run generate-pwa-assets  # Generate icons from favicon.svg
 ### PWA Configuration
 - `vite.config.ts` - VitePWA plugin configuration
 - `pwa-assets.config.ts` - Icon generation settings
-- `public/favicon.svg` - Source icon (gradient purple/pink with "Us" text)
+- `public/favicon.svg` - Source icon (gradient purple/pink with "us" text)
 
 ### iOS Safari PWA Quirks
 iOS Safari has rendering bugs when running as a PWA. Key patterns used:
 
+**iOS PWA Detection** - Only run workarounds on iOS in standalone mode:
+```typescript
+const isIOSPWA = typeof navigator !== 'undefined' &&
+  /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+  typeof window !== 'undefined' &&
+  window.matchMedia('(display-mode: standalone)').matches
+```
+
 **Force Repaint** - Conditional content (`{#if}`) may not visually appear despite DOM updating:
 ```typescript
 function forceRepaint() {
+  if (!isIOSPWA) return  // Skip on non-iOS platforms
   requestAnimationFrame(() => {
     document.body.style.transform = 'translateZ(0)';
     requestAnimationFrame(() => {
@@ -189,11 +211,27 @@ Utilities in `src/app.css` for notched devices (use sparingly - they override ex
 - Offline banner displayed when disconnected
 - Firebase SDK handles offline Firestore persistence automatically
 
+## Search Features
+
+The Search page (`/`) supports two modes:
+
+### Library Mode (default)
+- Searches local Firestore collections (media, notes, places)
+- Supports advanced query syntax: `@movie`, `@tv`, `status:completed`, `rating:4+`
+- Quick filter buttons for content types
+
+### Discover Mode
+- Queries external APIs for new content to add
+- TMDB API for movies and TV shows
+- Wikipedia API for games (with relevance scoring)
+- Category filters: All (6 each), Movies (15), TV (15), Games (15)
+- Auto-fetches game thumbnails when adding items without images
+
 ## Routes
 
 | Path | Component | Description |
 |------|-----------|-------------|
-| `/` | Search | Universal search across all content |
+| `/` | Search | Library search + Discover new content |
 | `/library/movies` | Library | Movies collection |
 | `/library/tv` | Library | TV shows collection |
 | `/library/games` | Library | Games collection |
@@ -227,7 +265,7 @@ In `src/app.css`:
 
 ### Swipe Gestures
 - Sidebar supports swipe-to-close (50px threshold)
-- Swipe from left edge (24px zone) opens sidebar globally
+- Global edge swipe removed (conflicted with iOS/Android system gestures)
 
 ## Performance Patterns
 
