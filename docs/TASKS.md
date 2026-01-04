@@ -14,11 +14,6 @@ This document contains prioritized task sets for future development work on the 
 
 ### LOW Priority
 
-#### 8. Tree-shake Unused Icon Imports
-**Files:** Multiple Svelte components
-**Issue:** Importing icons that may not be used
-**Fix:** Audit icon usage and remove unused imports. Run build and check bundle analyzer.
-
 #### 9. Verify CSS Tree-shaking
 **File:** Build configuration
 **Issue:** Potential unused Tailwind styles in bundle
@@ -29,9 +24,9 @@ This document contains prioritized task sets for future development work on the 
 ## Feature Enhancements
 
 ### Navigation & UX
-- [ ] Add keyboard navigation for media grid (arrow keys)
+- [x] Add keyboard navigation for media grid (arrow keys)
 - [ ] Add pull-to-refresh for mobile
-- [ ] Add "back to top" button on long lists
+- [x] Add "back to top" button on long lists
 - [ ] Implement infinite scroll for large libraries
 
 ### Media Library
@@ -50,7 +45,7 @@ This document contains prioritized task sets for future development work on the 
 - [ ] Add map view with pins
 - [ ] Add route planning between places
 - [ ] Add photo attachments to places
-- [ ] Add check-in history with dates
+- [x] Add visit management (remove visits, date range picker for trips)
 
 ### Settings
 - [ ] Add data export (JSON/CSV)
@@ -63,10 +58,10 @@ This document contains prioritized task sets for future development work on the 
 ## Technical Debt
 
 ### Code Quality
-- [ ] Fix all a11y warnings (52 currently)
+- [x] Fix all a11y warnings (44 fixed)
 - [x] Replace deprecated `<svelte:component>` with dynamic component syntax
-- [ ] Add proper form label associations
-- [ ] Convert `article` elements with button role to actual buttons
+- [x] Add proper form label associations
+- [x] Convert `article` elements with button role to actual buttons/divs
 
 ### Testing
 - [ ] Add E2E tests with Playwright
@@ -120,3 +115,8 @@ Last updated: 2026-01-04
 - [x] **Cache Relative Time Calculations** - Added 60-second interval timer in Notes.svelte instead of recalculating every render
 - [x] **Conditionally Attach Touch Listeners** - Added early returns in Sidebar.svelte edge swipe handlers
 - [x] **Add Error Retry for Preference Sync** - Added `saveWithRetry()` with exponential backoff (1s, 2s, 4s) in app.ts
+- [x] **Fix A11y Warnings** - Fixed all 44 a11y warnings: converted visual labels to spans, added form label associations, fixed interactive roles
+- [x] **Tree-shake Icon Imports** - Verified Vite tree-shaking is working correctly for lucide-svelte icons
+- [x] **Add Back to Top Button** - New BackToTop component shows after scrolling 400px on all pages
+- [x] **Add Keyboard Navigation** - Media grid now supports arrow key navigation with Enter/Space to open details
+- [x] **Add Visit Management** - Places can now remove individual visits and add date ranges for trips
