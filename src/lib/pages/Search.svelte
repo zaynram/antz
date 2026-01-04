@@ -6,7 +6,7 @@
   import { onMount } from 'svelte'
   import { parseQuery, matchesQuery, hasSearchCriteria, getFilterSummary, type SearchableItem } from '$lib/queryParser'
   import { tmdbConfig } from '$lib/config'
-  import { Film, Tv, Gamepad2, StickyNote, MapPin, Search as SearchIcon, HelpCircle, ChevronDown, ChevronUp, X, Check } from 'lucide-svelte'
+  import { Film, Tv, Gamepad2, StickyNote, MapPin, Search as SearchIcon, HelpCircle, ChevronDown, ChevronUp, X, Check, ChevronRight } from 'lucide-svelte'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
   import PlaceDetailModal from '$lib/components/PlaceDetailModal.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
@@ -433,10 +433,10 @@
             {@const isUnread = !n.read && n.createdBy !== $activeUser}
             <button
               type="button"
-              class="w-full p-4 card hover:border-accent transition-colors text-left touch-manipulation {isUnread ? 'border-accent/50 bg-accent/5' : ''}"
+              class="w-full p-4 card transition-colors text-left touch-manipulation {isExpanded ? 'border-accent bg-accent/5' : 'hover:border-accent'} {isUnread && !isExpanded ? 'border-accent/50 bg-accent/5' : ''}"
               onclick={() => toggleNoteExpand(n)}
             >
-              <div class="flex items-start gap-4">
+              <div class="flex items-start gap-3">
                 <div class="shrink-0 w-11 h-11 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
                   <StickyNote size={20} />
                 </div>
@@ -462,6 +462,9 @@
                       {n.content}
                     </p>
                   {/if}
+                </div>
+                <div class="shrink-0 text-slate-400 transition-transform {isExpanded ? 'rotate-90' : ''}">
+                  <ChevronRight size={18} />
                 </div>
               </div>
             </button>
