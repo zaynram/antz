@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { activeUser, userPreferences, currentPreferences, displayAbbreviations } from '$lib/stores/app'
-  import { uploadProfilePicture, deleteProfilePicture, logOut } from '$lib/firebase'
-  import type { Theme, LocationMode, GeoLocation } from '$lib/types'
   import LocationPicker from '$lib/components/LocationPicker.svelte'
   import PageHeader from '$lib/components/ui/PageHeader.svelte'
-  import { Sun, Moon, MapPin, Camera, X, Loader2, RefreshCw, LogOut, Settings, User, Palette, Info } from 'lucide-svelte'
-  import { toast } from 'svelte-sonner'
+  import { deleteProfilePicture, logOut, uploadProfilePicture } from '$lib/firebase'
   import { hapticLight } from '$lib/haptics'
+  import { activeUser, currentPreferences, displayAbbreviations, userPreferences } from '$lib/stores/app'
+  import type { GeoLocation, LocationMode, Theme } from '$lib/types'
+  import { Camera, Info, Loader2, LogOut, MapPin, Moon, Palette, RefreshCw, Settings, Sun, User, X } from 'lucide-svelte'
+  import { toast } from 'svelte-sonner'
 
   interface Props {
     navigate: (path: string) => void

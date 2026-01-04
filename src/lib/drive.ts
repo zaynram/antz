@@ -149,8 +149,9 @@ export async function uploadFileToDrive(
     // Make the file publicly accessible (anyone with link can view)
     await makeFilePublic(uploadData.id)
 
-    // Use Drive's direct download URL - works best for public files in img tags
-    const publicUrl = `https://drive.google.com/thumbnail?id=${uploadData.id}&sz=w400`
+    // Use uc export format - most reliable for public image embedding
+    // This returns the raw image data, works best in img src
+    const publicUrl = `https://drive.google.com/uc?export=download&id=${uploadData.id}`
 
     return {
         id: uploadData.id,
