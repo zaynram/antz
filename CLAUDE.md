@@ -227,3 +227,92 @@ In `src/app.css`:
 
 ### Swipe Gestures
 - Sidebar supports swipe-to-close (50px threshold)
+- Swipe from left edge (24px zone) opens sidebar globally
+
+## Performance Patterns
+
+### Debouncing Expensive Operations
+Always debounce user input that triggers expensive computations:
+
+```typescript
+// Search input debouncing
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+const DEBOUNCE_MS = 150
+
+$effect(() => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    debouncedQuery = searchQuery
+  }, DEBOUNCE_MS)
+  return () => {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  }
+})
+```
+
+### ResizeObserver Debouncing
+ResizeObserver fires frequently; always debounce state updates:
+
+```typescript
+$effect(() => {
+  if (!container) return
+  let resizeTimer: ReturnType<typeof setTimeout> | null = null
+  const observer = new ResizeObserver((entries) => {
+    if (resizeTimer) clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(() => {
+      containerWidth = entries[0].contentRect.width
+    }, 100)
+  })
+  observer.observe(container)
+  return () => {
+    observer.disconnect()
+    if (resizeTimer) clearTimeout(resizeTimer)
+  }
+})
+```
+
+### Avoiding Race Conditions in Async Effects
+Use request IDs to prevent stale responses from overwriting fresh data:
+
+```typescript
+let requestId = 0
+$effect(() => {
+  const currentId = ++requestId
+  const controller = new AbortController()
+
+  fetchData(controller.signal).then(data => {
+    if (currentId === requestId) {  // Only update if still current
+      results = data
+    }
+  })
+
+  return () => controller.abort()
+})
+```
+
+### Shallow Comparison for Objects
+Avoid `JSON.stringify()` for object comparison; use shallow field comparison:
+
+```typescript
+function prefsEqual(a: Prefs, b: Prefs): boolean {
+  const keys = ['theme', 'name', 'accentColor'] as const
+  return keys.every(k => a[k] === b[k])
+}
+```
+
+### Preventing Duplicate Subscriptions
+Guard async initialization to prevent concurrent calls:
+
+```typescript
+let isInitializing = false
+
+async function initSync(): Promise<void> {
+  if (isInitializing) return
+  isInitializing = true
+  try {
+    // ... initialization logic
+  } finally {
+    isInitializing = false
+  }
+}
+```

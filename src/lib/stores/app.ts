@@ -79,6 +79,39 @@ let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let isRemoteUpdate = false;
 let unsubscribeFirestore: (() => void) | null = null;
 let unsubscribeLocalPrefs: (() => void) | null = null;
+let isSyncInitializing = false; // Guard against concurrent init calls
+
+// Shallow comparison for preferences (avoids expensive JSON.stringify)
+function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
+  const keysToCompare: (keyof UserPreferences)[] = [
+    'theme', 'accentColor', 'name', 'profilePicture',
+    'locationMode', 'currentLocation', 'referenceLocation', 'searchRadius'
+  ];
+
+  for (const userId of ['Z', 'T'] as const) {
+    const aPrefs = a[userId];
+    const bPrefs = b[userId];
+    if (!aPrefs || !bPrefs) {
+      if (aPrefs !== bPrefs) return false;
+      continue;
+    }
+    for (const key of keysToCompare) {
+      const aVal = aPrefs[key];
+      const bVal = bPrefs[key];
+      // Handle location objects specially
+      if (key === 'currentLocation' || key === 'referenceLocation') {
+        const aLoc = aVal as { lat: number; lng: number } | undefined;
+        const bLoc = bVal as { lat: number; lng: number } | undefined;
+        if (!aLoc && !bLoc) continue;
+        if (!aLoc || !bLoc) return false;
+        if (aLoc.lat !== bLoc.lat || aLoc.lng !== bLoc.lng) return false;
+      } else if (aVal !== bVal) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
 
 // Debounced save to Firestore
 function debouncedSaveToFirestore(prefs: UserPreferencesMap): void {
@@ -94,6 +127,10 @@ function debouncedSaveToFirestore(prefs: UserPreferencesMap): void {
 
 // Initialize Firestore sync (call after auth)
 export async function initPreferencesSync(): Promise<void> {
+  // Prevent concurrent initialization
+  if (isSyncInitializing) return;
+  isSyncInitializing = true;
+
   // Clean up any existing subscriptions first to prevent duplicates on re-auth
   if (unsubscribeFirestore) {
     unsubscribeFirestore();
@@ -125,8 +162,8 @@ export async function initPreferencesSync(): Promise<void> {
   // Subscribe to remote changes
   unsubscribeFirestore = subscribeToPreferences((remotePrefs) => {
     const localPrefs = get(userPreferences);
-    // Only update if different (avoid loops)
-    if (JSON.stringify(remotePrefs) !== JSON.stringify(localPrefs)) {
+    // Only update if different (avoid loops) - use shallow comparison instead of JSON.stringify
+    if (!prefsEqual(remotePrefs, localPrefs)) {
       isRemoteUpdate = true;
       userPreferences.set({
         Z: { ...DEFAULT_PREFERENCES.Z, ...remotePrefs.Z },
@@ -142,6 +179,8 @@ export async function initPreferencesSync(): Promise<void> {
     unsubscribeLocalPrefs();
   }
   unsubscribeLocalPrefs = userPreferences.subscribe(debouncedSaveToFirestore);
+
+  isSyncInitializing = false;
 }
 
 // Cleanup sync subscription

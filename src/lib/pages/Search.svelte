@@ -23,7 +23,10 @@
 
   // Search state
   let searchQuery = $state('')
+  let debouncedQuery = $state('') // Debounced query for expensive search operations
   let searchInput = $state<HTMLInputElement | null>(null)
+  let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+  const SEARCH_DEBOUNCE_MS = 150
 
   // Tips toggle (persisted)
   let showTips = $state(true)
@@ -71,8 +74,19 @@
     }
   }
 
-  // Parse query
-  let parsedQuery = $derived(parseQuery(searchQuery))
+  // Debounce search query to prevent expensive recalculations on every keystroke
+  $effect(() => {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = setTimeout(() => {
+      debouncedQuery = searchQuery
+    }, SEARCH_DEBOUNCE_MS)
+    return () => {
+      if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+    }
+  })
+
+  // Parse query - use debounced query for expensive operations
+  let parsedQuery = $derived(parseQuery(debouncedQuery))
   let hasQuery = $derived(hasSearchCriteria(parsedQuery))
   let filterSummary = $derived(getFilterSummary(parsedQuery))
 

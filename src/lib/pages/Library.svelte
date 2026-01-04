@@ -130,9 +130,11 @@
     forceRepaint()
   }
 
-  // Live search effect
+  // Live search effect with proper abort handling
+  let searchRequestId = 0 // Track request sequence to prevent stale updates
   $effect(() => {
     const query = searchQuery.trim()
+    const currentRequestId = ++searchRequestId
 
     if (searchTimer) clearTimeout(searchTimer)
     if (searchAbortController) {
@@ -146,12 +148,18 @@
       return
     }
 
-    searchTimer = setTimeout(() => {
-      searchAbortController = new AbortController()
+    // Create AbortController before timeout to ensure proper cleanup
+    const controller = new AbortController()
+    searchAbortController = controller
+
+    searchTimer = setTimeout(async () => {
+      // Verify this is still the current request before proceeding
+      if (currentRequestId !== searchRequestId) return
+
       if (type === 'game') {
-        searchWikipedia(query, searchAbortController.signal)
+        await searchWikipedia(query, controller.signal)
       } else {
-        searchTMDB(query, searchAbortController.signal)
+        await searchTMDB(query, controller.signal)
       }
     }, DEBOUNCE_MS)
   })
@@ -373,16 +381,25 @@
     large: '⬛',
   }
 
+  // Debounced ResizeObserver to prevent excessive recalculations
+  let resizeTimer: ReturnType<typeof setTimeout> | null = null
   $effect(() => {
     if (!gridContainer) return
     const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        containerWidth = entry.contentRect.width
-      }
+      // Debounce resize updates to prevent continuous recalculations
+      if (resizeTimer) clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(() => {
+        for (const entry of entries) {
+          containerWidth = entry.contentRect.width
+        }
+      }, 100) // 100ms debounce
     })
     resizeObserver.observe(gridContainer)
     containerWidth = gridContainer.clientWidth
-    return () => resizeObserver.disconnect()
+    return () => {
+      resizeObserver.disconnect()
+      if (resizeTimer) clearTimeout(resizeTimer)
+    }
   })
 
 </script>
