@@ -5,7 +5,8 @@
   import { activeUser, currentPreferences } from '$lib/stores/app'
   import type { Media, Note, Place } from '$lib/types'
   import { onMount } from 'svelte'
-  import { Bug, Database, Trash2, RefreshCw, Download, Upload, Cpu, HardDrive, Wifi } from 'lucide-svelte'
+  import { Bug, Database, Trash2, RefreshCw, Download, Upload, Cpu, HardDrive, Wifi, Image } from 'lucide-svelte'
+  import { fetchGameThumbnail } from '$lib/wikipedia'
 
   // Data stats
   let media = $state<Media[]>([])
@@ -19,6 +20,13 @@
   let migrating = $state(false)
   let migrationLog = $state<string[]>([])
   let migrationStats = $state({ updated: 0, skipped: 0, failed: 0 })
+
+  // Image migration state
+  let imageMigrating = $state(false)
+  let imageMigrationLog = $state<string[]>([])
+  let imageMigrationStats = $state({ updated: 0, skipped: 0, failed: 0 })
+  type ImageMigrationType = 'all' | 'games' | 'movies' | 'tv'
+  let imageMigrationType = $state<ImageMigrationType>('all')
 
   // System info
   let systemInfo = $state({
@@ -73,6 +81,11 @@
     notes: notes.length,
     places: places.length,
     visitedPlaces: places.filter(p => p.visited).length,
+    // Image stats
+    missingImages: media.filter(m => !m.posterPath).length,
+    gamesMissingImages: media.filter(m => m.type === 'game' && !m.posterPath).length,
+    moviesMissingImages: media.filter(m => m.type === 'movie' && !m.posterPath).length,
+    tvMissingImages: media.filter(m => m.type === 'tv' && !m.posterPath).length,
   })
 
   function formatBytes(bytes: number): string {
@@ -162,6 +175,124 @@
       migrationLog = [...migrationLog, `Error: ${e}`]
     } finally {
       migrating = false
+    }
+  }
+
+  // Fetch TMDB poster for movie/TV
+  async function fetchTMDBPoster(tmdbId: number, mediaType: 'movie' | 'tv'): Promise<string | null> {
+    try {
+      const endpoint = mediaType === 'movie' ? 'movie' : 'tv'
+      const res = await fetch(`${tmdbConfig.baseUrl}/${endpoint}/${tmdbId}?api_key=${tmdbConfig.apiKey}`)
+      if (res.ok === false) return null
+      const data = await res.json()
+      return data.poster_path || null
+    } catch {
+      return null
+    }
+  }
+
+  // Search TMDB for movie/TV by title
+  async function searchTMDBByTitle(title: string, mediaType: 'movie' | 'tv'): Promise<{ tmdbId: number; posterPath: string } | null> {
+    try {
+      const endpoint = mediaType === 'movie' ? 'movie' : 'tv'
+      const params = new URLSearchParams({
+        api_key: tmdbConfig.apiKey,
+        query: title,
+        include_adult: 'false'
+      })
+      const res = await fetch(`${tmdbConfig.baseUrl}/search/${endpoint}?${params}`)
+      if (res.ok === false) return null
+      const data = await res.json()
+      const first = data.results?.[0]
+      if (first && first.poster_path) {
+        return { tmdbId: first.id, posterPath: first.poster_path }
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  // Run image migration
+  async function runImageMigration() {
+    imageMigrating = true
+    imageMigrationLog = [`Starting image migration (${imageMigrationType})...`]
+    imageMigrationStats = { updated: 0, skipped: 0, failed: 0 }
+
+    try {
+      const mediaRef = collection(db, 'media')
+      const snapshot = await getDocs(mediaRef)
+
+      // Filter based on type selection
+      const itemsToProcess = snapshot.docs.filter(docSnap => {
+        const data = docSnap.data()
+        if (data.posterPath) return false // Already has image
+        if (imageMigrationType === 'all') return true
+        return data.type === imageMigrationType.replace('s', '') // 'games' -> 'game'
+      })
+
+      imageMigrationLog = [...imageMigrationLog, `Found ${itemsToProcess.length} items missing images`]
+
+      for (const docSnap of itemsToProcess) {
+        const data = docSnap.data()
+        const { type, title, tmdbId } = data
+
+        try {
+          let posterPath: string | null = null
+
+          if (type === 'game') {
+            // Use Wikipedia for games
+            imageMigrationLog = [...imageMigrationLog, `Searching Wikipedia: ${title}...`]
+            posterPath = await fetchGameThumbnail(title)
+          } else if (type === 'movie' || type === 'tv') {
+            // Try TMDB - first by ID if available, then by title search
+            if (tmdbId) {
+              imageMigrationLog = [...imageMigrationLog, `Fetching TMDB (ID ${tmdbId}): ${title}...`]
+              posterPath = await fetchTMDBPoster(tmdbId, type)
+            }
+
+            if (!posterPath) {
+              imageMigrationLog = [...imageMigrationLog, `Searching TMDB: ${title}...`]
+              const result = await searchTMDBByTitle(title, type)
+              if (result) {
+                posterPath = result.posterPath
+                // Also update tmdbId if we didn't have one
+                if (!tmdbId) {
+                  await updateDoc(doc(db, 'media', docSnap.id), {
+                    tmdbId: result.tmdbId,
+                    posterPath: posterPath
+                  })
+                  imageMigrationLog = [...imageMigrationLog, `  ✓ Found + linked TMDB ID ${result.tmdbId}`]
+                  imageMigrationStats.updated++
+                  await new Promise(r => setTimeout(r, 300))
+                  continue
+                }
+              }
+            }
+          }
+
+          if (posterPath) {
+            await updateDoc(doc(db, 'media', docSnap.id), { posterPath })
+            imageMigrationLog = [...imageMigrationLog, `  ✓ Updated image`]
+            imageMigrationStats.updated++
+          } else {
+            imageMigrationLog = [...imageMigrationLog, `  - No image found`]
+            imageMigrationStats.skipped++
+          }
+
+          // Rate limiting
+          await new Promise(r => setTimeout(r, 300))
+        } catch (e) {
+          imageMigrationLog = [...imageMigrationLog, `  ✗ Failed: ${e}`]
+          imageMigrationStats.failed++
+        }
+      }
+
+      imageMigrationLog = [...imageMigrationLog, '', `Complete: ${imageMigrationStats.updated} updated, ${imageMigrationStats.skipped} no image found, ${imageMigrationStats.failed} failed`]
+    } catch (e) {
+      imageMigrationLog = [...imageMigrationLog, `Error: ${e}`]
+    } finally {
+      imageMigrating = false
     }
   }
 
@@ -347,6 +478,67 @@
       <div class="bg-slate-900 text-slate-300 p-3 rounded-lg font-mono text-xs max-h-48 overflow-y-auto">
         {#each migrationLog as line}
           <div class:text-emerald-400={line.includes('✓')} class:text-red-400={line.includes('✗')}>{line}</div>
+        {/each}
+      </div>
+    {/if}
+  </section>
+
+  <!-- Image Migration Tool -->
+  <section class="bg-surface border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+    <div class="flex items-center gap-2 mb-2">
+      <Image size={18} class="text-slate-400" />
+      <h2 class="font-semibold">Fix Missing Images</h2>
+    </div>
+    <p class="text-sm text-slate-500 mb-4">
+      Fetch missing poster images from TMDB (movies/TV) and Wikipedia (games).
+      {#if dataStats.missingImages > 0}
+        <span class="text-amber-500 font-medium">
+          {dataStats.missingImages} items missing images
+          ({dataStats.gamesMissingImages} games, {dataStats.moviesMissingImages} movies, {dataStats.tvMissingImages} TV)
+        </span>
+      {:else}
+        <span class="text-emerald-500">All items have images!</span>
+      {/if}
+    </p>
+
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <select
+        bind:value={imageMigrationType}
+        class="px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+        disabled={imageMigrating}
+      >
+        <option value="all">All Types ({dataStats.missingImages})</option>
+        <option value="games">Games Only ({dataStats.gamesMissingImages})</option>
+        <option value="movies">Movies Only ({dataStats.moviesMissingImages})</option>
+        <option value="tv">TV Only ({dataStats.tvMissingImages})</option>
+      </select>
+
+      <button
+        type="button"
+        onclick={runImageMigration}
+        disabled={imageMigrating || dataStats.missingImages === 0}
+        class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium disabled:opacity-50"
+      >
+        {#if imageMigrating}
+          <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          Fetching Images...
+        {:else}
+          <Image size={16} />
+          Fetch Images
+        {/if}
+      </button>
+    </div>
+
+    {#if imageMigrationLog.length > 0}
+      <div class="flex gap-4 mb-3 text-xs">
+        <span class="text-emerald-500">Updated: {imageMigrationStats.updated}</span>
+        <span class="text-slate-400">Not found: {imageMigrationStats.skipped}</span>
+        <span class="text-red-500">Failed: {imageMigrationStats.failed}</span>
+      </div>
+
+      <div class="bg-slate-900 text-slate-300 p-3 rounded-lg font-mono text-xs max-h-48 overflow-y-auto">
+        {#each imageMigrationLog as line}
+          <div class:text-emerald-400={line.includes('✓')} class:text-red-400={line.includes('✗')} class:text-slate-500={line.includes('- No')}>{line}</div>
         {/each}
       </div>
     {/if}
