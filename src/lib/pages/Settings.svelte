@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { activeUser, userPreferences, currentPreferences } from '$lib/stores/app'
+  import { activeUser, userPreferences, currentPreferences, displayAbbreviations } from '$lib/stores/app'
   import { uploadProfilePicture, deleteProfilePicture, logOut } from '$lib/firebase'
   import type { Theme, LocationMode, GeoLocation } from '$lib/types'
   import LocationPicker from '$lib/components/LocationPicker.svelte'
@@ -275,10 +275,10 @@
           onclick={() => handleUserSwitch('Z')}
         >
           {#if $userPreferences.Z?.profilePicture}
-            <img src={$userPreferences.Z.profilePicture} alt="Z" class="w-8 h-8 rounded-full object-cover" />
+            <img src={$userPreferences.Z.profilePicture} alt={$displayAbbreviations.Z} class="w-8 h-8 rounded-full object-cover" />
           {:else}
             <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold" style:background-color={$userPreferences.Z?.accentColor || '#6366f1'}>
-              Z
+              {$displayAbbreviations.Z}
             </div>
           {/if}
           <span class="font-medium">{$userPreferences.Z?.name || 'Z'}</span>
@@ -289,10 +289,10 @@
           onclick={() => handleUserSwitch('T')}
         >
           {#if $userPreferences.T?.profilePicture}
-            <img src={$userPreferences.T.profilePicture} alt="T" class="w-8 h-8 rounded-full object-cover" />
+            <img src={$userPreferences.T.profilePicture} alt={$displayAbbreviations.T} class="w-8 h-8 rounded-full object-cover" />
           {:else}
             <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold" style:background-color={$userPreferences.T?.accentColor || '#ec4899'}>
-              T
+              {$displayAbbreviations.T}
             </div>
           {/if}
           <span class="font-medium">{$userPreferences.T?.name || 'T'}</span>
@@ -327,7 +327,7 @@
                 class="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-semibold"
                 style:background-color={localAccentColor}
               >
-                {$activeUser}
+                {$displayAbbreviations[$activeUser]}
               </div>
             {/if}
             {#if uploadingPicture}

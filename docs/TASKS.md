@@ -120,3 +120,5 @@ Last updated: 2026-01-04
 - [x] **Add Back to Top Button** - New BackToTop component shows after scrolling 400px on all pages
 - [x] **Add Keyboard Navigation** - Media grid now supports arrow key navigation with Enter/Space to open details
 - [x] **Add Visit Management** - Places can now remove individual visits and add date ranges for trips
+- [x] **Half-Star Ratings** - Click cycles: half → full → clear for media and places. Updated MediaDetailModal, PlaceDetailModal, and Library quick ratings
+- [x] **Dynamic User Abbreviations** - Settings page shows first letter of display name instead of hardcoded Z/T; added `displayAbbreviations` store

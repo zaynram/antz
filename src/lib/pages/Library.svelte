@@ -288,11 +288,33 @@
     await updateDocument<Media>('media', item.id, { status }, $activeUser)
   }
 
-  async function quickRate(item: Media, rating: number): Promise<void> {
+  // Cycle rating: null → half → full → null
+  function cycleRating(current: number | null, starIndex: number): number | null {
+    const halfValue = starIndex - 0.5
+    const fullValue = starIndex
+
+    if (current === halfValue) {
+      return fullValue // half → full
+    } else if (current === fullValue) {
+      return null // full → clear
+    } else {
+      return halfValue // anything else → half
+    }
+  }
+
+  // Get star fill state: 'full', 'half', or 'empty'
+  function getStarFill(rating: number | null, starIndex: number): 'full' | 'half' | 'empty' {
+    if (rating === null) return 'empty'
+    if (rating >= starIndex) return 'full'
+    if (rating >= starIndex - 0.5) return 'half'
+    return 'empty'
+  }
+
+  async function quickRate(item: Media, starIndex: number): Promise<void> {
     if (!item.id) return
     const currentRatings = item.ratings || { Z: null, T: null }
     const userRating = currentRatings[$activeUser as UserId]
-    const newRating = userRating === rating ? null : rating
+    const newRating = cycleRating(userRating, starIndex)
     await updateDocument<Media>('media', item.id, {
       ratings: { ...currentRatings, [$activeUser]: newRating }
     }, $activeUser)
@@ -768,12 +790,18 @@
               <div class="flex items-center">
                 {#each [1, 2, 3, 4, 5] as star}
                   {@const displayRating = getDisplayRating(item)}
+                  {@const fill = getStarFill(displayRating, star)}
                   <button
                     type="button"
-                    class="w-7 h-7 text-lg flex items-center justify-center transition-colors touch-manipulation {(displayRating ?? 0) >= star ? 'text-amber-400' : 'text-slate-200 dark:text-slate-700 hover:text-amber-300'}"
+                    class="w-7 h-7 text-lg flex items-center justify-center transition-colors touch-manipulation relative"
                     onclick={() => quickRate(item, star)}
                   >
-                    ★
+                    <span class="text-slate-200 dark:text-slate-700">★</span>
+                    {#if fill === 'full'}
+                      <span class="absolute inset-0 flex items-center justify-center text-amber-400">★</span>
+                    {:else if fill === 'half'}
+                      <span class="absolute inset-0 flex items-center justify-center text-amber-400 overflow-hidden" style="clip-path: inset(0 50% 0 0)">★</span>
+                    {/if}
                   </button>
                 {/each}
               </div>

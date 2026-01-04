@@ -72,15 +72,40 @@
     await updateDocument<Media>('media', media.id, { status }, $activeUser);
   }
 
-  async function updateRating(userId: UserId, rating: number | null): Promise<void> {
+  // Cycle rating: null → half → full → null
+  function cycleRating(current: number | null, starIndex: number): number | null {
+    const halfValue = starIndex - 0.5
+    const fullValue = starIndex
+
+    if (current === halfValue) {
+      return fullValue // half → full
+    } else if (current === fullValue) {
+      return null // full → clear
+    } else {
+      return halfValue // anything else → half
+    }
+  }
+
+  async function updateRating(userId: UserId, starIndex: number): Promise<void> {
     if (!media?.id) return;
     hapticLight();
 
+    const currentRating = getUserRating(media, userId)
+    const newRating = cycleRating(currentRating, starIndex)
+
     // Create or update the ratings object
     const currentRatings = media.ratings || { Z: null, T: null };
-    const updatedRatings = { ...currentRatings, [userId]: rating };
+    const updatedRatings = { ...currentRatings, [userId]: newRating };
 
     await updateDocument<Media>('media', media.id, { ratings: updatedRatings }, $activeUser);
+  }
+
+  // Get star fill state: 'full', 'half', or 'empty'
+  function getStarFill(rating: number | null, starIndex: number): 'full' | 'half' | 'empty' {
+    if (rating === null) return 'empty'
+    if (rating >= starIndex) return 'full'
+    if (rating >= starIndex - 0.5) return 'half'
+    return 'empty'
   }
 
   async function updateWatchDate(): Promise<void> {
@@ -217,11 +242,17 @@
               <div class="text-xs text-slate-400 mb-0.5">{getDisplayNameForUser('Z')}'s Rating</div>
               <div class="flex">
                 {#each [1, 2, 3, 4, 5] as star}
+                  {@const fill = getStarFill(getUserRating(media, 'Z'), star)}
                   <button
-                    class="w-9 h-9 text-xl flex items-center justify-center transition-colors touch-manipulation {(getUserRating(media, 'Z') ?? 0) >= star ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600 hover:text-amber-300'}"
-                    onclick={() => updateRating('Z', getUserRating(media, 'Z') === star ? null : star)}
+                    class="w-9 h-9 text-xl flex items-center justify-center transition-colors touch-manipulation relative"
+                    onclick={() => updateRating('Z', star)}
                   >
-                    ★
+                    <span class="text-slate-300 dark:text-slate-600">★</span>
+                    {#if fill === 'full'}
+                      <span class="absolute inset-0 flex items-center justify-center text-amber-400">★</span>
+                    {:else if fill === 'half'}
+                      <span class="absolute inset-0 flex items-center justify-center text-amber-400 overflow-hidden" style="clip-path: inset(0 50% 0 0)">★</span>
+                    {/if}
                   </button>
                 {/each}
               </div>
@@ -232,11 +263,17 @@
               <div class="text-xs text-slate-400 mb-0.5">{getDisplayNameForUser('T')}'s Rating</div>
               <div class="flex">
                 {#each [1, 2, 3, 4, 5] as star}
+                  {@const fill = getStarFill(getUserRating(media, 'T'), star)}
                   <button
-                    class="w-9 h-9 text-xl flex items-center justify-center transition-colors touch-manipulation {(getUserRating(media, 'T') ?? 0) >= star ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600 hover:text-amber-300'}"
-                    onclick={() => updateRating('T', getUserRating(media, 'T') === star ? null : star)}
+                    class="w-9 h-9 text-xl flex items-center justify-center transition-colors touch-manipulation relative"
+                    onclick={() => updateRating('T', star)}
                   >
-                    ★
+                    <span class="text-slate-300 dark:text-slate-600">★</span>
+                    {#if fill === 'full'}
+                      <span class="absolute inset-0 flex items-center justify-center text-amber-400">★</span>
+                    {:else if fill === 'half'}
+                      <span class="absolute inset-0 flex items-center justify-center text-amber-400 overflow-hidden" style="clip-path: inset(0 50% 0 0)">★</span>
+                    {/if}
                   </button>
                 {/each}
               </div>

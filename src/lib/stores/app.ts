@@ -235,6 +235,15 @@ export const displayNames = derived(
   })
 );
 
+// Reactive derived store for display abbreviations (first letter of name)
+export const displayAbbreviations = derived(
+  userPreferences,
+  ($prefs) => ({
+    Z: ($prefs.Z?.name || 'Z').charAt(0).toUpperCase(),
+    T: ($prefs.T?.name || 'T').charAt(0).toUpperCase()
+  })
+);
+
 // Get the other user's ID
 export function getOtherUserId(userId: UserId): UserId {
   return userId === 'Z' ? 'T' : 'Z';
