@@ -105,6 +105,48 @@
     }, $activeUser)
   }
 
+  async function removeVisit(index: number): Promise<void> {
+    if (!place?.id) return
+    hapticLight()
+
+    const visitDates = [...(place.visitDates || [])]
+    visitDates.splice(index, 1)
+
+    await updateDocument<Place>('places', place.id, {
+      visited: visitDates.length > 0,
+      visitDates
+    }, $activeUser)
+  }
+
+  async function addDateRangeVisit(): Promise<void> {
+    if (!place?.id || !rangeStartDate || !rangeEndDate) return
+    hapticLight()
+
+    const start = Timestamp.fromDate(new Date(rangeStartDate))
+    const end = Timestamp.fromDate(new Date(rangeEndDate))
+
+    // Add all dates in range (for trips spanning multiple days)
+    const visitDates = [...(place.visitDates || []), start]
+    // Only add end date if different from start
+    if (rangeStartDate !== rangeEndDate) {
+      visitDates.push(end)
+    }
+
+    await updateDocument<Place>('places', place.id, {
+      visited: true,
+      visitDates
+    }, $activeUser)
+
+    // Reset the date inputs
+    rangeStartDate = ''
+    rangeEndDate = ''
+    showDateRange = false
+  }
+
+  let showDateRange = $state(false)
+  let rangeStartDate = $state('')
+  let rangeEndDate = $state('')
+
   async function addComment(): Promise<void> {
     if (!place?.id || !newComment.trim()) return
 
@@ -225,17 +267,6 @@
             <Check size={20} />
             <span>{place.visited ? 'Visited' : 'Mark as Visited'}</span>
           </button>
-
-          {#if place.visited}
-            <button
-              type="button"
-              class="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent/10 text-accent font-medium hover:bg-accent/20 transition-colors touch-manipulation"
-              onclick={addVisit}
-            >
-              <Calendar size={20} />
-              <span>Add Visit</span>
-            </button>
-          {/if}
         </div>
 
         <!-- Visit history -->
@@ -243,12 +274,83 @@
           <div>
             <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Visit History</span>
             <div class="flex flex-wrap gap-2">
-              {#each place.visitDates as date}
-                <span class="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs">
+              {#each place.visitDates as date, index}
+                <span class="group/visit px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs flex items-center gap-1">
                   {formatDate(date)}
+                  <button
+                    type="button"
+                    class="w-4 h-4 rounded-full hover:bg-red-500 hover:text-white text-slate-400 flex items-center justify-center opacity-0 group-hover/visit:opacity-100 transition-opacity"
+                    onclick={() => removeVisit(index)}
+                    aria-label="Remove visit"
+                  >
+                    <X size={10} />
+                  </button>
                 </span>
               {/each}
             </div>
+          </div>
+        {/if}
+
+        <!-- Add visit with date range -->
+        {#if place.visited}
+          <div>
+            {#if showDateRange}
+              <div class="flex flex-wrap gap-2 items-end">
+                <div class="flex-1 min-w-[120px]">
+                  <label for="range-start" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Start Date</label>
+                  <input
+                    id="range-start"
+                    type="date"
+                    bind:value={rangeStartDate}
+                    class="input-sm w-full"
+                  />
+                </div>
+                <div class="flex-1 min-w-[120px]">
+                  <label for="range-end" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">End Date</label>
+                  <input
+                    id="range-end"
+                    type="date"
+                    bind:value={rangeEndDate}
+                    class="input-sm w-full"
+                  />
+                </div>
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    class="px-3 py-2 text-sm bg-accent text-white rounded-lg disabled:opacity-50 touch-manipulation"
+                    onclick={addDateRangeVisit}
+                    disabled={!rangeStartDate || !rangeEndDate}
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    class="px-3 py-2 text-sm bg-slate-100 dark:bg-slate-700 rounded-lg touch-manipulation"
+                    onclick={() => showDateRange = false}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            {:else}
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-accent/10 text-accent font-medium hover:bg-accent/20 transition-colors touch-manipulation"
+                  onclick={addVisit}
+                >
+                  <Calendar size={16} />
+                  <span>Add Today</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors touch-manipulation"
+                  onclick={() => showDateRange = true}
+                >
+                  <span>Add Date Range</span>
+                </button>
+              </div>
+            {/if}
           </div>
         {/if}
 

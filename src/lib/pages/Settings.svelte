@@ -116,12 +116,16 @@
     uploadingPicture = true
     try {
       const url = await uploadProfilePicture($activeUser, file)
+      if (!url) {
+        throw new Error('No URL returned from upload')
+      }
       localProfilePicture = url
       savePreferences()
       toast.success('Profile picture uploaded')
     } catch (err) {
       console.error('Upload failed:', err)
-      toast.error('Failed to upload picture')
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      toast.error(`Upload failed: ${message}`)
     } finally {
       uploadingPicture = false
       input.value = ''
