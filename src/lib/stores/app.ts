@@ -21,12 +21,25 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
 };
 
 function createPersistedStore<T>(key: string, initial: T) {
-  const stored = localStorage.getItem(key);
-  const value = stored ? (JSON.parse(stored) as T) : initial;
+  // Safely read from localStorage (handles private browsing mode)
+  let value = initial;
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      value = JSON.parse(stored) as T;
+    }
+  } catch (e) {
+    console.warn(`Failed to load ${key} from localStorage:`, e);
+  }
+
   const store = writable<T>(value);
 
   store.subscribe((v) => {
-    localStorage.setItem(key, JSON.stringify(v));
+    try {
+      localStorage.setItem(key, JSON.stringify(v));
+    } catch (e) {
+      console.warn(`Failed to save ${key} to localStorage:`, e);
+    }
   });
 
   return store;
@@ -43,6 +56,7 @@ export const userPreferences = createPersistedStore<UserPreferencesMap>(
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let isRemoteUpdate = false;
 let unsubscribeFirestore: (() => void) | null = null;
+let unsubscribeLocalPrefs: (() => void) | null = null;
 
 // Debounced save to Firestore
 function debouncedSaveToFirestore(prefs: UserPreferencesMap): void {
@@ -58,6 +72,12 @@ function debouncedSaveToFirestore(prefs: UserPreferencesMap): void {
 
 // Initialize Firestore sync (call after auth)
 export async function initPreferencesSync(): Promise<void> {
+  // Clean up any existing subscriptions first to prevent duplicates on re-auth
+  if (unsubscribeFirestore) {
+    unsubscribeFirestore();
+    unsubscribeFirestore = null;
+  }
+
   // Load initial preferences from Firestore
   try {
     const remotePrefs = await loadPreferencesFromFirestore();
@@ -95,7 +115,11 @@ export async function initPreferencesSync(): Promise<void> {
   });
 
   // Subscribe to local changes and sync to Firestore
-  userPreferences.subscribe(debouncedSaveToFirestore);
+  // Clean up any existing subscription first to prevent duplicates on re-auth
+  if (unsubscribeLocalPrefs) {
+    unsubscribeLocalPrefs();
+  }
+  unsubscribeLocalPrefs = userPreferences.subscribe(debouncedSaveToFirestore);
 }
 
 // Cleanup sync subscription
@@ -103,6 +127,10 @@ export function cleanupPreferencesSync(): void {
   if (unsubscribeFirestore) {
     unsubscribeFirestore();
     unsubscribeFirestore = null;
+  }
+  if (unsubscribeLocalPrefs) {
+    unsubscribeLocalPrefs();
+    unsubscribeLocalPrefs = null;
   }
   if (syncDebounceTimer) {
     clearTimeout(syncDebounceTimer);
