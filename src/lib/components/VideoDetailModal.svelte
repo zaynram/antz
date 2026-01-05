@@ -109,9 +109,20 @@
     
     if (watchedDateInput) {
       const date = new Date(watchedDateInput + 'T00:00:00');
+      const [yearStr, monthStr, dayStr] = watchedDateInput.split('-');
+      const year = Number(yearStr);
+      const month = Number(monthStr);
+      const day = Number(dayStr);
+
+      // Guard against invalid date input; do not update if parsing fails
+      if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+        return;
+      }
+
+      const dateUtc = new Date(Date.UTC(year, month - 1, day));
+
       await updateDocument<Video>('videos', video.id, { 
-        watchedDate: Timestamp.fromDate(date) 
-      }, $activeUser);
+        watchedDate: Timestamp.fromDate(dateUtc) 
     } else {
       await updateDocument<Video>('videos', video.id, { 
         watchedDate: undefined 
