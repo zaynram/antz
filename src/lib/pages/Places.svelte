@@ -2,7 +2,7 @@
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
   import { activeUser, currentPreferences, displayNames } from '$lib/stores/app'
   import type { Place, PlaceCategory, GeoLocation, UserId } from '$lib/types'
-  import { getPlaceDisplayRating, calculateDistance, formatDistance } from '$lib/types'
+  import { getPlaceDisplayRating, calculateDistance, formatDistance, formatBudget, getBudgetLabel } from '$lib/types'
   import { toast } from 'svelte-sonner'
   import { Timestamp } from 'firebase/firestore'
   import { onMount } from 'svelte'
@@ -41,7 +41,7 @@
   let showForm = $state(false)
   let showFilters = $state(false)
   let selectedPlace = $state<Place | null>(null)
-  let newPlace = $state({ name: '', category: 'restaurant' as PlaceCategory, notes: '', location: undefined as GeoLocation | undefined })
+  let newPlace = $state({ name: '', category: 'restaurant' as PlaceCategory, notes: '', location: undefined as GeoLocation | undefined, budget: null as number | null })
 
   type TabKey = 'all' | 'to-visit' | 'visited'
   let activeTab = $state<TabKey>('all')
@@ -49,6 +49,7 @@
   // Filter state
   let filterCategory = $state<PlaceCategory | 'all'>('all')
   let filterAddedBy = $state<UserId | 'all'>('all')
+  let filterBudget = $state<number | 'all'>('all')
   let sortField = $state<'name' | 'distance' | 'rating' | 'visits'>('distance')
   let sortDirection = $state<'asc' | 'desc'>('asc')
 
@@ -103,13 +104,14 @@
           visited: false,
           visitDates: [],
           rating: null,
-          location: newPlace.location
+          location: newPlace.location,
+          budget: newPlace.budget
         },
         $activeUser
       )
       hapticSuccess()
       toast.success(`Added "${newPlace.name}"`)
-      newPlace = { name: '', category: 'restaurant', notes: '', location: undefined }
+      newPlace = { name: '', category: 'restaurant', notes: '', location: undefined, budget: null }
       showForm = false
     } catch (e) {
       console.error('Failed to add place:', e)
@@ -132,7 +134,8 @@
             lat: suggestion.coordinates.lat,
             lng: suggestion.coordinates.lng,
             address: suggestion.address
-          }
+          },
+          budget: suggestion.priceLevel ?? null
         },
         $activeUser
       )
@@ -205,7 +208,7 @@
   function toggleForm() {
     showForm = !showForm
     if (!showForm) {
-      newPlace = { name: '', category: 'restaurant', notes: '', location: undefined }
+      newPlace = { name: '', category: 'restaurant', notes: '', location: undefined, budget: null }
     }
     forceRepaint()
   }
@@ -222,6 +225,7 @@
   function clearFilters() {
     filterCategory = 'all'
     filterAddedBy = 'all'
+    filterBudget = 'all'
     sortField = 'distance'
     sortDirection = 'asc'
   }
@@ -229,7 +233,8 @@
   // Count active filters
   let activeFilterCount = $derived(
     (filterCategory !== 'all' ? 1 : 0) +
-    (filterAddedBy !== 'all' ? 1 : 0)
+    (filterAddedBy !== 'all' ? 1 : 0) +
+    (filterBudget !== 'all' ? 1 : 0)
   )
 
   // Count tabs
@@ -257,6 +262,11 @@
     // Added by filter
     if (filterAddedBy !== 'all') {
       result = result.filter(p => p.createdBy === filterAddedBy)
+    }
+
+    // Budget filter
+    if (filterBudget !== 'all') {
+      result = result.filter(p => p.budget === filterBudget)
     }
 
     // Sort
@@ -351,12 +361,24 @@
           {/each}
         </select>
 
-        <LocationPicker
-          value={newPlace.location}
-          onChange={(loc) => newPlace.location = loc}
-          placeholder="Location..."
-        />
+        <select
+          class="input"
+          bind:value={newPlace.budget}
+        >
+          <option value={null}>Budget (optional)</option>
+          <option value={0}>Free</option>
+          <option value={1}>$ - Inexpensive</option>
+          <option value={2}>$$ - Moderate</option>
+          <option value={3}>$$$ - Expensive</option>
+          <option value={4}>$$$$ - Very Expensive</option>
+        </select>
       </div>
+
+      <LocationPicker
+        value={newPlace.location}
+        onChange={(loc) => newPlace.location = loc}
+        placeholder="Location..."
+      />
 
       <textarea
         placeholder="Notes (optional)"
@@ -388,6 +410,18 @@
             {#each categories as cat}
               <option value={cat}>{categoryLabels[cat]}</option>
             {/each}
+          </select>
+        </div>
+
+        <div class="flex-1 min-w-[120px]">
+          <label for="places-filter-budget" class="block text-xs text-slate-500 dark:text-slate-400 mb-1.5">Budget</label>
+          <select id="places-filter-budget" bind:value={filterBudget} class="input-sm">
+            <option value="all">All Budgets</option>
+            <option value={0}>Free</option>
+            <option value={1}>$ - Inexpensive</option>
+            <option value={2}>$$ - Moderate</option>
+            <option value={3}>$$$ - Expensive</option>
+            <option value={4}>$$$$ - Very Expensive</option>
           </select>
         </div>
 
@@ -470,6 +504,10 @@
 
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400 mt-1">
               <span class="capitalize">{categoryLabels[place.category]}</span>
+              {#if place.budget !== null && place.budget !== undefined}
+                <span>·</span>
+                <span class="font-medium">{formatBudget(place.budget)}</span>
+              {/if}
               {#if distance !== null}
                 <span>·</span>
                 <span class="flex items-center gap-0.5">

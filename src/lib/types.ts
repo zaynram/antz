@@ -192,6 +192,7 @@ export interface Place extends BaseDocument {
     placeId?: string // Google Places ID for richer data
     tags?: string[] // User-defined tags
     photos?: string[] // URLs to photos in Google Drive
+    budget?: number | null // Price level: 0-4 (0=Free, 1=Inexpensive, 2=Moderate, 3=Expensive, 4=Very Expensive)
 }
 
 // Place rating helpers (mirror Media rating helpers)
@@ -245,6 +246,25 @@ export function formatDistance(km: number): string {
     if (km < 1) return `${Math.round(km * 1000)} m`
     if (km < 10) return `${km.toFixed(1)} km`
     return `${Math.round(km)} km`
+}
+
+// Budget helpers
+export function formatBudget(budget: number | null | undefined): string {
+    if (budget === null || budget === undefined) return 'Unknown'
+    const symbols = ['Free', '$', '$$', '$$$', '$$$$']
+    return symbols[budget] || 'Unknown'
+}
+
+export function getBudgetLabel(budget: number | null | undefined): string {
+    if (budget === null || budget === undefined) return 'Unknown'
+    const labels = [
+        'Free',
+        'Inexpensive',
+        'Moderate',
+        'Expensive',
+        'Very Expensive'
+    ]
+    return labels[budget] || 'Unknown'
 }
 
 export interface TMDBSearchResult {
