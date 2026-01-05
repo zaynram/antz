@@ -81,7 +81,6 @@
       return fullValue
     } else if (current === fullValue) {
       return null
-    } else {
     } else if (current === null || current > fullValue) {
       // When there is no rating yet, or when reducing from a higher star,
       // reset to the clicked star's half value.
@@ -89,6 +88,7 @@
     } else {
       // For other cases (e.g., a lower rating from another star), keep the current rating.
       return current
+    }
   }
 
   async function updateRating(userId: UserId, starIndex: number): Promise<void> {
@@ -108,7 +108,6 @@
     if (!video?.id) return;
     
     if (watchedDateInput) {
-      const date = new Date(watchedDateInput + 'T00:00:00');
       const [yearStr, monthStr, dayStr] = watchedDateInput.split('-');
       const year = Number(yearStr);
       const month = Number(monthStr);
@@ -123,6 +122,7 @@
 
       await updateDocument<Video>('videos', video.id, { 
         watchedDate: Timestamp.fromDate(dateUtc) 
+      }, $activeUser);
     } else {
       await updateDocument<Video>('videos', video.id, { 
         watchedDate: undefined 
@@ -188,6 +188,7 @@
         role="dialog"
         aria-modal="true"
         tabindex="0"
+      >
         <!-- Header -->
         <div class="flex items-start justify-between p-6 border-b border-slate-200 dark:border-slate-700">
           <div class="flex-1 pr-4">

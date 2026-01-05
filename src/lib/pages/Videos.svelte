@@ -310,6 +310,7 @@
       onkeydown={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
+      tabindex="0"
     >
       <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Add Video</h2>
       
