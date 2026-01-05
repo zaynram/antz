@@ -250,13 +250,13 @@ export function formatDistance(km: number): string {
 
 // Budget helpers
 export function formatBudget(budget: number | null | undefined): string {
-    if (budget === null || budget === undefined) return 'Unknown'
+    if (budget === null || budget === undefined || budget < 0 || budget > 4) return 'Unknown'
     const symbols = ['Free', '$', '$$', '$$$', '$$$$']
-    return symbols[budget] || 'Unknown'
+    return symbols[budget]
 }
 
 export function getBudgetLabel(budget: number | null | undefined): string {
-    if (budget === null || budget === undefined) return 'Unknown'
+    if (budget === null || budget === undefined || budget < 0 || budget > 4) return 'Unknown'
     const labels = [
         'Free',
         'Inexpensive',
@@ -264,7 +264,7 @@ export function getBudgetLabel(budget: number | null | undefined): string {
         'Expensive',
         'Very Expensive'
     ]
-    return labels[budget] || 'Unknown'
+    return labels[budget]
 }
 
 export interface TMDBSearchResult {
