@@ -3,7 +3,7 @@
   import { activeUser, displayNames } from '$lib/stores/app'
   import { getYouTubeEmbedUrl } from '$lib/youtube'
   import type { Video, VideoStatus, MediaComment, UserId } from '$lib/types'
-  import { getVideoUserRating, getVideoAverageRating } from '$lib/types'
+  import { getVideoUserRating, getVideoAverageRating, createEmptyRatings, ALL_USER_IDS } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
   import { X, ExternalLink, Star, MessageCircle, Trash2 } from 'lucide-svelte'
   import { hapticLight, hapticSuccess } from '$lib/haptics'
@@ -94,7 +94,7 @@
     const currentRating = getVideoUserRating(video, userId)
     const newRating = cycleRating(currentRating, starIndex)
 
-    const currentRatings = video.ratings || { Z: null, T: null };
+    const currentRatings = video.ratings || createEmptyRatings();
     const updatedRatings = { ...currentRatings, [userId]: newRating };
 
     await updateDocument<Video>('videos', video.id, { ratings: updatedRatings }, $activeUser);
@@ -254,26 +254,26 @@
         <div class="p-6 border-b border-slate-200 dark:border-slate-700">
           <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Ratings</h3>
           
-          {#each ['Z', 'T'] as userId}
+          {#each ALL_USER_IDS as userId}
             <div class="mb-4">
               <p class="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                {getDisplayNameForUser(userId as UserId)}
+                {getDisplayNameForUser(userId)}
               </p>
               <div class="flex gap-1">
                 {#each [1, 2, 3, 4, 5] as star}
-                  {@const userRating = getVideoUserRating(video, userId as UserId)}
+                  {@const userRating = getVideoUserRating(video, userId)}
                   {@const isFull = userRating !== null && userRating >= star}
                   {@const isHalf = userRating !== null && userRating >= star - 0.5 && userRating < star}
                   <button
-                    onclick={() => updateRating(userId as UserId, star)}
+                    onclick={() => updateRating(userId, star)}
                     class="text-2xl transition-transform hover:scale-110 touch-feedback {isFull || isHalf ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600'}"
                   >
                     {isFull ? '★' : isHalf ? '⯨' : '☆'}
                   </button>
                 {/each}
-                {#if getVideoUserRating(video, userId as UserId)}
+                {#if getVideoUserRating(video, userId)}
                   <span class="ml-2 text-sm text-slate-600 dark:text-slate-400">
-                    {getVideoUserRating(video, userId as UserId)}
+                    {getVideoUserRating(video, userId)}
                   </span>
                 {/if}
               </div>

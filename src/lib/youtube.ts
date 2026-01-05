@@ -49,6 +49,8 @@ export function parseYouTubeUrl(url: string): YouTubeVideoInfo | null {
 
         return null
     } catch (e) {
+        // Invalid URL format - this is expected for non-URL strings
+        console.warn("Failed to parse YouTube URL:", url, e)
         return null
     }
 }

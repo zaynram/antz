@@ -2,6 +2,17 @@ import type { Timestamp } from "firebase/firestore"
 
 export type UserId = "Z" | "T"
 
+// All user IDs in the system - used for iterating over users
+export const ALL_USER_IDS: UserId[] = ["Z", "T"]
+
+// Create an empty ratings object with null for all users
+export function createEmptyRatings(): Record<UserId, null> {
+    return ALL_USER_IDS.reduce((acc, userId) => {
+        acc[userId] = null
+        return acc
+    }, {} as Record<UserId, null>)
+}
+
 export type Theme = "light" | "dark"
 
 export type LocationMode = "auto" | "manual" | "off"
@@ -255,20 +266,13 @@ export function getVideoUserRating(video: Video, userId: UserId): number | null 
 
 export function getVideoAverageRating(video: Video): number | null {
     if (video.ratings) {
-        const ratingZ = video.ratings.Z
-        const ratingT = video.ratings.T
+        const ratings = ALL_USER_IDS.map(userId => video.ratings?.[userId])
+            .filter((r): r is number => r !== null && r !== undefined)
 
-        if (
-            ratingZ !== null &&
-            ratingZ !== undefined &&
-            ratingT !== null &&
-            ratingT !== undefined
-        ) {
-            return (ratingZ + ratingT) / 2
-        }
-
-        if (ratingZ !== null && ratingZ !== undefined) return ratingZ
-        if (ratingT !== null && ratingT !== undefined) return ratingT
+        if (ratings.length === 0) return video.rating ?? null
+        if (ratings.length === 1) return ratings[0]
+        
+        return ratings.reduce((sum, r) => sum + r, 0) / ratings.length
     }
     return video.rating ?? null
 }

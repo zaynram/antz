@@ -3,7 +3,7 @@
   import { activeUser, displayNames } from '$lib/stores/app'
   import { parseYouTubeUrl, getYouTubeThumbnail, isYouTubeUrl } from '$lib/youtube'
   import type { Video, VideoStatus, UserId } from '$lib/types'
-  import { getVideoDisplayRating, getVideoUserRating } from '$lib/types'
+  import { getVideoDisplayRating, getVideoUserRating, createEmptyRatings } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
   import { Plus, ExternalLink, Trash2, Video as VideoIcon } from 'lucide-svelte'
   import { hapticLight, hapticSuccess, hapticError } from '$lib/haptics'
@@ -71,7 +71,7 @@
         thumbnailUrl: getYouTubeThumbnail(videoInfo.videoId),
         status: 'queued',
         rating: null,
-        ratings: { Z: null, T: null },
+        ratings: createEmptyRatings(),
         notes: '',
         createdBy: $activeUser,
         createdAt: Timestamp.now(),
