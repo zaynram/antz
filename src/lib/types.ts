@@ -2,6 +2,17 @@ import type { Timestamp } from "firebase/firestore"
 
 export type UserId = "Z" | "T"
 
+// All user IDs in the system - used for iterating over users
+export const ALL_USER_IDS: UserId[] = ["Z", "T"]
+
+// Create an empty ratings object with null for all users
+export function createEmptyRatings(): Record<UserId, null> {
+    return ALL_USER_IDS.reduce((acc, userId) => {
+        acc[userId] = null
+        return acc
+    }, {} as Record<UserId, null>)
+}
+
 export type Theme = "light" | "dark"
 
 export type LocationMode = "auto" | "manual" | "off"
@@ -226,4 +237,46 @@ export interface TMDBSearchResult {
     first_air_date?: string
     overview: string
     genre_ids?: number[]
+}
+
+export type VideoStatus = "queued" | "watched" | "skipped"
+
+export interface Video extends BaseDocument {
+    title: string
+    url: string
+    videoId: string // YouTube video ID
+    thumbnailUrl?: string
+    duration?: string // e.g., "10:23"
+    channelName?: string
+    status: VideoStatus
+    rating: number | null // Legacy field for backward compatibility
+    ratings?: Record<UserId, number | null> // Per-user ratings
+    notes: string
+    watchedDate?: Timestamp
+    comments?: MediaComment[]
+}
+
+// Helper functions for video ratings
+export function getVideoUserRating(video: Video, userId: UserId): number | null {
+    if (video.ratings && userId in video.ratings) {
+        return video.ratings[userId]
+    }
+    return video.rating ?? null
+}
+
+export function getVideoAverageRating(video: Video): number | null {
+    if (video.ratings) {
+        const ratings = ALL_USER_IDS.map(userId => video.ratings?.[userId])
+            .filter((r): r is number => r !== null && r !== undefined)
+
+        if (ratings.length === 0) return video.rating ?? null
+        if (ratings.length === 1) return ratings[0]
+        
+        return ratings.reduce((sum, r) => sum + r, 0) / ratings.length
+    }
+    return video.rating ?? null
+}
+
+export function getVideoDisplayRating(video: Video): number | null {
+    return getVideoAverageRating(video)
 }

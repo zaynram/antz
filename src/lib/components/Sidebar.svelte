@@ -10,6 +10,7 @@
     Gamepad2,
     StickyNote,
     MapPin,
+    Video,
     Settings,
     Menu,
     X,
@@ -112,6 +113,7 @@
 
   const navItems = [
     { path: '/', label: 'Search', icon: Search },
+    { path: '/videos', label: 'Videos', icon: Video },
     { path: '/notes', label: 'Notes', icon: StickyNote },
     { path: '/places', label: 'Places', icon: MapPin },
   ]

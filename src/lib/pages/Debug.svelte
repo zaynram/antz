@@ -3,7 +3,8 @@
   import { db, subscribeToCollection } from '$lib/firebase'
   import { tmdbConfig } from '$lib/config'
   import { activeUser, currentPreferences } from '$lib/stores/app'
-  import type { Media, Note, Place } from '$lib/types'
+  import type { Media, Note, Place, Video } from '$lib/types'
+  import { createEmptyRatings } from '$lib/types'
   import { onMount } from 'svelte'
   import { Bug, Database, Trash2, RefreshCw, Download, Upload, Cpu, HardDrive, Wifi, Image } from 'lucide-svelte'
   import { fetchGameThumbnail } from '$lib/wikipedia'
@@ -27,6 +28,11 @@
   let imageMigrationStats = $state({ updated: 0, skipped: 0, failed: 0 })
   type ImageMigrationType = 'all' | 'games' | 'movies' | 'tv'
   let imageMigrationType = $state<ImageMigrationType>('all')
+
+  // Video ratings migration state
+  let videoRatingsMigrating = $state(false)
+  let videoRatingsMigrationLog = $state<string[]>([])
+  let videoRatingsMigrationStats = $state({ updated: 0, skipped: 0, failed: 0 })
 
   // System info
   let systemInfo = $state({
@@ -296,6 +302,54 @@
     }
   }
 
+  // Video ratings migration - ensures all videos have proper ratings structure
+  async function runVideoRatingsMigration() {
+    videoRatingsMigrating = true
+    videoRatingsMigrationLog = ['Starting video ratings migration...']
+    videoRatingsMigrationStats = { updated: 0, skipped: 0, failed: 0 }
+
+    try {
+      const videosSnapshot = await getDocs(collection(db, 'videos'))
+      videoRatingsMigrationLog = [...videoRatingsMigrationLog, `Found ${videosSnapshot.docs.length} videos`]
+
+      for (const videoDoc of videosSnapshot.docs) {
+        const data = videoDoc.data() as Video
+        const title = data.title || 'Untitled'
+
+        try {
+          // Check if ratings structure needs updating
+          const needsUpdate = !data.ratings || 
+                             Object.keys(data.ratings).length === 0 ||
+                             typeof data.ratings !== 'object'
+
+          if (needsUpdate) {
+            videoRatingsMigrationLog = [...videoRatingsMigrationLog, `Updating: ${title}...`]
+            
+            const updates: Partial<Video> = {
+              ratings: createEmptyRatings()
+            }
+
+            await updateDoc(doc(db, 'videos', videoDoc.id), updates)
+            videoRatingsMigrationLog = [...videoRatingsMigrationLog, `  ✓ Updated ratings structure`]
+            videoRatingsMigrationStats.updated++
+          } else {
+            videoRatingsMigrationLog = [...videoRatingsMigrationLog, `Skip: ${title} (already has ratings)`]
+            videoRatingsMigrationStats.skipped++
+          }
+        } catch (e) {
+          videoRatingsMigrationLog = [...videoRatingsMigrationLog, `  ✗ Failed: ${e}`]
+          videoRatingsMigrationStats.failed++
+        }
+      }
+
+      videoRatingsMigrationLog = [...videoRatingsMigrationLog, '', `Complete: ${videoRatingsMigrationStats.updated} updated, ${videoRatingsMigrationStats.skipped} skipped, ${videoRatingsMigrationStats.failed} failed`]
+    } catch (e) {
+      videoRatingsMigrationLog = [...videoRatingsMigrationLog, `Error: ${e}`]
+    } finally {
+      videoRatingsMigrating = false
+    }
+  }
+
   // Cache management
   async function clearCache() {
     if (!confirm('Clear all cached data? This will reload the page.')) return
@@ -539,6 +593,43 @@
       <div class="bg-slate-900 text-slate-300 p-3 rounded-lg font-mono text-xs max-h-48 overflow-y-auto">
         {#each imageMigrationLog as line}
           <div class:text-emerald-400={line.includes('✓')} class:text-red-400={line.includes('✗')} class:text-slate-500={line.includes('- No')}>{line}</div>
+        {/each}
+      </div>
+    {/if}
+  </section>
+
+  <!-- Video Ratings Migration Tool -->
+  <section class="bg-surface border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+    <h2 class="font-semibold mb-2">Video Ratings Migration</h2>
+    <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">
+      Ensures all videos have the proper ratings structure for per-user ratings.
+    </p>
+
+    <button
+      type="button"
+      onclick={runVideoRatingsMigration}
+      disabled={videoRatingsMigrating}
+      class="px-4 py-2 bg-accent text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity flex items-center gap-2"
+    >
+      {#if videoRatingsMigrating}
+        <RefreshCw size={16} class="animate-spin" />
+        <span>Migrating...</span>
+      {:else}
+        <Database size={16} />
+        <span>Run Video Ratings Migration</span>
+      {/if}
+    </button>
+
+    {#if videoRatingsMigrationLog.length > 0}
+      <div class="mt-4 flex gap-4 text-sm">
+        <span class="text-emerald-500">Updated: {videoRatingsMigrationStats.updated}</span>
+        <span class="text-slate-400">Skipped: {videoRatingsMigrationStats.skipped}</span>
+        <span class="text-red-500">Failed: {videoRatingsMigrationStats.failed}</span>
+      </div>
+      
+      <div class="mt-4 bg-slate-900 text-slate-300 p-3 rounded-lg font-mono text-xs overflow-y-auto max-h-96">
+        {#each videoRatingsMigrationLog as line}
+          <div class:text-emerald-400={line.includes('✓')} class:text-red-400={line.includes('✗')}>{line}</div>
         {/each}
       </div>
     {/if}
