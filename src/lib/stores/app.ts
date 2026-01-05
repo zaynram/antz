@@ -154,6 +154,16 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
                 return false
             }
         }
+        
+        // Check youtubeAuth separately (compare access tokens as proxy for full object)
+        const aYTAuth = aPrefs.youtubeAuth?.accessToken
+        const bYTAuth = bPrefs.youtubeAuth?.accessToken
+        if (aYTAuth !== bYTAuth) return false
+        
+        // Check grayjayConfig separately
+        const aGJEnabled = aPrefs.grayjayConfig?.enabled
+        const bGJEnabled = bPrefs.grayjayConfig?.enabled
+        if (aGJEnabled !== bGJEnabled) return false
     }
     return true
 }

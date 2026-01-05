@@ -182,21 +182,46 @@ export function downloadExportFile(data: string, filename: string, mimeType: str
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
     try {
+        // Modern Clipboard API (preferred)
         if (navigator.clipboard && navigator.clipboard.writeText) {
             await navigator.clipboard.writeText(text)
             return true
-        } else {
-            // Fallback for older browsers
-            const textarea = document.createElement("textarea")
-            textarea.value = text
-            textarea.style.position = "fixed"
-            textarea.style.opacity = "0"
-            document.body.appendChild(textarea)
-            textarea.select()
-            const success = document.execCommand("copy")
-            document.body.removeChild(textarea)
-            return success
         }
+        
+        // Fallback for browsers without Clipboard API
+        // Create temporary textarea element
+        const textarea = document.createElement("textarea")
+        textarea.value = text
+        
+        // Make it invisible but still focusable
+        textarea.style.position = "fixed"
+        textarea.style.top = "0"
+        textarea.style.left = "0"
+        textarea.style.width = "2em"
+        textarea.style.height = "2em"
+        textarea.style.padding = "0"
+        textarea.style.border = "none"
+        textarea.style.outline = "none"
+        textarea.style.boxShadow = "none"
+        textarea.style.background = "transparent"
+        textarea.style.opacity = "0"
+        
+        document.body.appendChild(textarea)
+        
+        // Select and attempt to copy
+        textarea.focus()
+        textarea.select()
+        
+        let success = false
+        try {
+            // Try the old method
+            success = document.execCommand("copy")
+        } catch (err) {
+            console.warn("Copy fallback failed:", err)
+        }
+        
+        document.body.removeChild(textarea)
+        return success
     } catch (error) {
         console.error("Failed to copy to clipboard:", error)
         return false
