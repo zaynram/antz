@@ -37,7 +37,9 @@ export function parseYouTubeUrl(url: string): YouTubeVideoInfo | null {
         }
         // youtu.be short URLs
         else if (urlObj.hostname === "youtu.be") {
-            videoId = urlObj.pathname.substring(1)
+            const trimmedPath = urlObj.pathname.startsWith("/") ? urlObj.pathname.slice(1) : urlObj.pathname
+            const [idCandidate] = trimmedPath.split("/")
+            videoId = idCandidate || null
         }
 
         if (videoId) {
