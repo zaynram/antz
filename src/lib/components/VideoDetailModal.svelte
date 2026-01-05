@@ -82,8 +82,13 @@
     } else if (current === fullValue) {
       return null
     } else {
+    } else if (current === null || current > fullValue) {
+      // When there is no rating yet, or when reducing from a higher star,
+      // reset to the clicked star's half value.
       return halfValue
-    }
+    } else {
+      // For other cases (e.g., a lower rating from another star), keep the current rating.
+      return current
   }
 
   async function updateRating(userId: UserId, starIndex: number): Promise<void> {
