@@ -5,7 +5,7 @@
   import type { Video, VideoStatus, UserId } from '$lib/types'
   import { getVideoDisplayRating, getVideoUserRating } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
-  import { Plus, ExternalLink, Star, Trash2, Video as VideoIcon } from 'lucide-svelte'
+  import { Plus, ExternalLink, Trash2, Video as VideoIcon } from 'lucide-svelte'
   import { hapticLight, hapticSuccess, hapticError } from '$lib/haptics'
   import { toast } from 'svelte-sonner'
   import VideoDetailModal from '$lib/components/VideoDetailModal.svelte'
@@ -78,7 +78,7 @@
         updatedAt: Timestamp.now(),
       }
 
-      await addDocument('videos', video)
+      await addDocument('videos', video, $activeUser)
       hapticSuccess()
       toast.success('Video added to queue')
       closeAddModal()

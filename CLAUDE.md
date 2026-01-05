@@ -155,6 +155,13 @@ Pure functions in `filters.ts`: `applyFilters()`, `applySort()` with composable 
 
 **`/places/{id}`** - Location tracking with categories and visit history
 
+**`/videos/{id}`** - YouTube playlist for shared video watching
+
+-   `status`: "queued" | "watched" | "skipped"
+-   `ratings`: Per-user rating object
+-   `videoId`: YouTube video ID
+-   Supports embedded playback and comments
+
 **`/preferences`** - Cross-device user preferences sync (single document with Z/T preferences)
 
 ## Testing
@@ -268,6 +275,7 @@ The Search page (`/`) supports two modes:
 | `/library/movies` | Library   | Movies collection                     |
 | `/library/tv`     | Library   | TV shows collection                   |
 | `/library/games`  | Library   | Games collection                      |
+| `/videos`         | Videos    | YouTube playlist queue                |
 | `/notes`          | Notes     | Free-form notes with tags             |
 | `/places`         | Places    | Location/venue tracking               |
 | `/settings`       | Settings  | Profile, theme, PWA updates           |
