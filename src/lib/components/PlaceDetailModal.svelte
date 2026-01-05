@@ -5,7 +5,7 @@
   import { hapticLight } from '$lib/haptics'
   import { activeUser, displayNames } from '$lib/stores/app'
   import type { Place, PlaceCategory, PlaceComment, UserId } from '$lib/types'
-  import { getPlaceAverageRating, getPlaceUserRating } from '$lib/types'
+  import { getPlaceAverageRating, getPlaceUserRating, formatBudget, getBudgetLabel } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
   import { Calendar, Check, Coffee, ExternalLink, MapPin, Sparkles, Trees, UtensilsCrossed, Wine, X } from 'lucide-svelte'
   import type { ComponentType } from 'svelte'
@@ -20,6 +20,7 @@
   let editedNotes = $state('')
   let newComment = $state('')
   let editedCategory = $state<PlaceCategory>('restaurant')
+  let editedBudget = $state<number | null>(null)
 
   let previousPlaceId: string | undefined = undefined
 
@@ -47,6 +48,7 @@
     if (place && place.id !== previousPlaceId) {
       editedNotes = place.notes || ''
       editedCategory = place.category
+      editedBudget = place.budget ?? null
       previousPlaceId = place.id
     }
   })
@@ -63,6 +65,11 @@
   async function updateCategory(): Promise<void> {
     if (!place?.id) return
     await updateDocument<Place>('places', place.id, { category: editedCategory }, $activeUser)
+  }
+
+  async function updateBudget(): Promise<void> {
+    if (!place?.id) return
+    await updateDocument<Place>('places', place.id, { budget: editedBudget }, $activeUser)
   }
 
   async function updateLocation(location: { lat: number; lng: number; address?: string } | undefined): Promise<void> {
@@ -385,7 +392,7 @@
           </div>
         {/if}
 
-        <!-- Category & Rating row -->
+        <!-- Category, Budget & Rating row -->
         <div class="flex flex-wrap gap-4 items-start">
           <div class="flex-1 min-w-[120px]">
             <label for="place-category" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Category</label>
@@ -398,6 +405,23 @@
               {#each categories as cat}
                 <option value={cat}>{categoryLabels[cat]}</option>
               {/each}
+            </select>
+          </div>
+
+          <div class="flex-1 min-w-[120px]">
+            <label for="place-budget" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Budget</label>
+            <select
+              id="place-budget"
+              bind:value={editedBudget}
+              onchange={updateBudget}
+              class="input-sm"
+            >
+              <option value={null}>Not set</option>
+              <option value={0}>Free</option>
+              <option value={1}>$ - Inexpensive</option>
+              <option value={2}>$$ - Moderate</option>
+              <option value={3}>$$$ - Expensive</option>
+              <option value={4}>$$$$ - Very Expensive</option>
             </select>
           </div>
 
