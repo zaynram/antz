@@ -37,6 +37,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         unitSystem: "metric",
         locationMode: "off",
         searchRadius: 5000,
+        videoSyncPlatform: "none",
         lastUpdated: Date.now(),
     },
     T: {
@@ -46,6 +47,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         unitSystem: "metric",
         locationMode: "off",
         searchRadius: 5000,
+        videoSyncPlatform: "none",
         lastUpdated: Date.now(),
     },
 }
@@ -127,6 +129,8 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
         "currentLocation",
         "referenceLocation",
         "searchRadius",
+        "videoSyncPlatform",
+        "youtubePlaylistId",
     ]
 
     for (const userId of ["Z", "T"] as const) {
