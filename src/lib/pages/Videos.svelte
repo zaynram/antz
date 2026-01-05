@@ -2,8 +2,8 @@
   import { addDocument, updateDocument, deleteDocument, subscribeToCollection } from '$lib/firebase'
   import { activeUser, displayNames } from '$lib/stores/app'
   import { parseYouTubeUrl, getYouTubeThumbnail } from '$lib/youtube'
-  import type { Video, VideoStatus, UserId } from '$lib/types'
-  import { getVideoDisplayRating, getVideoUserRating, createEmptyRatings } from '$lib/types'
+  import type { Video, VideoStatus } from '$lib/types'
+  import { getVideoDisplayRating, createEmptyRatings } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
   import { Plus, ExternalLink, Trash2, Video as VideoIcon } from 'lucide-svelte'
   import { hapticLight, hapticSuccess, hapticError } from '$lib/haptics'
@@ -296,16 +296,30 @@
 
 <!-- Add Video Modal -->
 {#if showAddModal}
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onclick={closeAddModal}>
-    <div class="bg-white dark:bg-slate-800 rounded-lg max-w-md w-full p-6 shadow-xl" onclick={(e) => e.stopPropagation()}>
+  <div 
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" 
+    onclick={closeAddModal}
+    onkeydown={(e) => e.key === 'Escape' && closeAddModal()}
+    role="button"
+    tabindex="-1"
+    aria-label="Close modal"
+  >
+    <div 
+      class="bg-white dark:bg-slate-800 rounded-lg max-w-md w-full p-6 shadow-xl" 
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+    >
       <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Add Video</h2>
       
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+          <label for="video-url" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
             YouTube URL *
           </label>
           <input
+            id="video-url"
             type="text"
             bind:value={newVideoUrl}
             placeholder="https://www.youtube.com/watch?v=..."
@@ -314,10 +328,11 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+          <label for="video-title" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
             Title (optional)
           </label>
           <input
+            id="video-title"
             type="text"
             bind:value={newVideoTitle}
             placeholder="Enter a custom title"

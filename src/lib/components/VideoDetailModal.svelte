@@ -1,13 +1,12 @@
 <script lang="ts">
-  import { updateDocument, deleteDocument } from '$lib/firebase'
+  import { updateDocument } from '$lib/firebase'
   import { activeUser, displayNames } from '$lib/stores/app'
   import { getYouTubeEmbedUrl } from '$lib/youtube'
   import type { Video, VideoStatus, MediaComment, UserId } from '$lib/types'
   import { getVideoUserRating, getVideoAverageRating, createEmptyRatings, ALL_USER_IDS } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
-  import { X, ExternalLink, Star, MessageCircle, Trash2 } from 'lucide-svelte'
+  import { X, ExternalLink, MessageCircle, Trash2 } from 'lucide-svelte'
   import { hapticLight, hapticSuccess } from '$lib/haptics'
-  import { toast } from 'svelte-sonner'
 
   interface Props {
     video: Video | null;
