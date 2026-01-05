@@ -6,7 +6,7 @@
   import { hapticLight, hapticSuccess } from '$lib/haptics'
   import { activeUser, displayNames } from '$lib/stores/app'
   import type { ProfileItem, ProfileCategory, UserId } from '$lib/types'
-  import { Heart, Plus, Star, Trash2, X, Gift, Coffee, Music, Film, BookOpen, Zap, Sparkles, Palette, Users, MapPin } from 'lucide-svelte'
+  import { Heart, Plus, Star, Trash2, X, Gift, Coffee, Music, Film, BookOpen, Zap, Sparkles, Palette, Users, MapPin, Utensils } from 'lucide-svelte'
   import { onMount } from 'svelte'
   import { toast } from 'svelte-sonner'
 
@@ -15,7 +15,7 @@
 
   // Categories with icons
   const categoryInfo: Record<ProfileCategory, { label: string; icon: any; emoji: string }> = {
-    food: { label: 'Food', icon: Coffee, emoji: '🍕' },
+    food: { label: 'Food', icon: Utensils, emoji: '🍕' },
     drinks: { label: 'Drinks', icon: Coffee, emoji: '☕' },
     music: { label: 'Music', icon: Music, emoji: '🎵' },
     movies: { label: 'Movies', icon: Film, emoji: '🎬' },

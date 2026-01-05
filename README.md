@@ -90,7 +90,8 @@ src/
 │   │   ├── Login.svelte
 │   │   ├── Media.svelte         # TV/Movies/Games tracking
 │   │   ├── Notes.svelte         # Freeform notes
-│   │   └── Places.svelte        # POIs/Restaurants
+│   │   ├── Places.svelte        # POIs/Restaurants
+│   │   └── Profiles.svelte      # Partner profiles (individual preferences)
 │   ├── stores/
 │   │   └── app.ts               # Svelte stores (auth, user prefs)
 │   ├── config.ts                # Firebase + TMDB config
@@ -129,6 +130,15 @@ src/
 - `visited`: boolean
 - `visitDates`: Timestamp[]
 - `rating`: number | null
+- `createdBy`: "Z" | "T"
+
+### `/profiles/{id}`
+- `category`: "food" | "drinks" | "music" | "movies" | "books" | "activities" | "scents" | "colors" | "people" | "places" | "gifts" | "other"
+- `title`: string
+- `description`: string
+- `notes`: string
+- `rating`: 1-5 scale
+- `isFavorite`: boolean
 - `createdBy`: "Z" | "T"
 
 ## User Preferences
