@@ -5,7 +5,7 @@
   import { hapticLight } from '$lib/haptics'
   import { activeUser, displayNames } from '$lib/stores/app'
   import type { Place, PlaceCategory, PlaceComment, UserId } from '$lib/types'
-  import { getPlaceAverageRating, getPlaceUserRating, formatBudget, getBudgetLabel } from '$lib/types'
+  import { getPlaceAverageRating, getPlaceUserRating } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
   import { Calendar, Check, Coffee, ExternalLink, MapPin, Sparkles, Trees, UtensilsCrossed, Wine, X } from 'lucide-svelte'
   import type { ComponentType } from 'svelte'

@@ -2,7 +2,7 @@
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
   import { activeUser, currentPreferences, displayNames } from '$lib/stores/app'
   import type { Place, PlaceCategory, GeoLocation, UserId } from '$lib/types'
-  import { getPlaceDisplayRating, calculateDistance, formatDistance, formatBudget, getBudgetLabel } from '$lib/types'
+  import { getPlaceDisplayRating, calculateDistance, formatDistance, formatBudget } from '$lib/types'
   import { toast } from 'svelte-sonner'
   import { Timestamp } from 'firebase/firestore'
   import { onMount } from 'svelte'
