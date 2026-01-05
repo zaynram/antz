@@ -9,6 +9,8 @@ import type {
     Theme,
     UserId,
     UserPreferences,
+    ProfileItem,
+    ProfileCategory,
 } from "./types"
 import {
     calculateDistance,
@@ -477,6 +479,78 @@ describe("Type definitions", () => {
 
                 expect(getDisplayRating(media as Media)).toBe(4)
             })
+        })
+    })
+
+    describe("ProfileItem interface", () => {
+        it("should have all required properties", () => {
+            const item: Partial<ProfileItem> = {
+                category: "food",
+                title: "Margherita Pizza",
+                description: "Classic Italian pizza",
+                notes: "Best at Joe's Pizza",
+                createdBy: "Z",
+            }
+
+            expect(item.category).toBe("food")
+            expect(item.title).toBeTruthy()
+            expect(item.description).toBeTruthy()
+        })
+
+        it("should support all profile categories", () => {
+            const categories: ProfileCategory[] = [
+                "food",
+                "drinks",
+                "music",
+                "movies",
+                "books",
+                "activities",
+                "scents",
+                "colors",
+                "people",
+                "places",
+                "gifts",
+                "other",
+            ]
+
+            categories.forEach(category => {
+                const item: Partial<ProfileItem> = {
+                    category,
+                    title: "Test Item",
+                    description: "Test description",
+                    createdBy: "T",
+                }
+
+                expect(item.category).toBe(category)
+            })
+        })
+
+        it("should support optional rating and favorite fields", () => {
+            const item: Partial<ProfileItem> = {
+                category: "music",
+                title: "Favorite Song",
+                description: "Amazing track",
+                rating: 5,
+                isFavorite: true,
+                createdBy: "Z",
+            }
+
+            expect(item.rating).toBe(5)
+            expect(item.isFavorite).toBe(true)
+        })
+
+        it("should support optional photos and tags", () => {
+            const item: Partial<ProfileItem> = {
+                category: "food",
+                title: "Sushi",
+                description: "Fresh sushi",
+                photos: ["photo1.jpg", "photo2.jpg"],
+                tags: ["japanese", "seafood"],
+                createdBy: "T",
+            }
+
+            expect(item.photos).toHaveLength(2)
+            expect(item.tags).toHaveLength(2)
         })
     })
 

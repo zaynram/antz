@@ -280,3 +280,28 @@ export function getVideoAverageRating(video: Video): number | null {
 export function getVideoDisplayRating(video: Video): number | null {
     return getVideoAverageRating(video)
 }
+
+export type ProfileCategory = 
+    | "food" 
+    | "drinks" 
+    | "music" 
+    | "movies" 
+    | "books" 
+    | "activities" 
+    | "scents" 
+    | "colors" 
+    | "people" 
+    | "places" 
+    | "gifts" 
+    | "other"
+
+export interface ProfileItem extends BaseDocument {
+    category: ProfileCategory
+    title: string
+    description: string
+    notes?: string
+    tags?: string[]
+    photos?: string[] // URLs to photos in Google Drive
+    isFavorite?: boolean
+    rating?: number // 1-5 scale for how much they like it
+}
