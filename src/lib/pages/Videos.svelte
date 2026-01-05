@@ -1,14 +1,16 @@
 <script lang="ts">
   import { addDocument, updateDocument, deleteDocument, subscribeToCollection } from '$lib/firebase'
-  import { activeUser, displayNames } from '$lib/stores/app'
+  import { activeUser, displayNames, currentPreferences } from '$lib/stores/app'
   import { parseYouTubeUrl, getYouTubeThumbnail } from '$lib/youtube'
   import type { Video, VideoStatus } from '$lib/types'
   import { getVideoDisplayRating, createEmptyRatings } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
-  import { Plus, ExternalLink, Trash2, Video as VideoIcon } from 'lucide-svelte'
+  import { Plus, ExternalLink, Trash2, Video as VideoIcon, RefreshCw, Download, Share2, Info } from 'lucide-svelte'
   import { hapticLight, hapticSuccess, hapticError } from '$lib/haptics'
   import { toast } from 'svelte-sonner'
   import VideoDetailModal from '$lib/components/VideoDetailModal.svelte'
+  import { syncVideoQueue, isSyncAvailable, getSyncStatusMessage, getPlatformDisplayName } from '$lib/services/video-sync'
+  import { exportForGrayjay, exportVideoUrlList, createShareableVideoList, downloadExportFile, copyToClipboard } from '$lib/services/grayjay-sync'
 
   let videos = $state<Video[]>([])
   let loading = $state(true)
@@ -17,6 +19,8 @@
   let newVideoUrl = $state('')
   let newVideoTitle = $state('')
   let filterStatus = $state<VideoStatus | 'all'>('all')
+  let syncing = $state(false)
+  let showExportMenu = $state(false)
 
   // Subscribe to videos collection
   $effect(() => {
@@ -149,6 +153,69 @@
     stars += '☆'.repeat(5 - fullStars - (hasHalf ? 1 : 0))
     return stars
   }
+
+  async function handleSync() {
+    if (!$currentPreferences) {
+      toast.error('Preferences not loaded')
+      return
+    }
+
+    if (!isSyncAvailable($currentPreferences)) {
+      toast.error('Sync not configured. Please check settings.')
+      return
+    }
+
+    syncing = true
+    hapticLight()
+    
+    try {
+      const result = await syncVideoQueue($currentPreferences, videos)
+      
+      if (result.success) {
+        hapticSuccess()
+        toast.success(result.message)
+      } else {
+        hapticError()
+        if (result.errors && result.errors.length > 0) {
+          toast.error(`${result.message}\n${result.errors.join('\n')}`)
+        } else {
+          toast.error(result.message)
+        }
+      }
+    } catch (error) {
+      console.error('Sync error:', error)
+      hapticError()
+      toast.error('Sync failed. Please try again.')
+    } finally {
+      syncing = false
+    }
+  }
+
+  function handleExportJSON() {
+    const data = exportForGrayjay(videos)
+    downloadExportFile(data, 'video-queue.json', 'application/json')
+    toast.success('Exported video queue as JSON')
+    showExportMenu = false
+  }
+
+  function handleExportURLList() {
+    const data = exportVideoUrlList(videos)
+    downloadExportFile(data, 'video-urls.txt', 'text/plain')
+    toast.success('Exported video URLs as text')
+    showExportMenu = false
+  }
+
+  async function handleShareList() {
+    const text = createShareableVideoList(videos)
+    const success = await copyToClipboard(text)
+    if (success) {
+      toast.success('Video list copied to clipboard')
+    } else {
+      toast.error('Failed to copy to clipboard')
+    }
+    showExportMenu = false
+  }
+
 </script>
 
 <div class="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -160,14 +227,78 @@
           <VideoIcon size={28} class="text-accent" />
           <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Video Queue</h1>
         </div>
-        <button
-          onclick={openAddModal}
-          class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:opacity-90 transition-opacity touch-feedback"
-        >
-          <Plus size={20} />
-          <span>Add Video</span>
-        </button>
+        <div class="flex items-center gap-2">
+          <!-- Sync button -->
+          {#if $currentPreferences && $currentPreferences.videoSyncPlatform !== 'none'}
+            <button
+              onclick={handleSync}
+              disabled={syncing || !isSyncAvailable($currentPreferences)}
+              class="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:opacity-90 transition-opacity touch-feedback disabled:opacity-50"
+              title={getSyncStatusMessage($currentPreferences)}
+            >
+              <RefreshCw size={18} class={syncing ? 'animate-spin' : ''} />
+              <span class="hidden sm:inline">{syncing ? 'Syncing...' : getPlatformDisplayName($currentPreferences.videoSyncPlatform || 'none')}</span>
+            </button>
+          {/if}
+          
+          <!-- Export menu for Grayjay -->
+          {#if $currentPreferences && $currentPreferences.videoSyncPlatform === 'grayjay'}
+            <div class="relative">
+              <button
+                onclick={() => showExportMenu = !showExportMenu}
+                class="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:opacity-90 transition-opacity touch-feedback"
+              >
+                <Download size={18} />
+                <span class="hidden sm:inline">Export</span>
+              </button>
+              
+              {#if showExportMenu}
+                <div class="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <button
+                    onclick={handleExportJSON}
+                    class="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                  >
+                    <Download size={16} />
+                    Export JSON
+                  </button>
+                  <button
+                    onclick={handleExportURLList}
+                    class="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                  >
+                    <Download size={16} />
+                    Export URLs
+                  </button>
+                  <button
+                    onclick={handleShareList}
+                    class="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                  >
+                    <Share2 size={16} />
+                    Copy to Clipboard
+                  </button>
+                </div>
+              {/if}
+            </div>
+          {/if}
+          
+          <button
+            onclick={openAddModal}
+            class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:opacity-90 transition-opacity touch-feedback"
+          >
+            <Plus size={20} />
+            <span>Add Video</span>
+          </button>
+        </div>
       </div>
+
+      <!-- Sync status info -->
+      {#if $currentPreferences && $currentPreferences.videoSyncPlatform !== 'none'}
+        <div class="mb-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2 text-sm">
+          <Info size={16} class="text-blue-600 dark:text-blue-400" />
+          <span class="text-blue-800 dark:text-blue-200">
+            Syncing to {getPlatformDisplayName($currentPreferences.videoSyncPlatform || 'none')}: {getSyncStatusMessage($currentPreferences)}
+          </span>
+        </div>
+      {/if}
 
       <!-- Filter tabs -->
       <div class="flex gap-2 overflow-x-auto">
