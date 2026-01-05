@@ -10,15 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
       - name: Type check
-        run: npx svelte-check --tsconfig ./tsconfig.json --threshold error
+        run: bunx svelte-check --tsconfig ./tsconfig.json --threshold error
       - name: Run tests
-        run: npm run test:run
+        run: bun test:run
 
   build-and-preview:
     runs-on: ubuntu-latest
@@ -29,14 +26,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
       - name: Generate PWA assets
-        run: npm run generate-pwa-assets
-      - run: npm run build
+        run: bun run generate-pwa-assets
+      - run: bun run build
 
       - name: Deploy to Firebase Hosting Preview
         uses: FirebaseExtended/action-hosting-deploy@v0

@@ -48,16 +48,16 @@ If you prefer to deploy manually:
 
 ```bash
 # Install dependencies
-npm install
+bun install
 
 # Build the project
-npm run build
+bun run build
 
 # Login to Firebase (first time only)
-npx firebase login
+bunx firebase login
 
 # Deploy
-npx firebase deploy --only hosting
+bunx firebase deploy --only hosting
 ```
 
 ## Deployment URLs
@@ -75,7 +75,7 @@ npx firebase deploy --only hosting
 ### Build fails
 - Review the build logs in GitHub Actions
 - Ensure all dependencies are correctly specified in `package.json`
-- Test the build locally: `npm run build`
+- Test the build locally: `bun run build`
 
 ### Changes not appearing
 - Clear your browser cache

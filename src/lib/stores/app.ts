@@ -104,8 +104,8 @@ function mergePreferencesWithTimestamp(
     if (!local && !remote) return result
 
     // Both exist - use timestamps to determine which is newer
-    const localTime = local.lastUpdated || 0
-    const remoteTime = remote.lastUpdated || 0
+    const localTime = local?.lastUpdated || 0
+    const remoteTime = remote?.lastUpdated || 0
 
     // Merge with the newer one winning
     if (remoteTime > localTime) {
