@@ -18,6 +18,8 @@ import {
     getAverageRating,
     getDisplayRating,
     getUserRating,
+    formatBudget,
+    getBudgetLabel,
     type GeoLocation,
 } from "./types"
 
@@ -626,6 +628,46 @@ describe("Type definitions", () => {
                 expect(formatDistance(0)).toBe("0 m")
                 expect(formatDistance(1)).toBe("1.0 km")
                 expect(formatDistance(10)).toBe("10 km")
+            })
+        })
+
+        describe("formatBudget", () => {
+            it("should format budget levels correctly", () => {
+                expect(formatBudget(0)).toBe("Free")
+                expect(formatBudget(1)).toBe("$")
+                expect(formatBudget(2)).toBe("$$")
+                expect(formatBudget(3)).toBe("$$$")
+                expect(formatBudget(4)).toBe("$$$$")
+            })
+
+            it("should handle null and undefined", () => {
+                expect(formatBudget(null)).toBe("Unknown")
+                expect(formatBudget(undefined)).toBe("Unknown")
+            })
+
+            it("should handle invalid budget levels", () => {
+                expect(formatBudget(5)).toBe("Unknown")
+                expect(formatBudget(-1)).toBe("Unknown")
+            })
+        })
+
+        describe("getBudgetLabel", () => {
+            it("should return correct labels for budget levels", () => {
+                expect(getBudgetLabel(0)).toBe("Free")
+                expect(getBudgetLabel(1)).toBe("Inexpensive")
+                expect(getBudgetLabel(2)).toBe("Moderate")
+                expect(getBudgetLabel(3)).toBe("Expensive")
+                expect(getBudgetLabel(4)).toBe("Very Expensive")
+            })
+
+            it("should handle null and undefined", () => {
+                expect(getBudgetLabel(null)).toBe("Unknown")
+                expect(getBudgetLabel(undefined)).toBe("Unknown")
+            })
+
+            it("should handle invalid budget levels", () => {
+                expect(getBudgetLabel(5)).toBe("Unknown")
+                expect(getBudgetLabel(-1)).toBe("Unknown")
             })
         })
     })
