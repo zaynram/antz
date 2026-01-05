@@ -176,8 +176,7 @@
         onkeydown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        tabindex="-1"
-      >
+        tabindex="0"
         <!-- Header -->
         <div class="flex items-start justify-between p-6 border-b border-slate-200 dark:border-slate-700">
           <div class="flex-1 pr-4">
