@@ -18,6 +18,14 @@ export interface GoogleMapsConfig {
     placesApiUrl: string
 }
 
+export interface YouTubeAPIConfig {
+    clientId: string
+    clientSecret: string
+    apiKey: string
+    redirectUri: string
+    scopes: string[]
+}
+
 // Replace these values with your Firebase project config
 // Get from: Firebase Console > Project Settings > General > Your apps > Web app
 export const firebaseConfig: FirebaseConfig = {
@@ -43,4 +51,19 @@ export const tmdbConfig: TMDBConfig = {
 export const googleMapsConfig: GoogleMapsConfig = {
     apiKey: "", // Add your Google Maps API key here
     placesApiUrl: "https://maps.googleapis.com/maps/api/place",
+}
+
+// YouTube Data API configuration
+// Get from: https://console.cloud.google.com/apis/credentials
+// Enable: YouTube Data API v3
+// Create OAuth 2.0 Client ID for Web application
+export const youtubeAPIConfig: YouTubeAPIConfig = {
+    clientId: "", // Add your OAuth 2.0 Client ID here
+    clientSecret: "", // Add your OAuth 2.0 Client Secret here (keep secure!)
+    apiKey: "", // Add your API key here (for public data access)
+    redirectUri: typeof window !== "undefined" ? `${window.location.origin}/oauth/youtube/callback` : "",
+    scopes: [
+        "https://www.googleapis.com/auth/youtube.readonly",
+        "https://www.googleapis.com/auth/youtube.force-ssl",
+    ],
 }
