@@ -14,6 +14,7 @@
   import Notes from '$lib/pages/Notes.svelte'
   import Places from '$lib/pages/Places.svelte'
   import Settings from '$lib/pages/Settings.svelte'
+  import Videos from '$lib/pages/Videos.svelte'
 
   let currentPath = $state(window.location.pathname)
   let isOffline = $state(!navigator.onLine)
@@ -114,6 +115,8 @@
         <Search {navigate} />
       {:else if currentPath === '/notes'}
         <Notes />
+      {:else if currentPath === '/videos'}
+        <Videos />
       {:else if libraryType}
         <Library type={libraryType} {navigate} />
       {:else if currentPath === '/places'}

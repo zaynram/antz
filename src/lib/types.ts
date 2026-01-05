@@ -227,3 +227,52 @@ export interface TMDBSearchResult {
     overview: string
     genre_ids?: number[]
 }
+
+export type VideoStatus = "queued" | "watched" | "skipped"
+
+export interface Video extends BaseDocument {
+    title: string
+    url: string
+    videoId: string // YouTube video ID
+    thumbnailUrl?: string
+    duration?: string // e.g., "10:23"
+    channelName?: string
+    status: VideoStatus
+    rating: number | null // Legacy field for backward compatibility
+    ratings?: Record<UserId, number | null> // Per-user ratings
+    notes: string
+    watchedDate?: Timestamp
+    comments?: MediaComment[]
+}
+
+// Helper functions for video ratings
+export function getVideoUserRating(video: Video, userId: UserId): number | null {
+    if (video.ratings && userId in video.ratings) {
+        return video.ratings[userId]
+    }
+    return video.rating ?? null
+}
+
+export function getVideoAverageRating(video: Video): number | null {
+    if (video.ratings) {
+        const ratingZ = video.ratings.Z
+        const ratingT = video.ratings.T
+
+        if (
+            ratingZ !== null &&
+            ratingZ !== undefined &&
+            ratingT !== null &&
+            ratingT !== undefined
+        ) {
+            return (ratingZ + ratingT) / 2
+        }
+
+        if (ratingZ !== null && ratingZ !== undefined) return ratingZ
+        if (ratingT !== null && ratingT !== undefined) return ratingT
+    }
+    return video.rating ?? null
+}
+
+export function getVideoDisplayRating(video: Video): number | null {
+    return getVideoAverageRating(video)
+}
