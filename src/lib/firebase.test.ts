@@ -6,10 +6,10 @@ vi.mock("firebase/app", () => ({
 }))
 
 vi.mock("firebase/auth", () => {
-    const MockGoogleAuthProvider = vi.fn(function () {
+    const MockGoogleAuthProvider = vi.fn(function (this: any) {
         this.addScope = vi.fn()
     })
-    MockGoogleAuthProvider.credentialFromResult = vi.fn(() => ({ accessToken: "mock-token" }))
+    ;(MockGoogleAuthProvider as any).credentialFromResult = vi.fn(() => ({ accessToken: "mock-token" }))
 
     return {
         getAuth: vi.fn(() => ({ currentUser: null })),
