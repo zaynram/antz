@@ -1,7 +1,7 @@
 <script lang="ts">
   import { addDocument, updateDocument, deleteDocument, subscribeToCollection } from '$lib/firebase'
   import { activeUser, displayNames } from '$lib/stores/app'
-  import { parseYouTubeUrl, getYouTubeThumbnail, isYouTubeUrl } from '$lib/youtube'
+  import { parseYouTubeUrl, getYouTubeThumbnail } from '$lib/youtube'
   import type { Video, VideoStatus, UserId } from '$lib/types'
   import { getVideoDisplayRating, getVideoUserRating, createEmptyRatings } from '$lib/types'
   import { Timestamp } from 'firebase/firestore'
@@ -50,13 +50,14 @@
   }
 
   async function addVideo() {
-    if (!newVideoUrl.trim()) {
+    const trimmedUrl = newVideoUrl.trim()
+    if (!trimmedUrl) {
       toast.error('Please enter a video URL')
       hapticError()
       return
     }
 
-    const videoInfo = parseYouTubeUrl(newVideoUrl.trim())
+    const videoInfo = parseYouTubeUrl(trimmedUrl)
     if (!videoInfo) {
       toast.error('Invalid YouTube URL')
       hapticError()
