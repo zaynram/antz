@@ -160,7 +160,7 @@ Pure functions in `filters.ts`: `applyFilters()`, `applySort()` with composable 
 -   `category`: "food" | "drinks" | "music" | "movies" | "books" | "activities" | "scents" | "colors" | "people" | "places" | "gifts" | "other"
 -   `title`: string - name of the item
 -   `description`: string - brief description
--   `notes`: string - additional notes
+-   `notes?: string` - additional notes (optional)
 -   `rating`: 1-5 scale
 -   `isFavorite`: boolean
 -   Per-user items for tracking individual preferences
