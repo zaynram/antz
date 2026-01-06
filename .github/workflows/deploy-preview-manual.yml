@@ -46,5 +46,5 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ANTZ_ANTZ }}
-          channelId: ${{ inputs.channel_id }}
+          channelId: ${{ inputs.channel_id || '' }}
           projectId: antz-antz
