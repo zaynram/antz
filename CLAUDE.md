@@ -161,7 +161,7 @@ Pure functions in `filters.ts`: `applyFilters()`, `applySort()` with composable 
 -   `title`: string - name of the item
 -   `description`: string - brief description
 -   `notes?: string` - additional notes (optional)
--   `rating`: 1-5 scale
+-   `rating`?: number (1-5 scale)
 -   `isFavorite`: boolean
 -   Per-user items for tracking individual preferences
 
