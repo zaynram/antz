@@ -18,6 +18,12 @@ export interface GoogleMapsConfig {
     placesApiUrl: string
 }
 
+export interface GitHubConfig {
+    owner: string
+    repo: string
+    token?: string // Optional personal access token for authenticated requests
+}
+
 // Replace these values with your Firebase project config
 // Get from: Firebase Console > Project Settings > General > Your apps > Web app
 export const firebaseConfig: FirebaseConfig = {
@@ -43,4 +49,13 @@ export const tmdbConfig: TMDBConfig = {
 export const googleMapsConfig: GoogleMapsConfig = {
     apiKey: "", // Add your Google Maps API key here
     placesApiUrl: "https://maps.googleapis.com/maps/api/place",
+}
+
+// GitHub API configuration
+// Get from: https://github.com/settings/tokens
+// Scopes needed: repo (for private repos) or public_repo (for public repos)
+export const githubConfig: GitHubConfig = {
+    owner: "zaynram",
+    repo: "antz",
+    token: "", // Optional: Add GitHub personal access token for authenticated requests
 }
