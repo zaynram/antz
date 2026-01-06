@@ -1,0 +1,50 @@
+name: Deploy Preview (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests (not recommended)'
+        required: false
+        type: boolean
+        default: false
+      channel_id:
+        description: 'Preview channel ID (leave empty for auto-generated)'
+        required: false
+        type: string
+
+jobs:
+  test:
+    if: ${{ !inputs.skip_tests }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - name: Type check
+        run: bunx svelte-check --tsconfig ./tsconfig.json --threshold error
+      - name: Run tests
+        run: bun test:run
+
+  build-and-preview:
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: ${{ always() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - name: Generate PWA assets
+        run: bun run generate-pwa-assets
+      - run: bun run build
+
+      - name: Deploy to Firebase Hosting Preview
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ANTZ_ANTZ }}
+          channelId: ${{ inputs.channel_id || '' }}
+          projectId: antz-antz

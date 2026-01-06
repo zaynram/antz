@@ -126,6 +126,25 @@ The app uses Firebase Firestore with these collections:
 - **Preview Deployments:** Automatic for pull requests
 - Workflows are in `.github/workflows/`
 
+### Pre-Deployment Requirements
+
+**CRITICAL: Before pushing any code changes or creating pull requests, ALWAYS:**
+
+1. **Run type checks:** `bunx svelte-check --tsconfig ./tsconfig.json --threshold error`
+   - Must complete with 0 errors (warnings are acceptable)
+   - Ensures Svelte 5 syntax compatibility and TypeScript correctness
+
+2. **Run all tests:** `bun test:run`
+   - All tests must pass (246 tests currently)
+   - Validates functionality and prevents regressions
+
+3. **Common Issues to Check:**
+   - Svelte 5 event handlers: Use `onclick`, `onkeydown`, etc. (NOT `on:click`, `on:keydown`)
+   - Mixed event handler syntax will cause type check failures
+   - TypeScript strict mode compliance
+
+**These checks are enforced in CI and will block deployment if they fail.**
+
 ## Important Notes
 
 - Firebase configuration is in `src/lib/config.ts`
