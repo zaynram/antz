@@ -162,7 +162,7 @@ Pure functions in `filters.ts`: `applyFilters()`, `applySort()` with composable 
 -   `description`: string - brief description
 -   `notes?: string` - additional notes (optional)
 -   `rating`?: number (1-5 scale)
--   `isFavorite`: boolean
+-   `isFavorite?`: boolean
 -   Per-user items for tracking individual preferences
 
 **`/videos/{id}`** - YouTube playlist for shared video watching
