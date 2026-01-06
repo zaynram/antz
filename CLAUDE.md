@@ -47,7 +47,8 @@ bun run deploy       # Build + Firebase deploy
 
 ### Key Files
 
--   `src/lib/config.ts` - Firebase & TMDB configuration
+-   `src/lib/config.ts` - Firebase & TMDB configuration (**gitignored - copy from config.example.ts**)
+-   `src/lib/config.example.ts` - Template for configuration file
 -   `src/lib/firebase.ts` - Firebase SDK wrapper (Auth, Firestore, Storage)
 -   `src/lib/wikipedia.ts` - Wikipedia API for game search with relevance scoring
 -   `src/lib/types.ts` - TypeScript interfaces for all data models
