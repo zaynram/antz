@@ -136,7 +136,7 @@ src/
 - `category`: "food" | "drinks" | "music" | "movies" | "books" | "activities" | "scents" | "colors" | "people" | "places" | "gifts" | "other"
 - `title`: string
 - `description`: string
-- `notes`: string
+- `notes?: string` (optional)
 - `rating`: 1-5 scale
 - `isFavorite`: boolean
 - `createdBy`: "Z" | "T"
