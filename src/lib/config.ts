@@ -53,8 +53,16 @@ export const googleMapsConfig: GoogleMapsConfig = {
 
 // GitHub API configuration
 // Get from: https://github.com/settings/tokens
-// Scopes allowed:
-// - issues read/write (antz repo only)
+// 
+// IMPORTANT: config.ts is a public-facing file. All tokens here are created
+// specifically for this application and expose no sensitive information.
+// Any changes to config.ts will be flagged by GitHub and require manual bypass.
+//
+// Token requirements:
+// - Use fine-grained personal access token (recommended) OR classic token
+// - For fine-grained: Grant "Read and write" access to "Issues" for this repository only
+// - For classic: Use minimal scope "public_repo" (for public repos) or "repo" (for private)
+// - Fine-grained tokens provide better security by limiting access to just this repo
 export const githubConfig: GitHubConfig = {
     owner: "zaynram",
     repo: "antz",

@@ -6,7 +6,7 @@ import { githubConfig } from "./config"
 
 const GITHUB_API_BASE = "https://api.github.com"
 
-interface GitHubIssue {
+export interface GitHubIssue {
     number: number
     title: string
     body: string | null
@@ -23,9 +23,12 @@ interface GitHubIssue {
     }>
     comments: number
     html_url: string
+    pull_request?: {
+        url: string
+    }
 }
 
-interface GitHubComment {
+export interface GitHubComment {
     id: number
     body: string
     user: {
@@ -59,7 +62,7 @@ function getHeaders(): HeadersInit {
     }
 
     if (githubConfig.token) {
-        headers.Authorization = `token ${githubConfig.token}`
+        headers.Authorization = `Bearer ${githubConfig.token}`
     }
 
     return headers
@@ -95,11 +98,14 @@ export async function listIssues(
 
     const issues = (await response.json()) as GitHubIssue[]
 
+    // Filter out pull requests (they appear in /issues endpoint but have pull_request property)
+    const filteredIssues = issues.filter(issue => !issue.pull_request)
+
     // Check if there are more pages
     const linkHeader = response.headers.get("Link")
     const hasMore = linkHeader ? linkHeader.includes('rel="next"') : false
 
-    return { issues, hasMore }
+    return { issues: filteredIssues, hasMore }
 }
 
 /**
@@ -233,6 +239,12 @@ export function hasGitHubToken(): boolean {
  */
 export function formatDate(dateString: string): string {
     const date = new Date(dateString)
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+        return "Invalid date"
+    }
+    
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
     const diffMins = Math.floor(diffMs / 60000)

@@ -13,21 +13,27 @@ export function getIOSCompatibleImageUrl(url: string): string {
     let fileId: string | null = null
 
     // Format 1: https://drive.google.com/uc?export=view&id=FILE_ID
-    const ucMatch = url.match(/[?&]id=([^&]+)/)
-    if (ucMatch) {
-        fileId = ucMatch[1]
+    if (url.includes("drive.google.com")) {
+        const ucMatch = url.match(/[?&]id=([^&]+)/)
+        if (ucMatch) {
+            fileId = ucMatch[1]
+        }
     }
 
     // Format 2: https://lh3.googleusercontent.com/d/FILE_ID
-    const googleUserContentMatch = url.match(/googleusercontent\.com\/d\/([^/?]+)/)
-    if (googleUserContentMatch) {
-        fileId = googleUserContentMatch[1]
+    if (!fileId && url.includes("googleusercontent.com")) {
+        const googleUserContentMatch = url.match(/googleusercontent\.com\/d\/([^/?]+)/)
+        if (googleUserContentMatch) {
+            fileId = googleUserContentMatch[1]
+        }
     }
 
     // Format 3: Direct file ID check in thumbnail URL
-    const thumbnailMatch = url.match(/thumbnail\?id=([^&]+)/)
-    if (thumbnailMatch) {
-        fileId = thumbnailMatch[1]
+    if (!fileId && url.includes("drive.google.com/thumbnail")) {
+        const thumbnailMatch = url.match(/thumbnail\?id=([^&]+)/)
+        if (thumbnailMatch) {
+            fileId = thumbnailMatch[1]
+        }
     }
 
     // If we found a file ID, return iOS-compatible thumbnail URL with cache busting

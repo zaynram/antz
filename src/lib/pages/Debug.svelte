@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tmdbConfig } from '$lib/config'
   import { db, subscribeToCollection } from '$lib/firebase'
-  import { createComment, createIssue, formatDate, hasGitHubToken, listComments, listIssues, updateIssue } from '$lib/github'
+  import { createComment, createIssue, formatDate, hasGitHubToken, listComments, listIssues, updateIssue, type GitHubIssue, type GitHubComment } from '$lib/github'
   import { activeUser, currentPreferences } from '$lib/stores/app'
   import type { Media, Note, Place, Video } from '$lib/types'
   import { createEmptyRatings } from '$lib/types'
@@ -37,32 +37,13 @@
   let videoRatingsMigrationStats = $state({ updated: 0, skipped: 0, failed: 0 })
 
   // GitHub issues state
-  type GitHubIssueData = {
-    number: number
-    title: string
-    body: string | null
-    state: 'open' | 'closed'
-    created_at: string
-    updated_at: string
-    user: { login: string; avatar_url: string }
-    labels: Array<{ name: string; color: string }>
-    comments: number
-    html_url: string
-  }
-  type GitHubCommentData = {
-    id: number
-    body: string
-    user: { login: string; avatar_url: string }
-    created_at: string
-    updated_at: string
-  }
-  let issues = $state<GitHubIssueData[]>([])
+  let issues = $state<GitHubIssue[]>([])
   let issuesLoading = $state(false)
   let issuesPage = $state(1)
   // let issuesHasMore = $state(false) // Reserved for pagination
   let issuesState = $state<'open' | 'closed' | 'all'>('all')
-  let selectedIssue = $state<GitHubIssueData | null>(null)
-  let issueComments = $state<GitHubCommentData[]>([])
+  let selectedIssue = $state<GitHubIssue | null>(null)
+  let issueComments = $state<GitHubComment[]>([])
   let commentsLoading = $state(false)
   let showCreateIssue = $state(false)
   let showEditIssue = $state(false)
@@ -409,7 +390,7 @@
     }
   }
 
-  async function selectIssue(issue: GitHubIssueData) {
+  async function selectIssue(issue: GitHubIssue) {
     selectedIssue = issue
     issueComments = []
     commentsLoading = true
@@ -821,7 +802,9 @@
         <!-- Issue List View -->
         {#if !selectedIssue && !showCreateIssue}
           <div class="flex flex-wrap items-center gap-3 mb-4">
+            <label for="issue-state-filter" class="sr-only">Filter issues by state</label>
             <select
+              id="issue-state-filter"
               bind:value={issuesState}
               onchange={loadIssues}
               class="px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
@@ -838,7 +821,8 @@
               class="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
             >
               {#if issuesLoading}
-                <div class="w-4 h-4 border-2 border-slate-600 border-t-transparent rounded-full animate-spin"></div>
+                <div class="w-4 h-4 border-2 border-slate-600 border-t-transparent rounded-full animate-spin" aria-hidden="true"></div>
+                <span class="sr-only" role="status" aria-live="polite">Loading issues...</span>
                 Loading...
               {:else}
                 <RefreshCw size={16} />
@@ -905,6 +889,7 @@
                 type="button"
                 onclick={() => { showCreateIssue = false; newIssueTitle = ''; newIssueBody = '' }}
                 class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
+                aria-label="Close create issue form"
               >
                 <X size={16} />
               </button>
@@ -940,7 +925,8 @@
                 class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {#if isSubmitting}
-                  <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true"></div>
+                  <span class="sr-only" role="status" aria-live="polite">Creating issue...</span>
                   Creating...
                 {:else}
                   Create Issue
@@ -1027,7 +1013,8 @@
 
               {#if commentsLoading}
                 <div class="text-center py-4">
-                  <div class="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <div class="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto" aria-hidden="true"></div>
+                  <span class="sr-only" role="status" aria-live="polite">Loading comments...</span>
                 </div>
               {:else if issueComments.length > 0}
                 <div class="space-y-3 mb-4 max-h-64 overflow-y-auto">
@@ -1058,7 +1045,8 @@
                   class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50"
                 >
                   {#if isSubmitting}
-                    <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true"></div>
+                    <span class="sr-only" role="status" aria-live="polite">Adding comment...</span>
                     Adding...
                   {:else}
                     <MessageSquare size={16} />
@@ -1079,6 +1067,7 @@
                 type="button"
                 onclick={() => { showEditIssue = false; editIssueTitle = ''; editIssueBody = '' }}
                 class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
+                aria-label="Close edit issue form"
               >
                 <X size={16} />
               </button>
@@ -1114,7 +1103,8 @@
                 class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {#if isSubmitting}
-                  <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true"></div>
+                  <span class="sr-only" role="status" aria-live="polite">Updating issue...</span>
                   Updating...
                 {:else}
                   Update Issue
