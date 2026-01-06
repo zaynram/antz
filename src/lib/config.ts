@@ -53,7 +53,8 @@ export const googleMapsConfig: GoogleMapsConfig = {
 
 // GitHub API configuration
 // Get from: https://github.com/settings/tokens
-// Scopes needed: repo (for private repos) or public_repo (for public repos)
+// Scopes allowed:
+// - issues read/write (antz repo only)
 export const githubConfig: GitHubConfig = {
     owner: "zaynram",
     repo: "antz",
