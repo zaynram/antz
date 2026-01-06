@@ -313,7 +313,6 @@ export async function deleteFileFromDrive(folderPath: string[], filename: string
 function getExtensionFromMimeType(mimeType: string): string {
     const mimeMap: Record<string, string> = {
         'image/jpeg': 'jpg',
-        'image/jpg': 'jpg',
         'image/png': 'png',
         'image/gif': 'gif',
         'image/webp': 'webp',
@@ -335,7 +334,9 @@ export async function uploadProfilePicture(userId: string, file: File): Promise<
 
 /**
  * Delete a user's profile picture
- * Tries all possible extensions since we don't know which one was used
+ * Tries all possible extensions since we don't store the extension metadata
+ * This approach minimizes complexity by not requiring a separate metadata store,
+ * and the extra API calls are negligible for this use case (user-initiated action)
  */
 export async function deleteProfilePicture(userId: string): Promise<void> {
     const extensions = ['jpg', 'png', 'gif', 'webp', 'jpeg']
