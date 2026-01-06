@@ -298,7 +298,7 @@ export type ProfileCategory =
 export interface ProfileItem extends BaseDocument {
     category: ProfileCategory
     title: string
-    description: string
+    description?: string
     notes?: string
     tags?: string[]
     photos?: string[] // URLs to photos in Google Drive
