@@ -21,7 +21,7 @@ export interface GoogleMapsConfig {
 export interface GitHubConfig {
     owner: string
     repo: string
-    token?: string // Optional personal access token for authenticated requests
+    token: string
 }
 
 // Replace these values with your Firebase project config
@@ -57,5 +57,5 @@ export const googleMapsConfig: GoogleMapsConfig = {
 export const githubConfig: GitHubConfig = {
     owner: "zaynram",
     repo: "antz",
-    token: "", // Optional: Add GitHub personal access token for authenticated requests
+    token: "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",
 }
