@@ -5,6 +5,7 @@
 /**
  * Convert old Google Drive URLs to iOS-compatible thumbnail URLs
  * Handles both thumbnailLink and uc?export=view formats
+ * For GIFs, uses uc?export=view to preserve animation
  */
 export function getIOSCompatibleImageUrl(url: string): string {
     if (!url) return url
@@ -36,10 +37,26 @@ export function getIOSCompatibleImageUrl(url: string): string {
         }
     }
 
-    // If we found a file ID, return iOS-compatible thumbnail URL with cache busting
+    // If we found a file ID, return iOS-compatible URL
     if (fileId) {
         const timestamp = Date.now()
-        return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400&timestamp=${timestamp}`
+        
+        // Check if this is a GIF based on:
+        // 1. The ext parameter in the URL (added by uploadFileToDrive)
+        // 2. Filename hints in the URL
+        const extMatch = url.match(/[?&]ext=([^&]+)/)
+        const extension = extMatch ? extMatch[1].toLowerCase() : ''
+        const isGif = extension === 'gif' || 
+                      url.toLowerCase().includes('.gif') || 
+                      url.toLowerCase().includes('_pfp.gif')
+        
+        if (isGif) {
+            // Use uc?export=view for GIFs to preserve animation
+            return `https://drive.google.com/uc?export=view&id=${fileId}&timestamp=${timestamp}`
+        } else {
+            // Use thumbnail endpoint for other images (better performance)
+            return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400&timestamp=${timestamp}`
+        }
     }
 
     // Return original URL if no file ID found

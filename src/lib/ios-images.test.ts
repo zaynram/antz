@@ -32,5 +32,29 @@ describe("iOS Image Utilities", () => {
             const result = getIOSCompatibleImageUrl("")
             expect(result).toBe("")
         })
+
+        it("should use uc?export=view for GIF files (ext parameter)", () => {
+            const gifUrl = "https://drive.google.com/thumbnail?id=GIF123&sz=w400&timestamp=123456&ext=gif"
+            const result = getIOSCompatibleImageUrl(gifUrl)
+            expect(result).toMatch(/^https:\/\/drive\.google\.com\/uc\?export=view&id=GIF123&timestamp=\d+$/)
+        })
+
+        it("should use uc?export=view for GIF files (filename hint)", () => {
+            const gifUrl = "https://drive.google.com/uc?export=view&id=GIF456&name=z_pfp.gif"
+            const result = getIOSCompatibleImageUrl(gifUrl)
+            expect(result).toMatch(/^https:\/\/drive\.google\.com\/uc\?export=view&id=GIF456&timestamp=\d+$/)
+        })
+
+        it("should use thumbnail endpoint for non-GIF images", () => {
+            const jpgUrl = "https://drive.google.com/thumbnail?id=JPG123&sz=w400&timestamp=123456&ext=jpg"
+            const result = getIOSCompatibleImageUrl(jpgUrl)
+            expect(result).toMatch(/^https:\/\/drive\.google\.com\/thumbnail\?id=JPG123&sz=w400&timestamp=\d+$/)
+        })
+
+        it("should use thumbnail endpoint for PNG images", () => {
+            const pngUrl = "https://drive.google.com/thumbnail?id=PNG123&sz=w400&timestamp=123456&ext=png"
+            const result = getIOSCompatibleImageUrl(pngUrl)
+            expect(result).toMatch(/^https:\/\/drive\.google\.com\/thumbnail\?id=PNG123&sz=w400&timestamp=\d+$/)
+        })
     })
 })
