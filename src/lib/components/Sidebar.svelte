@@ -15,7 +15,8 @@
     Menu,
     X,
     LogOut,
-    ChevronRight
+    ChevronRight,
+    Heart
   } from 'lucide-svelte'
 
   interface Props {
@@ -116,6 +117,7 @@
     { path: '/videos', label: 'Videos', icon: Video },
     { path: '/notes', label: 'Notes', icon: StickyNote },
     { path: '/places', label: 'Places', icon: MapPin },
+    { path: '/profiles', label: 'Profiles', icon: Heart },
   ]
 
   const libraryItems = [
