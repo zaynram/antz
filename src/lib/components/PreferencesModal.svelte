@@ -3,6 +3,7 @@
   import { uploadProfilePicture, deleteProfilePicture } from '$lib/firebase'
   import type { Theme, LocationMode, GeoLocation } from '$lib/types'
   import LocationPicker from './LocationPicker.svelte'
+  import { getIOSCompatibleImageUrl } from '$lib/ios-images'
   import { Sun, Moon, MapPin, Camera, X, Loader2 } from 'lucide-svelte'
   import { toast } from 'svelte-sonner'
 
@@ -178,11 +179,13 @@
           <div class="flex items-center gap-4">
             <div class="relative">
               {#if localProfilePicture}
-                <img
-                  src={localProfilePicture}
-                  alt="Profile"
-                  class="w-16 h-16 rounded-full object-cover"
-                />
+                {#key $activeUser}
+                  <img
+                    src={getIOSCompatibleImageUrl(localProfilePicture)}
+                    alt="Profile"
+                    class="w-16 h-16 rounded-full object-cover"
+                  />
+                {/key}
                 <button
                   type="button"
                   class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
