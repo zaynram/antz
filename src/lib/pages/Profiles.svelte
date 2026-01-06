@@ -361,7 +361,17 @@
 
 <!-- Add/Edit Modal -->
 {#if showAddModal}
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+    role="dialog"
+    aria-modal="true"
+    on:keydown={(event) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        closeModal();
+      }
+    }}
+  >
     <div class="bg-surface rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
       <div class="sticky top-0 bg-surface border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
         <h2 class="text-xl font-bold">
