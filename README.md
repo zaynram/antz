@@ -137,7 +137,7 @@ src/
 - `title`: string
 - `description`: string
 - `notes?: string` (optional)
-- `rating`: 1-5 scale
+- `rating?`: number (1-5 scale)
 - `isFavorite`: boolean
 - `createdBy`: "Z" | "T"
 
