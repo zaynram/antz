@@ -138,7 +138,7 @@ src/
 - `description`: string
 - `notes?: string` (optional)
 - `rating?`: number (1-5 scale)
-- `isFavorite`: boolean
+- `isFavorite?: boolean` (optional)
 - `createdBy`: "Z" | "T"
 
 ## User Preferences
