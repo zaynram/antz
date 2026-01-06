@@ -1068,6 +1068,7 @@
                 onclick={() => { showEditIssue = false; editIssueTitle = ''; editIssueBody = '' }}
                 class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
                 aria-label="Close edit issue form"
+                aria-label="Close edit issue form"
               >
                 <X size={16} />
               </button>
