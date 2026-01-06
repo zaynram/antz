@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { collection, getDocs, updateDoc, doc } from 'firebase/firestore'
-  import { db, subscribeToCollection } from '$lib/firebase'
   import { tmdbConfig } from '$lib/config'
+  import { db, subscribeToCollection } from '$lib/firebase'
+  import { createComment, createIssue, formatDate, hasGitHubToken, listComments, listIssues, updateIssue } from '$lib/github'
   import { activeUser, currentPreferences } from '$lib/stores/app'
   import type { Media, Note, Place, Video } from '$lib/types'
   import { createEmptyRatings } from '$lib/types'
-  import { onMount } from 'svelte'
-  import { Bug, Database, Trash2, RefreshCw, Download, Upload, Cpu, HardDrive, Wifi, Image, GitBranch, MessageSquare, Plus, X, Edit, ExternalLink } from 'lucide-svelte'
   import { fetchGameThumbnail } from '$lib/wikipedia'
-  import { listIssues, createIssue, updateIssue, createComment, listComments, hasGitHubToken, formatDate } from '$lib/github'
+  import { collection, doc, getDocs, updateDoc } from 'firebase/firestore'
+  import { Bug, Cpu, Database, Download, Edit, ExternalLink, GitBranch, HardDrive, Image, MessageSquare, Plus, RefreshCw, Trash2, Upload, Wifi, X } from 'lucide-svelte'
+  import { onMount } from 'svelte'
   import { toast } from 'svelte-sonner'
 
   // Data stats
@@ -269,7 +269,7 @@
       const snapshot = await getDocs(mediaRef)
 
       // Filter based on type selection
-      const itemsToProcess = snapshot.docs.filter(docSnap => {
+      const itemsToProcess = snapshot.docs.filter((docSnap: { data: () => { [_: string]: string } }) => {
         const data = docSnap.data()
         if (data.posterPath) return false // Already has image
         if (imageMigrationType === 'all') return true
@@ -357,13 +357,13 @@
 
         try {
           // Check if ratings structure needs updating
-          const needsUpdate = !data.ratings || 
+          const needsUpdate = !data.ratings ||
                              Object.keys(data.ratings).length === 0 ||
                              typeof data.ratings !== 'object'
 
           if (needsUpdate) {
             videoRatingsMigrationLog = [...videoRatingsMigrationLog, `Updating: ${title}...`]
-            
+
             const updates: Partial<Video> = {
               ratings: createEmptyRatings()
             }
@@ -794,7 +794,7 @@
         <span class="text-slate-400">Skipped: {videoRatingsMigrationStats.skipped}</span>
         <span class="text-red-500">Failed: {videoRatingsMigrationStats.failed}</span>
       </div>
-      
+
       <div class="mt-4 bg-slate-900 text-slate-300 p-3 rounded-lg font-mono text-xs overflow-y-auto max-h-96">
         {#each videoRatingsMigrationLog as line}
           <div class:text-emerald-400={line.includes('✓')} class:text-red-400={line.includes('✗')}>{line}</div>

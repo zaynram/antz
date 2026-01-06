@@ -21,7 +21,7 @@ export interface GoogleMapsConfig {
 export interface GitHubConfig {
     owner: string
     repo: string
-    token: string
+    token?: string
 }
 
 // Replace these values with your Firebase project config

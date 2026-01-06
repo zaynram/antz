@@ -138,7 +138,9 @@ export async function createIssue(params: CreateIssueParams): Promise<GitHubIssu
     if (response.ok === false) {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(
-            `Failed to create issue: ${response.statusText}${errorData.message ? ` - ${errorData.message}` : ""}`
+            `Failed to create issue: ${response.statusText}${
+                errorData.message ? ` - ${errorData.message}` : ""
+            }`
         )
     }
 
@@ -165,7 +167,9 @@ export async function updateIssue(
     if (response.ok === false) {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(
-            `Failed to update issue: ${response.statusText}${errorData.message ? ` - ${errorData.message}` : ""}`
+            `Failed to update issue: ${response.statusText}${
+                errorData.message ? ` - ${errorData.message}` : ""
+            }`
         )
     }
 
@@ -194,10 +198,7 @@ export async function listComments(issueNumber: number): Promise<GitHubComment[]
 /**
  * Add a comment to an issue
  */
-export async function createComment(
-    issueNumber: number,
-    body: string
-): Promise<GitHubComment> {
+export async function createComment(issueNumber: number, body: string): Promise<GitHubComment> {
     const { owner, repo } = githubConfig
 
     const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/issues/${issueNumber}/comments`
@@ -211,7 +212,9 @@ export async function createComment(
     if (response.ok === false) {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(
-            `Failed to create comment: ${response.statusText}${errorData.message ? ` - ${errorData.message}` : ""}`
+            `Failed to create comment: ${response.statusText}${
+                errorData.message ? ` - ${errorData.message}` : ""
+            }`
         )
     }
 
