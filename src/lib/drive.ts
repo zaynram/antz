@@ -153,11 +153,12 @@ export async function uploadFileToDrive(
         console.warn("File uploaded but may not be publicly accessible")
     }
 
-    // For iOS compatibility, use the direct drive.google.com URL format
-    // This format is more reliable than thumbnailLink for cross-origin loading
-    // Add a timestamp to prevent iOS caching issues
-    const timestamp = Date.now()
-    const publicUrl = `https://drive.google.com/thumbnail?id=${uploadData.id}&sz=w400&timestamp=${timestamp}`
+    // Get the file with thumbnail link
+    const fileDetails = await getFileDetails(uploadData.id)
+
+    // Use thumbnailLink if available (more reliable), fallback to uc export
+    const publicUrl =
+        fileDetails.thumbnailLink || `https://drive.google.com/uc?export=view&id=${uploadData.id}`
 
     return {
         id: uploadData.id,
@@ -168,9 +169,7 @@ export async function uploadFileToDrive(
 
 /**
  * Get file details including thumbnail link
- * Note: Not currently used as we switched to direct thumbnail URLs for iOS compatibility
  */
-/*
 async function getFileDetails(fileId: string): Promise<{ thumbnailLink?: string }> {
     const token = await getAccessToken()
 
@@ -187,7 +186,6 @@ async function getFileDetails(fileId: string): Promise<{ thumbnailLink?: string 
 
     return await response.json()
 }
-*/
 
 /**
  * Make a file publicly accessible (anyone with link can view)

@@ -2,7 +2,6 @@
   import { activeUser, currentPreferences } from '$lib/stores/app'
   import { logOut } from '$lib/firebase'
   import { hapticLight } from '$lib/haptics'
-  import { getIOSCompatibleImageUrl } from '$lib/ios-images'
   import {
     Search,
     Library,
@@ -194,13 +193,11 @@
       onclick={toggleUser}
     >
       {#if $currentPreferences.profilePicture}
-        {#key $activeUser}
-          <img
-            src={getIOSCompatibleImageUrl($currentPreferences.profilePicture)}
-            alt={$currentPreferences.name}
-            class="w-10 h-10 rounded-full object-cover ring-2 ring-accent"
-          />
-        {/key}
+        <img
+          src={$currentPreferences.profilePicture}
+          alt={$currentPreferences.name}
+          class="w-10 h-10 rounded-full object-cover ring-2 ring-accent"
+        />
       {:else}
         <div class="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-white font-bold">
           {$activeUser}
