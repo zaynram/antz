@@ -20,7 +20,17 @@ Relationship documentation app for Z & T. Serverless SPA with Firebase backend.
 bun install
 ```
 
-### 2. Configure Firebase
+### 2. Create configuration file
+
+Copy the example config file and add your API keys:
+
+```bash
+cp src/lib/config.example.ts src/lib/config.ts
+```
+
+**Note:** `config.ts` is gitignored to prevent committing API keys. You must set this up manually.
+
+### 3. Configure Firebase
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. Select your existing project (or create one)
@@ -29,13 +39,19 @@ bun install
 5. Go to Project Settings → General → Your apps → Add web app
 6. Copy the config values to `src/lib/config.ts`
 
-### 3. Configure TMDB (optional, for media search)
+### 4. Configure TMDB (optional, for media search)
 
 1. Create account at [TMDB](https://www.themoviedb.org/)
 2. Go to Settings → API → Create API key
 3. Add key to `src/lib/config.ts`
 
-### 4. Install Firebase CLI & deploy rules
+### 5. Configure GitHub (optional, for issue sync in debug panel)
+
+1. Go to [GitHub Settings → Personal Access Tokens](https://github.com/settings/tokens)
+2. Create a fine-grained token with "Issues: Read and write" access for this repository
+3. Add token to `src/lib/config.ts` under `githubConfig.token`
+
+### 6. Install Firebase CLI & deploy rules
 
 ```bash
 bun add -g firebase-tools
@@ -44,13 +60,13 @@ firebase use YOUR_PROJECT_ID
 firebase deploy --only firestore:rules
 ```
 
-### 5. Run locally
+### 7. Run locally
 
 ```bash
 bun dev
 ```
 
-### 6. Deploy
+### 8. Deploy
 
 #### Automated Deployment (Recommended)
 

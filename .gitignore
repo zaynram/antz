@@ -14,6 +14,9 @@ dist/
 firebase-debug.log
 /admin-credential.ts
 
+# Configuration with API keys (must be set up manually)
+src/lib/config.ts
+
 # IDE
 .vscode/
 .idea/
