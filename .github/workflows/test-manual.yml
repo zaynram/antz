@@ -1,9 +1,10 @@
-name: Type Check & Test (Manual)
+name: Type Check & Test
 
 on:
   pull-request:
     branches:
       - main
+
   workflow_dispatch:
     inputs:
       skip_type_check:
