@@ -1,7 +1,7 @@
 ﻿<script lang="ts">
   import { tmdbConfig } from '$lib/config'
   import { db, subscribeToCollection } from '$lib/firebase'
-  import { createComment, createIssue, formatDate, hasGitHubToken, listComments, listIssues, testGitHubToken, updateIssue, type GitHubIssue, type GitHubComment } from '$lib/github'
+  import { createComment, createIssue, formatDate, hasGitHubToken, listComments, listIssues, testGitHubToken, updateIssue, type GitHubApiError, type GitHubIssue, type GitHubComment } from '$lib/github'
   import { activeUser, currentPreferences } from '$lib/stores/app'
   import type { Media, Note, Place, Video } from '$lib/types'
   import { createEmptyRatings } from '$lib/types'
@@ -388,12 +388,14 @@
       toast.error(errorMessage)
       
       // Test token if we got an auth error (401 or 403 status code)
-      const status = (err as any)?.status
-      if (status === 401 || status === 403) {
-        const tokenTest = await testGitHubToken()
-        if (!tokenTest.valid) {
-          console.error('Token validation failed:', tokenTest.error)
-          toast.error(`Token issue: ${tokenTest.error}`)
+      if (err && typeof err === 'object' && 'status' in err) {
+        const apiError = err as GitHubApiError
+        if (apiError.status === 401 || apiError.status === 403) {
+          const tokenTest = await testGitHubToken()
+          if (!tokenTest.valid) {
+            console.error('Token validation failed:', tokenTest.error)
+            toast.error(`Token issue: ${tokenTest.error}`)
+          }
         }
       }
     } finally {
