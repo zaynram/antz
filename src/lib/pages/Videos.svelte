@@ -200,7 +200,36 @@
     } catch (error) {
       console.error('Sync error:', error)
       hapticError()
-      toast.error('Sync failed. Please try again.')
+
+      // Provide more specific feedback based on error type/metadata
+      let message = 'Sync failed. Please try again.'
+      const err = error as any
+
+      const status: number | undefined =
+        err?.status ?? err?.response?.status
+      const code: string | number | undefined =
+        err?.code ?? err?.response?.data?.code
+      const errorMessage: string = typeof err?.message === 'string' ? err.message : ''
+
+      const isNetworkError =
+        (!navigator.onLine) ||
+        err instanceof TypeError ||
+        code === 'ECONNABORTED' ||
+        code === 'ENETUNREACH'
+
+      const isAuthError =
+        status === 401 ||
+        status === 403 ||
+        code === 'auth' ||
+        /auth|unauthori[sz]ed|forbidden/i.test(errorMessage)
+
+      if (isNetworkError) {
+        message = 'Network error during sync. Please check your internet connection and try again.'
+      } else if (isAuthError) {
+        message = 'Sync failed due to an authentication error. Please check your sync settings or sign in again.'
+      }
+
+      toast.error(message)
     } finally {
       syncing = false
     }
