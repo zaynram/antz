@@ -117,7 +117,7 @@ export async function requestAccessToken(): Promise<YouTubeAuthTokens | null> {
         })
 
         // Request access token (will show OAuth consent screen)
-        client.requestAccessToken({ prompt: '' })
+        client.requestAccessToken()
     })
 }
 
