@@ -1,4 +1,4 @@
-name: Type Check & Test (Manual)
+name: Type Check & Test
 
 on:
   workflow_dispatch:
