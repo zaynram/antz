@@ -69,6 +69,20 @@ function getHeaders(): HeadersInit {
 }
 
 /**
+ * Handle fetch response and throw detailed error if not ok
+ */
+async function handleResponse(response: Response, operation: string): Promise<void> {
+    if (response.ok === false) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || response.statusText
+        const error = new Error(`${operation} (${response.status}): ${errorMessage}`)
+        // Attach status for easier error handling
+        ;(error as any).status = response.status
+        throw error
+    }
+}
+
+/**
  * List issues in the repository
  */
 export async function listIssues(
@@ -92,11 +106,7 @@ export async function listIssues(
         headers: getHeaders(),
     })
 
-    if (response.ok === false) {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.message || response.statusText
-        throw new Error(`Failed to fetch issues (${response.status}): ${errorMessage}`)
-    }
+    await handleResponse(response, "Failed to fetch issues")
 
     const issues = (await response.json()) as GitHubIssue[]
 
@@ -122,11 +132,7 @@ export async function getIssue(issueNumber: number): Promise<GitHubIssue> {
         headers: getHeaders(),
     })
 
-    if (response.ok === false) {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.message || response.statusText
-        throw new Error(`Failed to fetch issue (${response.status}): ${errorMessage}`)
-    }
+    await handleResponse(response, "Failed to fetch issue")
 
     return (await response.json()) as GitHubIssue
 }
@@ -198,11 +204,7 @@ export async function listComments(issueNumber: number): Promise<GitHubComment[]
         headers: getHeaders(),
     })
 
-    if (response.ok === false) {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.message || response.statusText
-        throw new Error(`Failed to fetch comments (${response.status}): ${errorMessage}`)
-    }
+    await handleResponse(response, "Failed to fetch comments")
 
     return (await response.json()) as GitHubComment[]
 }
