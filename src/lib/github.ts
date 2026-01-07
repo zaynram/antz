@@ -39,6 +39,10 @@ export interface GitHubComment {
     updated_at: string
 }
 
+export interface GitHubApiError extends Error {
+    status: number
+}
+
 interface CreateIssueParams {
     title: string
     body: string
@@ -75,9 +79,8 @@ async function handleResponse(response: Response, operation: string): Promise<vo
     if (response.ok === false) {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.message || response.statusText
-        const error = new Error(`${operation} (${response.status}): ${errorMessage}`)
-        // Attach status for easier error handling
-        ;(error as any).status = response.status
+        const error = new Error(`${operation} (${response.status}): ${errorMessage}`) as GitHubApiError
+        error.status = response.status
         throw error
     }
 }
@@ -151,14 +154,7 @@ export async function createIssue(params: CreateIssueParams): Promise<GitHubIssu
         body: JSON.stringify(params),
     })
 
-    if (response.ok === false) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(
-            `Failed to create issue: ${response.statusText}${
-                errorData.message ? ` - ${errorData.message}` : ""
-            }`
-        )
-    }
+    await handleResponse(response, "Failed to create issue")
 
     return (await response.json()) as GitHubIssue
 }
@@ -180,14 +176,7 @@ export async function updateIssue(
         body: JSON.stringify(params),
     })
 
-    if (response.ok === false) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(
-            `Failed to update issue: ${response.statusText}${
-                errorData.message ? ` - ${errorData.message}` : ""
-            }`
-        )
-    }
+    await handleResponse(response, "Failed to update issue")
 
     return (await response.json()) as GitHubIssue
 }
@@ -223,14 +212,7 @@ export async function createComment(issueNumber: number, body: string): Promise<
         body: JSON.stringify({ body }),
     })
 
-    if (response.ok === false) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(
-            `Failed to create comment: ${response.statusText}${
-                errorData.message ? ` - ${errorData.message}` : ""
-            }`
-        )
-    }
+    await handleResponse(response, "Failed to create comment")
 
     return (await response.json()) as GitHubComment
 }
