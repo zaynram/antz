@@ -39,6 +39,10 @@ export interface GitHubComment {
     updated_at: string
 }
 
+export interface GitHubApiError extends Error {
+    status: number
+}
+
 interface CreateIssueParams {
     title: string
     body: string
@@ -69,6 +73,19 @@ function getHeaders(): HeadersInit {
 }
 
 /**
+ * Handle fetch response and throw detailed error if not ok
+ */
+async function handleResponse(response: Response, operation: string): Promise<void> {
+    if (response.ok === false) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || response.statusText
+        const error = new Error(`${operation} (${response.status}): ${errorMessage}`) as GitHubApiError
+        error.status = response.status
+        throw error
+    }
+}
+
+/**
  * List issues in the repository
  */
 export async function listIssues(
@@ -92,9 +109,7 @@ export async function listIssues(
         headers: getHeaders(),
     })
 
-    if (response.ok === false) {
-        throw new Error(`Failed to fetch issues: ${response.statusText}`)
-    }
+    await handleResponse(response, "Failed to fetch issues")
 
     const issues = (await response.json()) as GitHubIssue[]
 
@@ -120,9 +135,7 @@ export async function getIssue(issueNumber: number): Promise<GitHubIssue> {
         headers: getHeaders(),
     })
 
-    if (response.ok === false) {
-        throw new Error(`Failed to fetch issue: ${response.statusText}`)
-    }
+    await handleResponse(response, "Failed to fetch issue")
 
     return (await response.json()) as GitHubIssue
 }
@@ -141,14 +154,7 @@ export async function createIssue(params: CreateIssueParams): Promise<GitHubIssu
         body: JSON.stringify(params),
     })
 
-    if (response.ok === false) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(
-            `Failed to create issue: ${response.statusText}${
-                errorData.message ? ` - ${errorData.message}` : ""
-            }`
-        )
-    }
+    await handleResponse(response, "Failed to create issue")
 
     return (await response.json()) as GitHubIssue
 }
@@ -170,14 +176,7 @@ export async function updateIssue(
         body: JSON.stringify(params),
     })
 
-    if (response.ok === false) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(
-            `Failed to update issue: ${response.statusText}${
-                errorData.message ? ` - ${errorData.message}` : ""
-            }`
-        )
-    }
+    await handleResponse(response, "Failed to update issue")
 
     return (await response.json()) as GitHubIssue
 }
@@ -194,9 +193,7 @@ export async function listComments(issueNumber: number): Promise<GitHubComment[]
         headers: getHeaders(),
     })
 
-    if (response.ok === false) {
-        throw new Error(`Failed to fetch comments: ${response.statusText}`)
-    }
+    await handleResponse(response, "Failed to fetch comments")
 
     return (await response.json()) as GitHubComment[]
 }
@@ -215,14 +212,7 @@ export async function createComment(issueNumber: number, body: string): Promise<
         body: JSON.stringify({ body }),
     })
 
-    if (response.ok === false) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(
-            `Failed to create comment: ${response.statusText}${
-                errorData.message ? ` - ${errorData.message}` : ""
-            }`
-        )
-    }
+    await handleResponse(response, "Failed to create comment")
 
     return (await response.json()) as GitHubComment
 }
@@ -232,6 +222,38 @@ export async function createComment(issueNumber: number, body: string): Promise<
  */
 export function hasGitHubToken(): boolean {
     return !!githubConfig.token && githubConfig.token.length > 0
+}
+
+/**
+ * Test the GitHub token and return detailed error information
+ */
+export async function testGitHubToken(): Promise<{ valid: boolean; error?: string; scopes?: string[] }> {
+    if (!hasGitHubToken()) {
+        return { valid: false, error: "Token not configured" }
+    }
+
+    try {
+        const response = await fetch(`${GITHUB_API_BASE}/user`, {
+            headers: getHeaders(),
+        })
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            return { 
+                valid: false, 
+                error: `Token validation failed (${response.status}): ${errorData.message || response.statusText}` 
+            }
+        }
+
+        // Get token scopes from headers
+        const scopes = response.headers.get("x-oauth-scopes")?.split(", ") || []
+        return { valid: true, scopes }
+    } catch (err) {
+        return { 
+            valid: false, 
+            error: err instanceof Error ? err.message : "Unknown error testing token" 
+        }
+    }
 }
 
 /**
