@@ -93,7 +93,9 @@ export async function listIssues(
     })
 
     if (response.ok === false) {
-        throw new Error(`Failed to fetch issues: ${response.statusText}`)
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || response.statusText
+        throw new Error(`Failed to fetch issues (${response.status}): ${errorMessage}`)
     }
 
     const issues = (await response.json()) as GitHubIssue[]
@@ -121,7 +123,9 @@ export async function getIssue(issueNumber: number): Promise<GitHubIssue> {
     })
 
     if (response.ok === false) {
-        throw new Error(`Failed to fetch issue: ${response.statusText}`)
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || response.statusText
+        throw new Error(`Failed to fetch issue (${response.status}): ${errorMessage}`)
     }
 
     return (await response.json()) as GitHubIssue
@@ -195,7 +199,9 @@ export async function listComments(issueNumber: number): Promise<GitHubComment[]
     })
 
     if (response.ok === false) {
-        throw new Error(`Failed to fetch comments: ${response.statusText}`)
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || response.statusText
+        throw new Error(`Failed to fetch comments (${response.status}): ${errorMessage}`)
     }
 
     return (await response.json()) as GitHubComment[]
@@ -232,6 +238,38 @@ export async function createComment(issueNumber: number, body: string): Promise<
  */
 export function hasGitHubToken(): boolean {
     return !!githubConfig.token && githubConfig.token.length > 0
+}
+
+/**
+ * Test the GitHub token and return detailed error information
+ */
+export async function testGitHubToken(): Promise<{ valid: boolean; error?: string; scopes?: string[] }> {
+    if (!hasGitHubToken()) {
+        return { valid: false, error: "Token not configured" }
+    }
+
+    try {
+        const response = await fetch(`${GITHUB_API_BASE}/user`, {
+            headers: getHeaders(),
+        })
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            return { 
+                valid: false, 
+                error: `Token validation failed (${response.status}): ${errorData.message || response.statusText}` 
+            }
+        }
+
+        // Get token scopes from headers
+        const scopes = response.headers.get("x-oauth-scopes")?.split(", ") || []
+        return { valid: true, scopes }
+    } catch (err) {
+        return { 
+            valid: false, 
+            error: err instanceof Error ? err.message : "Unknown error testing token" 
+        }
+    }
 }
 
 /**
