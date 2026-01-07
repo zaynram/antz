@@ -3,7 +3,7 @@ name: Deploy Preview to Firebase Hosting
 on:
   push:
     branches:
-      - *
+      - preview
 
 jobs:
   test:
