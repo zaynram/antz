@@ -1,6 +1,9 @@
 name: Type Check & Test (Manual)
 
 on:
+  pull-request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       skip_type_check:
