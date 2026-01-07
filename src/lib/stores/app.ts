@@ -155,10 +155,18 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
             }
         }
         
-        // Check youtubeAuth separately (compare access tokens as proxy for full object)
-        const aYTAuth = aPrefs.youtubeAuth?.accessToken
-        const bYTAuth = bPrefs.youtubeAuth?.accessToken
-        if (aYTAuth !== bYTAuth) return false
+        // Check youtubeAuth separately (compare accessToken and expiresAt)
+        const aYTAuth = aPrefs.youtubeAuth
+        const bYTAuth = bPrefs.youtubeAuth
+        if (!aYTAuth && !bYTAuth) {
+            // both undefined/null – equal
+        } else if (!aYTAuth || !bYTAuth) {
+            // one is present and the other is not
+            return false
+        } else {
+            if (aYTAuth.accessToken !== bYTAuth.accessToken) return false
+            if (aYTAuth.expiresAt !== bYTAuth.expiresAt) return false
+        }
         
         // Check grayjayConfig separately
         const aGJEnabled = aPrefs.grayjayConfig?.enabled
