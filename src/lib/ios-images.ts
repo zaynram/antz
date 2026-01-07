@@ -50,11 +50,21 @@ export function getIOSCompatibleImageUrl(url: string): string {
                       url.toLowerCase().includes('.gif') || 
                       url.toLowerCase().includes('_pfp.gif')
         
+        // Check if we're on a preview/non-production URL (Firebase preview channels)
+        // Preview URLs have formats like: project--channel-id-hash.web.app
+        const isPreviewUrl = typeof window !== 'undefined' && 
+                             (window.location.hostname.includes('--') || 
+                              window.location.hostname.includes('preview'))
+        
         if (isGif) {
             // Use uc?export=view for GIFs to preserve animation
             return `https://drive.google.com/uc?export=view&id=${fileId}&timestamp=${timestamp}`
+        } else if (isPreviewUrl) {
+            // Use uc?export=view for preview environments to avoid CORS issues
+            // The thumbnail endpoint may have stricter domain restrictions
+            return `https://drive.google.com/uc?export=view&id=${fileId}&timestamp=${timestamp}`
         } else {
-            // Use thumbnail endpoint for other images (better performance)
+            // Use thumbnail endpoint for other images in production (better performance)
             return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400&timestamp=${timestamp}`
         }
     }
