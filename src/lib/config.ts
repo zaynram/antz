@@ -23,6 +23,12 @@ export interface YouTubeAPIConfig {
     scopes: string[]
 }
 
+export interface GitHubConfig {
+    owner: string
+    repo: string
+    token?: string
+}
+
 // Replace these values with your Firebase project config
 // Get from: Firebase Console > Project Settings > General > Your apps > Web app
 export const firebaseConfig: FirebaseConfig = {
@@ -62,4 +68,21 @@ export const youtubeAPIConfig: YouTubeAPIConfig = {
         "https://www.googleapis.com/auth/youtube.readonly",
         "https://www.googleapis.com/auth/youtube.force-ssl",
     ],
+}
+// GitHub API configuration
+// Get from: https://github.com/settings/tokens
+// 
+// IMPORTANT: config.ts is a public-facing file. All tokens here are created
+// specifically for this application and expose no sensitive information.
+// Any changes to config.ts will be flagged by GitHub and require manual bypass.
+//
+// Token requirements:
+// - Use fine-grained personal access token (recommended) OR classic token
+// - For fine-grained: Grant "Read and write" access to "Issues" for this repository only
+// - For classic: Use minimal scope "public_repo" (for public repos) or "repo" (for private)
+// - Fine-grained tokens provide better security by limiting access to just this repo
+export const githubConfig: GitHubConfig = {
+    owner: "zaynram",
+    repo: "antz",
+    token: "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",
 }

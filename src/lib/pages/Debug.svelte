@@ -1,13 +1,15 @@
 <script lang="ts">
-  import { collection, getDocs, updateDoc, doc } from 'firebase/firestore'
-  import { db, subscribeToCollection } from '$lib/firebase'
   import { tmdbConfig } from '$lib/config'
+  import { db, subscribeToCollection } from '$lib/firebase'
+  import { createComment, createIssue, formatDate, hasGitHubToken, listComments, listIssues, updateIssue, type GitHubIssue, type GitHubComment } from '$lib/github'
   import { activeUser, currentPreferences } from '$lib/stores/app'
   import type { Media, Note, Place, Video } from '$lib/types'
   import { createEmptyRatings } from '$lib/types'
-  import { onMount } from 'svelte'
-  import { Bug, Database, Trash2, RefreshCw, Download, Upload, Cpu, HardDrive, Wifi, Image } from 'lucide-svelte'
   import { fetchGameThumbnail } from '$lib/wikipedia'
+  import { collection, doc, getDocs, updateDoc } from 'firebase/firestore'
+  import { Bug, Cpu, Database, Download, Edit, ExternalLink, GitBranch, HardDrive, Image, MessageSquare, Plus, RefreshCw, Trash2, Upload, Wifi, X } from 'lucide-svelte'
+  import { onMount } from 'svelte'
+  import { toast } from 'svelte-sonner'
 
   // Data stats
   let media = $state<Media[]>([])
@@ -33,6 +35,24 @@
   let videoRatingsMigrating = $state(false)
   let videoRatingsMigrationLog = $state<string[]>([])
   let videoRatingsMigrationStats = $state({ updated: 0, skipped: 0, failed: 0 })
+
+  // GitHub issues state
+  let issues = $state<GitHubIssue[]>([])
+  let issuesLoading = $state(false)
+  let issuesPage = $state(1)
+  // let issuesHasMore = $state(false) // Reserved for pagination
+  let issuesState = $state<'open' | 'closed' | 'all'>('all')
+  let selectedIssue = $state<GitHubIssue | null>(null)
+  let issueComments = $state<GitHubComment[]>([])
+  let commentsLoading = $state(false)
+  let showCreateIssue = $state(false)
+  let showEditIssue = $state(false)
+  let newIssueTitle = $state('')
+  let newIssueBody = $state('')
+  let editIssueTitle = $state('')
+  let editIssueBody = $state('')
+  let newCommentBody = $state('')
+  let isSubmitting = $state(false)
 
   // System info
   let systemInfo = $state({
@@ -230,7 +250,7 @@
       const snapshot = await getDocs(mediaRef)
 
       // Filter based on type selection
-      const itemsToProcess = snapshot.docs.filter(docSnap => {
+      const itemsToProcess = snapshot.docs.filter((docSnap: { data: () => { [_: string]: string } }) => {
         const data = docSnap.data()
         if (data.posterPath) return false // Already has image
         if (imageMigrationType === 'all') return true
@@ -318,13 +338,13 @@
 
         try {
           // Check if ratings structure needs updating
-          const needsUpdate = !data.ratings || 
+          const needsUpdate = !data.ratings ||
                              Object.keys(data.ratings).length === 0 ||
                              typeof data.ratings !== 'object'
 
           if (needsUpdate) {
             videoRatingsMigrationLog = [...videoRatingsMigrationLog, `Updating: ${title}...`]
-            
+
             const updates: Partial<Video> = {
               ratings: createEmptyRatings()
             }
@@ -348,6 +368,135 @@
     } finally {
       videoRatingsMigrating = false
     }
+  }
+
+  // GitHub issues functions
+  async function loadIssues() {
+    if (!hasGitHubToken()) {
+      toast.error('GitHub token not configured')
+      return
+    }
+
+    issuesLoading = true
+    try {
+      const result = await listIssues(issuesState, issuesPage)
+      issues = result.issues
+      // issuesHasMore = result.hasMore // Reserved for pagination
+    } catch (err) {
+      console.error('Failed to load issues:', err)
+      toast.error('Failed to load issues')
+    } finally {
+      issuesLoading = false
+    }
+  }
+
+  async function selectIssue(issue: GitHubIssue) {
+    selectedIssue = issue
+    issueComments = []
+    commentsLoading = true
+    try {
+      const comments = await listComments(issue.number)
+      issueComments = comments
+    } catch (err) {
+      console.error('Failed to load comments:', err)
+      toast.error('Failed to load comments')
+    } finally {
+      commentsLoading = false
+    }
+  }
+
+  async function handleCreateIssue() {
+    if (!newIssueTitle.trim()) {
+      toast.error('Issue title is required')
+      return
+    }
+
+    isSubmitting = true
+    try {
+      await createIssue({
+        title: newIssueTitle.trim(),
+        body: newIssueBody.trim() || '',
+      })
+      toast.success('Issue created successfully')
+      showCreateIssue = false
+      newIssueTitle = ''
+      newIssueBody = ''
+      await loadIssues()
+    } catch (err) {
+      console.error('Failed to create issue:', err)
+      toast.error('Failed to create issue')
+    } finally {
+      isSubmitting = false
+    }
+  }
+
+  async function handleEditIssue() {
+    if (!selectedIssue || !editIssueTitle.trim()) {
+      toast.error('Issue title is required')
+      return
+    }
+
+    isSubmitting = true
+    try {
+      const updated = await updateIssue(selectedIssue.number, {
+        title: editIssueTitle.trim(),
+        body: editIssueBody.trim() || '',
+      })
+      toast.success('Issue updated successfully')
+      showEditIssue = false
+      selectedIssue = updated
+      await loadIssues()
+    } catch (err) {
+      console.error('Failed to update issue:', err)
+      toast.error('Failed to update issue')
+    } finally {
+      isSubmitting = false
+    }
+  }
+
+  async function handleAddComment() {
+    if (!selectedIssue || !newCommentBody.trim()) {
+      toast.error('Comment body is required')
+      return
+    }
+
+    isSubmitting = true
+    try {
+      const comment = await createComment(selectedIssue.number, newCommentBody.trim())
+      issueComments = [...issueComments, comment]
+      newCommentBody = ''
+      toast.success('Comment added successfully')
+    } catch (err) {
+      console.error('Failed to add comment:', err)
+      toast.error('Failed to add comment')
+    } finally {
+      isSubmitting = false
+    }
+  }
+
+  async function handleToggleIssueState() {
+    if (!selectedIssue) return
+
+    const newState = selectedIssue.state === 'open' ? 'closed' : 'open'
+    isSubmitting = true
+    try {
+      const updated = await updateIssue(selectedIssue.number, { state: newState })
+      toast.success(`Issue ${newState}`)
+      selectedIssue = updated
+      await loadIssues()
+    } catch (err) {
+      console.error('Failed to toggle issue state:', err)
+      toast.error('Failed to toggle issue state')
+    } finally {
+      isSubmitting = false
+    }
+  }
+
+  function openEditIssue() {
+    if (!selectedIssue) return
+    editIssueTitle = selectedIssue.title
+    editIssueBody = selectedIssue.body || ''
+    showEditIssue = true
   }
 
   // Cache management
@@ -626,11 +775,352 @@
         <span class="text-slate-400">Skipped: {videoRatingsMigrationStats.skipped}</span>
         <span class="text-red-500">Failed: {videoRatingsMigrationStats.failed}</span>
       </div>
-      
+
       <div class="mt-4 bg-slate-900 text-slate-300 p-3 rounded-lg font-mono text-xs overflow-y-auto max-h-96">
         {#each videoRatingsMigrationLog as line}
           <div class:text-emerald-400={line.includes('✓')} class:text-red-400={line.includes('✗')}>{line}</div>
         {/each}
+      </div>
+    {/if}
+  </section>
+
+  <!-- GitHub Issues -->
+  <section class="bg-surface border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+    <div class="flex items-center gap-2 mb-2">
+      <GitBranch size={18} class="text-slate-400" />
+      <h2 class="font-semibold">GitHub Issues</h2>
+    </div>
+    <p class="text-sm text-slate-500 mb-4">
+      Manage GitHub issues for this repository.
+      {#if !hasGitHubToken()}
+        <span class="text-amber-500 font-medium">Configure GitHub token in config.ts to enable.</span>
+      {/if}
+    </p>
+
+    {#if hasGitHubToken()}
+      <div class="space-y-4">
+        <!-- Issue List View -->
+        {#if !selectedIssue && !showCreateIssue}
+          <div class="flex flex-wrap items-center gap-3 mb-4">
+            <label for="issue-state-filter" class="sr-only">Filter issues by state</label>
+            <select
+              id="issue-state-filter"
+              bind:value={issuesState}
+              onchange={loadIssues}
+              class="px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+            >
+              <option value="all">All Issues</option>
+              <option value="open">Open</option>
+              <option value="closed">Closed</option>
+            </select>
+
+            <button
+              type="button"
+              onclick={loadIssues}
+              disabled={issuesLoading}
+              class="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+            >
+              {#if issuesLoading}
+                <div class="w-4 h-4 border-2 border-slate-600 border-t-transparent rounded-full animate-spin" aria-hidden="true"></div>
+                <span class="sr-only" role="status" aria-live="polite">Loading issues...</span>
+                Loading...
+              {:else}
+                <RefreshCw size={16} />
+                Refresh
+              {/if}
+            </button>
+
+            <button
+              type="button"
+              onclick={() => showCreateIssue = true}
+              class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:opacity-90"
+            >
+              <Plus size={16} />
+              New Issue
+            </button>
+          </div>
+
+          {#if issues.length > 0}
+            <div class="space-y-2 max-h-96 overflow-y-auto">
+              {#each issues as issue (issue.number)}
+                <button
+                  type="button"
+                  onclick={() => selectIssue(issue)}
+                  class="w-full text-left p-3 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                >
+                  <div class="flex items-start gap-2">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="text-sm font-medium truncate">{issue.title}</span>
+                        <span class="text-xs px-2 py-0.5 rounded-full {issue.state === 'open' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}">
+                          {issue.state}
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-2 text-xs text-slate-500">
+                        <span>#{issue.number}</span>
+                        <span>•</span>
+                        <span>{formatDate(issue.updated_at)}</span>
+                        {#if issue.comments > 0}
+                          <span>•</span>
+                          <span class="flex items-center gap-1">
+                            <MessageSquare size={12} />
+                            {issue.comments}
+                          </span>
+                        {/if}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              {/each}
+            </div>
+          {:else if !issuesLoading}
+            <div class="text-center py-8 text-slate-400">
+              <p>No issues found</p>
+            </div>
+          {/if}
+        {/if}
+
+        <!-- Create Issue Form -->
+        {#if showCreateIssue}
+          <div class="space-y-4">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-semibold">Create New Issue</h3>
+              <button
+                type="button"
+                onclick={() => { showCreateIssue = false; newIssueTitle = ''; newIssueBody = '' }}
+                class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
+                aria-label="Close create issue form"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div>
+              <label for="new-issue-title" class="block text-sm font-medium mb-2">Title</label>
+              <input
+                id="new-issue-title"
+                type="text"
+                bind:value={newIssueTitle}
+                placeholder="Issue title"
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent"
+              />
+            </div>
+
+            <div>
+              <label for="new-issue-body" class="block text-sm font-medium mb-2">Description</label>
+              <textarea
+                id="new-issue-body"
+                bind:value={newIssueBody}
+                placeholder="Describe the issue..."
+                rows="6"
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent resize-none"
+              ></textarea>
+            </div>
+
+            <div class="flex gap-2">
+              <button
+                type="button"
+                onclick={handleCreateIssue}
+                disabled={isSubmitting || !newIssueTitle.trim()}
+                class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                {#if isSubmitting}
+                  <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true"></div>
+                  <span class="sr-only" role="status" aria-live="polite">Creating issue...</span>
+                  Creating...
+                {:else}
+                  Create Issue
+                {/if}
+              </button>
+              <button
+                type="button"
+                onclick={() => { showCreateIssue = false; newIssueTitle = ''; newIssueBody = '' }}
+                class="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Issue Detail View -->
+        {#if selectedIssue && !showEditIssue}
+          <div class="space-y-4">
+            <div class="flex items-start justify-between gap-2 mb-4">
+              <button
+                type="button"
+                onclick={() => { selectedIssue = null; issueComments = [] }}
+                class="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              >
+                ← Back to list
+              </button>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  onclick={openEditIssue}
+                  class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Edit issue"
+                >
+                  <Edit size={16} />
+                </button>
+                <a
+                  href={selectedIssue.html_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Open on GitHub"
+                >
+                  <ExternalLink size={16} />
+                </a>
+              </div>
+            </div>
+
+            <div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
+              <div class="flex items-center gap-2 mb-2">
+                <h3 class="font-semibold text-lg">{selectedIssue.title}</h3>
+                <span class="text-xs px-2 py-1 rounded-full {selectedIssue.state === 'open' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}">
+                  {selectedIssue.state}
+                </span>
+              </div>
+              <div class="text-xs text-slate-500 mb-3">
+                <span>#{selectedIssue.number}</span>
+                <span> • opened {formatDate(selectedIssue.created_at)}</span>
+                <span> by {selectedIssue.user.login}</span>
+              </div>
+              {#if selectedIssue.body}
+                <div class="text-sm whitespace-pre-wrap">{selectedIssue.body}</div>
+              {:else}
+                <div class="text-sm text-slate-400 italic">No description provided</div>
+              {/if}
+            </div>
+
+            <div class="flex gap-2">
+              <button
+                type="button"
+                onclick={handleToggleIssueState}
+                disabled={isSubmitting}
+                class="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Updating...' : selectedIssue.state === 'open' ? 'Close Issue' : 'Reopen Issue'}
+              </button>
+            </div>
+
+            <!-- Comments Section -->
+            <div class="border-t border-slate-200 dark:border-slate-700 pt-4">
+              <h4 class="font-semibold mb-3">
+                Comments ({issueComments.length})
+              </h4>
+
+              {#if commentsLoading}
+                <div class="text-center py-4">
+                  <div class="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto" aria-hidden="true"></div>
+                  <span class="sr-only" role="status" aria-live="polite">Loading comments...</span>
+                </div>
+              {:else if issueComments.length > 0}
+                <div class="space-y-3 mb-4 max-h-64 overflow-y-auto">
+                  {#each issueComments as comment (comment.id)}
+                    <div class="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
+                      <div class="text-xs text-slate-500 mb-2">
+                        <span class="font-medium">{comment.user.login}</span>
+                        <span> • {formatDate(comment.created_at)}</span>
+                      </div>
+                      <div class="text-sm whitespace-pre-wrap">{comment.body}</div>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+
+              <!-- Add Comment Form -->
+              <div class="space-y-2">
+                <textarea
+                  bind:value={newCommentBody}
+                  placeholder="Add a comment..."
+                  rows="3"
+                  class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent resize-none text-sm"
+                ></textarea>
+                <button
+                  type="button"
+                  onclick={handleAddComment}
+                  disabled={isSubmitting || !newCommentBody.trim()}
+                  class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                >
+                  {#if isSubmitting}
+                    <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true"></div>
+                    <span class="sr-only" role="status" aria-live="polite">Adding comment...</span>
+                    Adding...
+                  {:else}
+                    <MessageSquare size={16} />
+                    Add Comment
+                  {/if}
+                </button>
+              </div>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Edit Issue Form -->
+        {#if showEditIssue && selectedIssue}
+          <div class="space-y-4">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-semibold">Edit Issue #{selectedIssue.number}</h3>
+              <button
+                type="button"
+                onclick={() => { showEditIssue = false; editIssueTitle = ''; editIssueBody = '' }}
+                class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
+                aria-label="Close edit issue form"
+                aria-label="Close edit issue form"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div>
+              <label for="edit-issue-title" class="block text-sm font-medium mb-2">Title</label>
+              <input
+                id="edit-issue-title"
+                type="text"
+                bind:value={editIssueTitle}
+                placeholder="Issue title"
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent"
+              />
+            </div>
+
+            <div>
+              <label for="edit-issue-body" class="block text-sm font-medium mb-2">Description</label>
+              <textarea
+                id="edit-issue-body"
+                bind:value={editIssueBody}
+                placeholder="Describe the issue..."
+                rows="6"
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent resize-none"
+              ></textarea>
+            </div>
+
+            <div class="flex gap-2">
+              <button
+                type="button"
+                onclick={handleEditIssue}
+                disabled={isSubmitting || !editIssueTitle.trim()}
+                class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                {#if isSubmitting}
+                  <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true"></div>
+                  <span class="sr-only" role="status" aria-live="polite">Updating issue...</span>
+                  Updating...
+                {:else}
+                  Update Issue
+                {/if}
+              </button>
+              <button
+                type="button"
+                onclick={() => { showEditIssue = false; editIssueTitle = ''; editIssueBody = '' }}
+                class="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        {/if}
       </div>
     {/if}
   </section>

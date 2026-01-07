@@ -155,6 +155,16 @@ Pure functions in `filters.ts`: `applyFilters()`, `applySort()` with composable 
 
 **`/places/{id}`** - Location tracking with categories and visit history
 
+**`/profiles/{id}`** - Partner profiles - individual preferences
+
+-   `category`: "food" | "drinks" | "music" | "movies" | "books" | "activities" | "scents" | "colors" | "people" | "places" | "gifts" | "other"
+-   `title`: string - name of the item
+-   `description`: string - brief description
+-   `notes?: string` - additional notes (optional)
+-   `rating`?: number (1-5 scale)
+-   `isFavorite?`: boolean
+-   Per-user items for tracking individual preferences
+
 **`/videos/{id}`** - YouTube playlist for shared video watching
 
 -   `status`: "queued" | "watched" | "skipped"
@@ -278,6 +288,7 @@ The Search page (`/`) supports two modes:
 | `/videos`         | Videos    | YouTube playlist queue                |
 | `/notes`          | Notes     | Free-form notes with tags             |
 | `/places`         | Places    | Location/venue tracking               |
+| `/profiles`       | Profiles  | Partner profiles - individual preferences |
 | `/settings`       | Settings  | Profile, theme, PWA updates           |
 | `/debug`          | Debug     | Development tools                     |
 
