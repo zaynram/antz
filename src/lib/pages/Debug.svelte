@@ -387,8 +387,9 @@
       const errorMessage = err instanceof Error ? err.message : 'Failed to load issues'
       toast.error(errorMessage)
       
-      // Test token if we got an auth error
-      if (errorMessage.includes('401') || errorMessage.includes('403')) {
+      // Test token if we got an auth error (401 or 403 status code)
+      const status = (err as any)?.status
+      if (status === 401 || status === 403) {
         const tokenTest = await testGitHubToken()
         if (!tokenTest.valid) {
           console.error('Token validation failed:', tokenTest.error)
