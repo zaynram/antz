@@ -745,9 +745,10 @@ interface UserPreferences {
 
 ### YouTube OAuth
 - Access tokens expire after 1 hour
-- Refresh tokens used for long-term access
+- Token-based flow does NOT provide refresh tokens (security/privacy design)
+- Users must re-authenticate when token expires (seamless process)
 - Tokens stored in Firestore user preferences (encrypted at rest)
-- Client secret should be kept secure (consider backend proxy for production)
+- No client secret needed - designed for client-side security
 
 ### API Rate Limits
 - YouTube: 10,000 quota units per day (default)
@@ -756,7 +757,6 @@ interface UserPreferences {
 
 ### Best Practices
 - Only request necessary OAuth scopes
-- Implement token refresh logic
 - Handle API errors gracefully
 - Provide clear user feedback
 - Allow users to disconnect/revoke access

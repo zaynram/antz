@@ -39,7 +39,7 @@ declare global {
                         client_id: string
                         scope: string
                         callback: (response: { access_token: string; expires_in: number }) => void
-                        error_callback?: (error: any) => void
+                        error_callback?: (error: unknown) => void
                     }) => {
                         requestAccessToken: (options?: { prompt?: string }) => void
                     }
@@ -104,9 +104,9 @@ export async function requestAccessToken(): Promise<YouTubeAuthTokens | null> {
                 
                 resolve({
                     accessToken: response.access_token,
-                    // Note: Token-based flow doesn't provide refresh tokens
-                    // User will need to re-authenticate when token expires
-                    refreshToken: "", 
+                    // Note: Google Identity Services token-based flow does NOT return refresh tokens.
+                    // This field is intentionally left empty and kept only for type compatibility / future use.
+                    refreshToken: "",
                     expiresAt: expiresAt,
                 })
             },
@@ -139,37 +139,55 @@ export async function getValidAccessToken(tokens: YouTubeAuthTokens): Promise<st
  * Fetch user's YouTube playlists
  */
 export async function fetchUserPlaylists(accessToken: string): Promise<YouTubePlaylist[]> {
+    const playlists: YouTubePlaylist[] = []
+    let pageToken: string | undefined
+
     try {
-        const response = await fetch(
-            "https://www.googleapis.com/youtube/v3/playlists?" +
-            new URLSearchParams({
+        do {
+            const params: Record<string, string> = {
                 part: "snippet,contentDetails",
                 mine: "true",
                 maxResults: "50",
-            }),
-            {
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                },
             }
-        )
 
-        if (response.ok === false) {
-            console.error("Failed to fetch playlists:", response.status)
-            return []
-        }
+            if (pageToken) {
+                params.pageToken = pageToken
+            }
 
-        const data = await response.json()
-        
-        return data.items?.map((item: any) => ({
-            id: item.id,
-            title: item.snippet.title,
-            description: item.snippet.description,
-            itemCount: item.contentDetails.itemCount,
-        })) || []
+            const response = await fetch(
+                "https://www.googleapis.com/youtube/v3/playlists?" +
+                new URLSearchParams(params),
+                {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                }
+            )
+
+            if (!response.ok) {
+                console.error("Failed to fetch playlists:", response.status)
+                return playlists
+            }
+
+            const data: { items?: any[]; nextPageToken?: string } = await response.json()
+
+            const items = data.items ?? []
+            for (const item of items) {
+                playlists.push({
+                    id: item.id,
+                    title: item.snippet.title,
+                    description: item.snippet.description,
+                    itemCount: item.contentDetails.itemCount,
+                })
+            }
+
+            pageToken = data.nextPageToken
+        } while (pageToken)
+
+        return playlists
     } catch (error) {
         console.error("Error fetching playlists:", error)
-        return []
+        return playlists
     }
 }
 
@@ -206,12 +224,18 @@ export async function createPlaylist(
             }
         )
 
-        if (response.ok === false) {
+        if (!response.ok) {
             console.error("Failed to create playlist:", response.status)
             return null
         }
 
         const data = await response.json()
+
+        if (!data || typeof data.id !== "string") {
+            console.error("Playlist created but response is missing a valid id field:", data)
+            return null
+        }
+
         return data.id
     } catch (error) {
         console.error("Error creating playlist:", error)
@@ -226,38 +250,55 @@ export async function fetchPlaylistItems(
     accessToken: string,
     playlistId: string
 ): Promise<YouTubePlaylistItem[]> {
+    const allItems: YouTubePlaylistItem[] = []
+    let pageToken: string | undefined
+
     try {
-        const response = await fetch(
-            "https://www.googleapis.com/youtube/v3/playlistItems?" +
-            new URLSearchParams({
+        do {
+            const params: Record<string, string> = {
                 part: "snippet,contentDetails",
                 playlistId,
                 maxResults: "50",
-            }),
-            {
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                },
             }
-        )
 
-        if (response.ok === false) {
-            console.error("Failed to fetch playlist items:", response.status)
-            return []
-        }
+            if (pageToken) {
+                params.pageToken = pageToken
+            }
 
-        const data = await response.json()
-        
-        return data.items?.map((item: any, index: number) => ({
-            id: item.id,
-            videoId: item.contentDetails.videoId,
-            title: item.snippet.title,
-            thumbnailUrl: item.snippet.thumbnails?.default?.url,
-            position: index,
-        })) || []
+            const response = await fetch(
+                "https://www.googleapis.com/youtube/v3/playlistItems?" +
+                new URLSearchParams(params),
+                {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                }
+            )
+
+            if (!response.ok) {
+                console.error("Failed to fetch playlist items:", response.status)
+                return allItems
+            }
+
+            const data: { items?: any[]; nextPageToken?: string } = await response.json()
+
+            const itemsForPage: YouTubePlaylistItem[] =
+                data.items?.map((item: any, index: number) => ({
+                    id: item.id,
+                    videoId: item.contentDetails.videoId,
+                    title: item.snippet.title,
+                    thumbnailUrl: item.snippet.thumbnails?.default?.url,
+                    position: allItems.length + index,
+                })) || []
+
+            allItems.push(...itemsForPage)
+            pageToken = data.nextPageToken
+        } while (pageToken)
+
+        return allItems
     } catch (error) {
         console.error("Error fetching playlist items:", error)
-        return []
+        return allItems
     }
 }
 
@@ -293,7 +334,7 @@ export async function addVideoToPlaylist(
             }
         )
 
-        if (response.ok === false) {
+        if (!response.ok) {
             console.error("Failed to add video to playlist:", response.status)
             return false
         }
@@ -326,7 +367,7 @@ export async function removeVideoFromPlaylist(
             }
         )
 
-        if (response.ok === false) {
+        if (!response.ok) {
             console.error("Failed to remove video from playlist:", response.status)
             return false
         }

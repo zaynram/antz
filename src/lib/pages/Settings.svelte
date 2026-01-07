@@ -798,7 +798,7 @@
     <div 
       class="bg-white dark:bg-slate-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6 shadow-xl" 
       onclick={(e) => e.stopPropagation()}
-      onkeydown={(e) => e.stopPropagation()}
+      onkeydown={(e) => { if (e.key === 'Escape') e.stopPropagation() }}
       role="dialog"
       aria-modal="true"
       tabindex="0"

@@ -33,8 +33,15 @@
       }
     }
     
-    document.addEventListener('click', handleClickOutside)
-    return () => document.removeEventListener('click', handleClickOutside)
+    // Defer attaching the listener to avoid capturing the opening click event
+    const timeoutId = window.setTimeout(() => {
+      document.addEventListener('click', handleClickOutside)
+    }, 0)
+    
+    return () => {
+      clearTimeout(timeoutId)
+      document.removeEventListener('click', handleClickOutside)
+    }
   })
 
   // Subscribe to videos collection

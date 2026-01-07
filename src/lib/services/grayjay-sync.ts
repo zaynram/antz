@@ -214,10 +214,13 @@ export async function copyToClipboard(text: string): Promise<boolean> {
         
         let success = false
         try {
-            // Try the old method
+            // Try the old method (deprecated but needed for older browsers)
             success = document.execCommand("copy")
+            if (!success) {
+                console.warn("Clipboard API not available and execCommand('copy') failed")
+            }
         } catch (err) {
-            console.warn("Copy fallback failed:", err)
+            console.warn("Copy fallback failed - Clipboard API not supported:", err)
         }
         
         document.body.removeChild(textarea)
