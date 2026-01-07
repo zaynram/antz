@@ -1,8 +1,11 @@
 /**
  * YouTube Data API integration for syncing video queue to YouTube playlists
  * 
+ * This service uses Google Identity Services for in-app OAuth authentication.
+ * No client secret required - uses token-based authentication safe for client-side apps.
+ * 
  * This service handles:
- * - OAuth2 authentication with YouTube
+ * - Token-based OAuth2 authentication with YouTube (Google Identity Services)
  * - Creating and managing playlists
  * - Adding/removing videos from playlists
  * - Syncing local video queue with YouTube playlist
@@ -26,119 +29,107 @@ export interface YouTubePlaylistItem {
     position: number
 }
 
+// Global reference to Google Identity Services
+declare global {
+    interface Window {
+        google?: {
+            accounts: {
+                oauth2: {
+                    initTokenClient: (config: {
+                        client_id: string
+                        scope: string
+                        callback: (response: { access_token: string; expires_in: number }) => void
+                        error_callback?: (error: any) => void
+                    }) => {
+                        requestAccessToken: (options?: { prompt?: string }) => void
+                    }
+                }
+            }
+        }
+    }
+}
+
 /**
  * Check if YouTube API is configured
  */
 export function isYouTubeAPIConfigured(): boolean {
-    return !!(youtubeAPIConfig.clientId && youtubeAPIConfig.apiKey)
+    return !!(youtubeAPIConfig.clientId && youtubeAPIConfig.clientId.length > 0)
 }
 
 /**
- * Generate OAuth2 authorization URL for YouTube
+ * Load Google Identity Services library
  */
-export function getYouTubeAuthUrl(state?: string): string {
-    if (!isYouTubeAPIConfigured()) {
-        throw new Error("YouTube API not configured")
+export async function loadGoogleIdentityServices(): Promise<boolean> {
+    // Check if already loaded
+    if (window.google?.accounts?.oauth2) {
+        return true
     }
 
-    const params = new URLSearchParams({
-        client_id: youtubeAPIConfig.clientId,
-        redirect_uri: youtubeAPIConfig.redirectUri,
-        response_type: "code",
-        scope: youtubeAPIConfig.scopes.join(" "),
-        access_type: "offline", // Get refresh token
-        prompt: "consent", // Force consent screen to get refresh token
-        state: state || "", // CSRF protection token
+    return new Promise((resolve) => {
+        // Load the script
+        const script = document.createElement('script')
+        script.src = 'https://accounts.google.com/gsi/client'
+        script.async = true
+        script.defer = true
+        script.onload = () => resolve(true)
+        script.onerror = () => resolve(false)
+        document.head.appendChild(script)
     })
-
-    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
 }
 
 /**
- * Exchange authorization code for access and refresh tokens
+ * Request access token using Google Identity Services
+ * Opens OAuth consent screen for user to grant permissions
  */
-export async function exchangeCodeForTokens(code: string): Promise<YouTubeAuthTokens | null> {
-    try {
-        const response = await fetch("https://oauth2.googleapis.com/token", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-                code,
-                client_id: youtubeAPIConfig.clientId,
-                client_secret: youtubeAPIConfig.clientSecret,
-                redirect_uri: youtubeAPIConfig.redirectUri,
-                grant_type: "authorization_code",
-            }),
-        })
-
-        if (response.ok === false) {
-            console.error("Failed to exchange code for tokens:", response.status)
-            return null
-        }
-
-        const data = await response.json()
-        
-        return {
-            accessToken: data.access_token,
-            refreshToken: data.refresh_token,
-            expiresAt: Date.now() + (data.expires_in * 1000),
-        }
-    } catch (error) {
-        console.error("Error exchanging code for tokens:", error)
+export async function requestAccessToken(): Promise<YouTubeAuthTokens | null> {
+    if (!isYouTubeAPIConfigured()) {
+        console.error("YouTube API not configured")
         return null
     }
-}
 
-/**
- * Refresh access token using refresh token
- */
-export async function refreshAccessToken(refreshToken: string): Promise<YouTubeAuthTokens | null> {
-    try {
-        const response = await fetch("https://oauth2.googleapis.com/token", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-                refresh_token: refreshToken,
-                client_id: youtubeAPIConfig.clientId,
-                client_secret: youtubeAPIConfig.clientSecret,
-                grant_type: "refresh_token",
-            }),
-        })
-
-        if (response.ok === false) {
-            console.error("Failed to refresh access token:", response.status)
-            return null
-        }
-
-        const data = await response.json()
-        
-        return {
-            accessToken: data.access_token,
-            refreshToken: refreshToken, // Keep the same refresh token
-            expiresAt: Date.now() + (data.expires_in * 1000),
-        }
-    } catch (error) {
-        console.error("Error refreshing access token:", error)
+    // Ensure Google Identity Services is loaded
+    const loaded = await loadGoogleIdentityServices()
+    if (!loaded || !window.google?.accounts?.oauth2) {
+        console.error("Failed to load Google Identity Services")
         return null
     }
+
+    return new Promise((resolve) => {
+        const client = window.google!.accounts.oauth2.initTokenClient({
+            client_id: youtubeAPIConfig.clientId,
+            scope: youtubeAPIConfig.scopes.join(' '),
+            callback: (response) => {
+                // Calculate expiration time
+                const expiresAt = Date.now() + (response.expires_in * 1000)
+                
+                resolve({
+                    accessToken: response.access_token,
+                    // Note: Token-based flow doesn't provide refresh tokens
+                    // User will need to re-authenticate when token expires
+                    refreshToken: "", 
+                    expiresAt: expiresAt,
+                })
+            },
+            error_callback: (error) => {
+                console.error("OAuth error:", error)
+                resolve(null)
+            }
+        })
+
+        // Request access token (will show OAuth consent screen)
+        client.requestAccessToken({ prompt: '' })
+    })
 }
 
 /**
- * Get valid access token, refreshing if necessary
+ * Get valid access token
+ * For token-based flow, we don't have refresh tokens, so user needs to re-authenticate
  */
 export async function getValidAccessToken(tokens: YouTubeAuthTokens): Promise<string | null> {
     // Check if token is expired or will expire in the next 5 minutes
     if (tokens.expiresAt - Date.now() < 5 * 60 * 1000) {
-        const refreshed = await refreshAccessToken(tokens.refreshToken)
-        if (!refreshed) {
-            return null
-        }
-        // Note: Caller should update the stored tokens
-        return refreshed.accessToken
+        // Token expired or expiring soon - need to request new token
+        return null
     }
     
     return tokens.accessToken

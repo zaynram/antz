@@ -20,9 +20,6 @@ export interface GoogleMapsConfig {
 
 export interface YouTubeAPIConfig {
     clientId: string
-    clientSecret: string
-    apiKey: string
-    redirectUri: string
     scopes: string[]
 }
 
@@ -53,15 +50,14 @@ export const googleMapsConfig: GoogleMapsConfig = {
     placesApiUrl: "https://maps.googleapis.com/maps/api/place",
 }
 
-// YouTube Data API configuration
+// YouTube OAuth configuration
+// Uses Google Identity Services for in-app OAuth flow
+// Client ID is safe to embed in client-side code (public client)
 // Get from: https://console.cloud.google.com/apis/credentials
 // Enable: YouTube Data API v3
-// Create OAuth 2.0 Client ID for Web application
+// Create OAuth 2.0 Client ID for Web application (JavaScript origins + redirect URIs)
 export const youtubeAPIConfig: YouTubeAPIConfig = {
-    clientId: "", // Add your OAuth 2.0 Client ID here
-    clientSecret: "", // Add your OAuth 2.0 Client Secret here (keep secure!)
-    apiKey: "", // Add your API key here (for public data access)
-    redirectUri: typeof window !== "undefined" ? `${window.location.origin}/oauth/youtube/callback` : "",
+    clientId: "", // Add your OAuth 2.0 Client ID here (public client, safe to expose)
     scopes: [
         "https://www.googleapis.com/auth/youtube.readonly",
         "https://www.googleapis.com/auth/youtube.force-ssl",

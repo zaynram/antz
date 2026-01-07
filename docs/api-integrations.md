@@ -384,17 +384,23 @@ For offline support, Firestore data is cached automatically by Firebase SDK.
 
 ## YouTube Data API (`src/lib/services/youtube-sync.ts`)
 
-Integration for syncing video queue to YouTube playlists.
+Integration for syncing video queue to YouTube playlists using Google Identity Services.
+
+### About Google Identity Services
+
+This integration uses Google Identity Services (GIS), which provides secure, token-based OAuth 2.0 authentication for client-side web applications. Key features:
+
+- **No client secret required** - Safe for client-side applications
+- **Token-based authentication** - Uses access tokens, not authorization codes
+- **In-app OAuth flow** - Users authenticate directly in the app
+- **Secure by design** - Client ID can be safely embedded in client code
 
 ### Configuration
 
 ```typescript
 // src/lib/config.ts
 export const youtubeAPIConfig: YouTubeAPIConfig = {
-  clientId: "YOUR_CLIENT_ID",
-  clientSecret: "YOUR_CLIENT_SECRET", 
-  apiKey: "YOUR_API_KEY",
-  redirectUri: "http://localhost:5173/oauth/youtube/callback",
+  clientId: "YOUR_CLIENT_ID.apps.googleusercontent.com",
   scopes: [
     "https://www.googleapis.com/auth/youtube.readonly",
     "https://www.googleapis.com/auth/youtube.force-ssl",
@@ -409,19 +415,40 @@ export const youtubeAPIConfig: YouTubeAPIConfig = {
    - Create a new project or select existing one
    - Enable YouTube Data API v3
 
-2. **Create OAuth 2.0 Credentials**
+2. **Create OAuth 2.0 Client ID**
    - Go to Credentials section
-   - Create OAuth 2.0 Client ID (Web application)
-   - Add authorized redirect URI: `http://localhost:5173/oauth/youtube/callback` (dev) and your production URL
-   - Copy Client ID and Client Secret
+   - Create OAuth 2.0 Client ID
+   - **Application type**: Web application
+   - **Authorized JavaScript origins**: Add your app origins (e.g., `http://localhost:5173`, `https://yourdomain.com`)
+   - **Authorized redirect URIs**: Not needed for token-based flow
+   - Copy Client ID (no client secret needed!)
 
-3. **Create API Key**
-   - Create API key (optional, for public data access)
-   - Restrict to YouTube Data API v3
+3. **Configure App**
+   - Add Client ID to `src/lib/config.ts`
+   - Client ID is public and safe to commit to repository
 
-4. **Configure App**
-   - Add credentials to `src/lib/config.ts`
-   - Deploy and test OAuth flow
+4. **Test Authentication**
+   - Go to Settings → Video Queue Integration
+   - Select YouTube
+   - Click "Connect YouTube Account"
+   - Grant permissions in popup
+   - Token is stored securely in user preferences
+
+### How It Works
+
+1. **User initiates connection**: Clicks "Connect YouTube Account" in Settings
+2. **Google Identity Services loads**: Script loads from `accounts.google.com/gsi/client`
+3. **OAuth popup appears**: User sees Google's permission screen
+4. **Token received**: Access token returned to app (valid for ~1 hour)
+5. **Token stored**: Saved in user's Firestore preferences
+6. **Sync enabled**: User can now sync videos to YouTube playlist
+
+### Token Management
+
+- **Access tokens expire after ~1 hour**
+- **No refresh tokens** with this flow (security/privacy design)
+- **User must re-authenticate** when token expires
+- **Seamless re-auth**: Click "Connect YouTube Account" again when needed
 
 ### Functions
 
@@ -435,38 +462,32 @@ if (isYouTubeAPIConfigured()) {
 }
 ```
 
-#### `getYouTubeAuthUrl(state?)`
+#### `loadGoogleIdentityServices()`
 
-Generate OAuth2 authorization URL:
+Load the Google Identity Services library:
 
 ```typescript
-const authUrl = getYouTubeAuthUrl(csrfToken)
-window.location.href = authUrl
+const loaded = await loadGoogleIdentityServices()
+// Returns true if loaded successfully
 ```
 
-#### `exchangeCodeForTokens(code)`
+#### `requestAccessToken()`
 
-Exchange authorization code for tokens:
-
-```typescript
-const tokens = await exchangeCodeForTokens(authCode)
-// Returns: { accessToken, refreshToken, expiresAt }
-```
-
-#### `refreshAccessToken(refreshToken)`
-
-Refresh expired access token:
+Request access token (shows OAuth popup):
 
 ```typescript
-const newTokens = await refreshAccessToken(oldRefreshToken)
+const tokens = await requestAccessToken()
+// Returns: { accessToken, refreshToken: "", expiresAt }
+// or null if user cancels/error occurs
 ```
 
 #### `getValidAccessToken(tokens)`
 
-Get valid token, refreshing if necessary:
+Check if token is still valid:
 
 ```typescript
 const accessToken = await getValidAccessToken(userTokens)
+// Returns token if valid, null if expired
 ```
 
 #### `fetchUserPlaylists(accessToken)`

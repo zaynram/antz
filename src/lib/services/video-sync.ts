@@ -53,7 +53,7 @@ async function syncToYouTube(
         return {
             success: false,
             platform: "youtube",
-            message: "YouTube API is not configured. Please contact the administrator.",
+            message: "YouTube integration is not configured. Please add a Client ID in the app configuration.",
         }
     }
     
@@ -76,13 +76,13 @@ async function syncToYouTube(
     }
     
     try {
-        // Get valid access token (refresh if needed)
+        // Get valid access token (check if expired)
         const accessToken = await YouTubeSync.getValidAccessToken(userPreferences.youtubeAuth)
         if (!accessToken) {
             return {
                 success: false,
                 platform: "youtube",
-                message: "Failed to refresh YouTube authentication. Please reconnect your account.",
+                message: "Your YouTube session has expired. Please reconnect your account in settings.",
             }
         }
         

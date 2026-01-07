@@ -7,7 +7,7 @@
   import type { GeoLocation, LocationMode, Theme, VideoSyncPlatform } from '$lib/types'
   import { Camera, Info, Loader2, LogOut, MapPin, Moon, Palette, RefreshCw, Settings, Sun, User, Video, X, Download, ExternalLink as ExternalLinkIcon } from 'lucide-svelte'
   import { toast } from 'svelte-sonner'
-  import { isYouTubeAPIConfigured, getYouTubeAuthUrl } from '$lib/services/youtube-sync'
+  import { isYouTubeAPIConfigured, requestAccessToken } from '$lib/services/youtube-sync'
 
   interface Props {
     navigate: (path: string) => void
@@ -245,19 +245,37 @@
     savePreferences()
   }
 
-  function handleConnectYouTube(): void {
+  async function handleConnectYouTube(): Promise<void> {
     if (!isYouTubeAPIConfigured()) {
-      toast.error('YouTube API is not configured. Please contact the administrator.')
+      toast.error('YouTube integration is not configured. Please add a Client ID in the app configuration.')
       return
     }
     
-    // Generate state token for CSRF protection
-    const state = Math.random().toString(36).substring(7)
-    localStorage.setItem('youtube_oauth_state', state)
-    
-    // Redirect to YouTube OAuth
-    const authUrl = getYouTubeAuthUrl(state)
-    window.location.href = authUrl
+    try {
+      // Request access token using Google Identity Services
+      const tokens = await requestAccessToken()
+      
+      if (!tokens) {
+        toast.error('Failed to authenticate with YouTube. Please try again.')
+        return
+      }
+      
+      // Store tokens in user preferences
+      userPreferences.update(prefs => ({
+        ...prefs,
+        [$activeUser]: {
+          ...prefs[$activeUser],
+          youtubeAuth: tokens,
+          lastUpdated: Date.now()
+        }
+      }))
+      
+      await immediateSavePreferences()
+      toast.success('Successfully connected to YouTube!')
+    } catch (error) {
+      console.error('YouTube auth error:', error)
+      toast.error('Authentication failed. Please try again.')
+    }
   }
 
   function handleDisconnectYouTube(): void {
@@ -650,19 +668,22 @@
       {#if localVideoSyncPlatform === 'youtube'}
         <div class="space-y-3 pt-2">
           <p class="text-sm text-slate-600 dark:text-slate-400">
-            Sync your video queue with a YouTube playlist. Videos marked as "queued" will be added to the playlist.
+            Connect your YouTube account to sync your video queue with a YouTube playlist. Uses Google's secure in-app authentication.
           </p>
           
           {#if !isYouTubeAPIConfigured()}
             <div class="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
               <p class="text-sm text-amber-800 dark:text-amber-200">
-                YouTube API is not configured. Please contact the administrator to set up YouTube integration.
+                YouTube integration needs configuration. Please add a Client ID in the app settings.
               </p>
             </div>
           {:else if $currentPreferences?.youtubeAuth}
             <div class="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
               <p class="text-sm text-green-800 dark:text-green-200 mb-2">
                 ✓ Connected to YouTube
+              </p>
+              <p class="text-xs text-green-700 dark:text-green-300 mb-3">
+                Token expires: {new Date($currentPreferences.youtubeAuth.expiresAt).toLocaleString()}
               </p>
               <button
                 type="button"
@@ -681,6 +702,9 @@
               <ExternalLinkIcon size={18} />
               <span>Connect YouTube Account</span>
             </button>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              You'll be prompted to grant permissions to manage your YouTube playlists.
+            </p>
           {/if}
         </div>
       {/if}

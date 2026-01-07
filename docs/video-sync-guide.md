@@ -1,12 +1,12 @@
 # Video Queue Sync - User Guide
 
-This guide explains how to sync your video queue with YouTube or Grayjay.
+This guide explains how to sync your video queue with YouTube or export for Grayjay.
 
 ## Overview
 
 The video queue sync feature allows you to keep your app's video queue synchronized with external platforms:
 
-- **YouTube**: Automatic two-way sync with a YouTube playlist
+- **YouTube**: In-app OAuth authentication with token-based sync to YouTube playlist
 - **Grayjay**: Export-based integration with FUTO's Grayjay app
 
 Each user (Z & T) can configure their own sync platform independently.
@@ -20,25 +20,36 @@ Each user (Z & T) can configure their own sync platform independently.
 When enabled, YouTube sync:
 - ✅ Adds videos marked as "queued" to your YouTube playlist
 - ✅ Removes videos from the playlist when no longer queued
-- ✅ Works automatically when you click the sync button
+- ✅ Works with secure in-app authentication (Google Identity Services)
 - ❌ Does NOT sync watched or skipped videos
+
+### How It Works
+
+**Token-Based Authentication:**
+- Uses Google Identity Services for secure, in-app OAuth
+- No redirect to external pages - authentication happens in a popup
+- Access tokens are valid for ~1 hour
+- You'll need to reconnect when the token expires (quick and easy)
 
 ### Setup Steps
 
-1. **Enable YouTube API** (Administrator Only)
-   - The app administrator needs to configure YouTube API credentials
-   - See `docs/api-integrations.md` for setup instructions
+1. **Administrator Configuration** (One-time Setup)
+   - An app administrator needs to configure a Google OAuth Client ID
+   - This is a public identifier (safe to include in the app)
+   - No client secret needed - designed for client-side security
+   - See `docs/api-integrations.md` for detailed setup
 
 2. **Connect Your Account**
    - Go to Settings
    - Scroll to "Video Queue Integration"
    - Select "YouTube" as your platform
    - Click "Connect YouTube Account"
-   - Sign in with your Google account
+   - A popup will appear asking you to sign in with Google
    - Grant permissions for playlist access
+   - Your access token is stored securely
 
 3. **Select or Create Playlist**
-   - After connecting, you'll need to select which playlist to sync
+   - After connecting, select which playlist to sync
    - You can create a new playlist or use an existing one
    - Recommended: Create a dedicated "Video Queue" playlist
 
@@ -67,7 +78,20 @@ When enabled, YouTube sync:
 - Unlisted playlists are accessible via link
 - Public playlists appear in search results
 
+**Token Expiration**
+- Access tokens expire after approximately 1 hour
+- You'll see a message when your token expires
+- Simply click "Connect YouTube Account" again to reconnect
+- The process is quick (no need to re-grant permissions each time)
+- Your playlist selection is preserved
+
 ### Troubleshooting
+
+**"YouTube session has expired"**
+- Your access token has expired (normal after ~1 hour)
+- Go to Settings → Video Queue Integration
+- Click "Connect YouTube Account" to get a new token
+- This is a security feature to protect your account
 
 **"Not connected to YouTube"**
 - Go to Settings and connect your account
