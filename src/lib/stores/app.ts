@@ -37,6 +37,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         unitSystem: "metric",
         locationMode: "off",
         searchRadius: 5000,
+        videoSyncPlatform: "none",
         lastUpdated: Date.now(),
     },
     T: {
@@ -46,6 +47,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         unitSystem: "metric",
         locationMode: "off",
         searchRadius: 5000,
+        videoSyncPlatform: "none",
         lastUpdated: Date.now(),
     },
 }
@@ -127,6 +129,8 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
         "currentLocation",
         "referenceLocation",
         "searchRadius",
+        "videoSyncPlatform",
+        "youtubePlaylistId",
     ]
 
     for (const userId of ["Z", "T"] as const) {
@@ -150,6 +154,24 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
                 return false
             }
         }
+        
+        // Check youtubeAuth separately (compare accessToken and expiresAt)
+        const aYTAuth = aPrefs.youtubeAuth
+        const bYTAuth = bPrefs.youtubeAuth
+        if (!aYTAuth && !bYTAuth) {
+            // both undefined/null – equal
+        } else if (!aYTAuth || !bYTAuth) {
+            // one is present and the other is not
+            return false
+        } else {
+            if (aYTAuth.accessToken !== bYTAuth.accessToken) return false
+            if (aYTAuth.expiresAt !== bYTAuth.expiresAt) return false
+        }
+        
+        // Check grayjayConfig separately
+        const aGJEnabled = aPrefs.grayjayConfig?.enabled
+        const bGJEnabled = bPrefs.grayjayConfig?.enabled
+        if (aGJEnabled !== bGJEnabled) return false
     }
     return true
 }
