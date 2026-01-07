@@ -63,7 +63,7 @@ export const googleMapsConfig: GoogleMapsConfig = {
 // Enable: YouTube Data API v3
 // Create OAuth 2.0 Client ID for Web application (JavaScript origins + redirect URIs)
 export const youtubeAPIConfig: YouTubeAPIConfig = {
-    clientId: "", // Add your OAuth 2.0 Client ID here (public client, safe to expose)
+    clientId: "54919245814-lmhbib027sjf701os1gg39bknfht4fgt.apps.googleusercontent.com", // Add your OAuth 2.0 Client ID here (public client, safe to expose)
     scopes: [
         "https://www.googleapis.com/auth/youtube.readonly",
         "https://www.googleapis.com/auth/youtube.force-ssl",
