@@ -187,7 +187,7 @@
   ontouchend={handleTouchEnd}
 >
   <!-- Header with user info -->
-  <header class="p-4 pt-6 border-b border-slate-200 dark:border-slate-700">
+  <header class="p-4 border-b border-slate-200 dark:border-slate-700 safe-area-top">
     <button
       type="button"
       class="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors touch-manipulation"
