@@ -72,6 +72,15 @@ bunx firebase deploy --only hosting
 - Ensure the JSON content is complete and valid
 - Check that the service account has the necessary permissions
 
+### Preview URL shows "auth/unauthorized-domain" error
+Firebase preview URLs are automatically authorized when using the Firebase Hosting GitHub Action. If you see this error:
+
+1. **Check Firebase Console**: Go to Firebase Console → Authentication → Settings → Authorized domains
+2. **Verify auto-authorization**: Preview channel domains (format: `projectId--channelId-randomid.web.app`) should be auto-added
+3. **Manual fix if needed**: If the domain is not listed, add the pattern manually:
+   - For auto-generated channels: `antz-antz--pr*-*.web.app`
+   - Alternatively, remove the `channelId` parameter in the workflow to let Firebase auto-generate unique channel IDs per PR
+
 ### Build fails
 - Review the build logs in GitHub Actions
 - Ensure all dependencies are correctly specified in `package.json`

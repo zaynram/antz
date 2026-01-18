@@ -156,8 +156,10 @@ export async function uploadFileToDrive(
     // For iOS compatibility, use the direct drive.google.com URL format
     // This format is more reliable than thumbnailLink for cross-origin loading
     // Add a timestamp to prevent iOS caching issues
+    // Add file extension hint for GIF detection in getIOSCompatibleImageUrl
     const timestamp = Date.now()
-    const publicUrl = `https://drive.google.com/thumbnail?id=${uploadData.id}&sz=w400&timestamp=${timestamp}`
+    const extension = existingFileName.split('.').pop()?.toLowerCase() || ''
+    const publicUrl = `https://drive.google.com/thumbnail?id=${uploadData.id}&sz=w400&timestamp=${timestamp}&ext=${extension}`
 
     return {
         id: uploadData.id,
@@ -306,21 +308,50 @@ export async function deleteFileFromDrive(folderPath: string[], filename: string
 }
 
 /**
+ * Get file extension from MIME type
+ */
+function getExtensionFromMimeType(mimeType: string): string {
+    const mimeMap: Record<string, string> = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/gif': 'gif',
+        'image/webp': 'webp',
+    }
+    return mimeMap[mimeType] || 'jpg'
+}
+
+/**
  * Upload a profile picture for a user
- * Stores as: app/img/z_pfp.jpg or app/img/t_pfp.jpg
+ * Stores as: app/img/z_pfp.{ext} or app/img/t_pfp.{ext}
+ * Supports jpg, png, gif, and webp formats
  */
 export async function uploadProfilePicture(userId: string, file: File): Promise<string> {
-    const filename = `${userId.toLowerCase()}_pfp.jpg`
+    const extension = getExtensionFromMimeType(file.type)
+    const filename = `${userId.toLowerCase()}_pfp.${extension}`
     const result = await uploadFileToDrive(file, [IMG_FOLDER], filename)
     return result.webContentLink
 }
 
 /**
  * Delete a user's profile picture
+ * Tries all possible extensions since we don't store the extension metadata
+ * This approach minimizes complexity by not requiring a separate metadata store,
+ * and the extra API calls are negligible for this use case (user-initiated action)
  */
 export async function deleteProfilePicture(userId: string): Promise<void> {
-    const filename = `${userId.toLowerCase()}_pfp.jpg`
-    await deleteFileFromDrive([IMG_FOLDER], filename)
+    const extensions = ['jpg', 'png', 'gif', 'webp', 'jpeg']
+    const userPrefix = userId.toLowerCase()
+    
+    // Try to delete all possible profile picture files for this user
+    for (const ext of extensions) {
+        const filename = `${userPrefix}_pfp.${ext}`
+        try {
+            await deleteFileFromDrive([IMG_FOLDER], filename)
+        } catch (e) {
+            // Continue trying other extensions
+            console.debug(`No ${ext} profile picture found for ${userId}`)
+        }
+    }
 }
 
 /**

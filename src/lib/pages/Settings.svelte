@@ -460,7 +460,7 @@
               <Camera size={16} />
               <span>{localProfilePicture ? 'Change' : 'Upload'} Photo</span>
             </button>
-            <p class="text-xs text-slate-400 mt-1">Max 5MB, JPG/PNG</p>
+            <p class="text-xs text-slate-400 mt-1">Max 5MB, JPG/PNG/GIF/WebP</p>
           </div>
         </div>
       </div>
