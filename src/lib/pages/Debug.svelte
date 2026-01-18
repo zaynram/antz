@@ -1,7 +1,7 @@
 ﻿<script lang="ts">
   import { tmdbConfig } from '$lib/config'
   import { db, subscribeToCollection } from '$lib/firebase'
-  import { createComment, createIssue, formatDate, hasGitHubToken, listComments, listIssues, updateIssue, type GitHubIssue, type GitHubComment } from '$lib/github'
+  import { createComment, createIssue, formatDate, hasGitHubToken, listComments, listIssues, testGitHubToken, updateIssue, type GitHubApiError, type GitHubIssue, type GitHubComment } from '$lib/github'
   import { activeUser, currentPreferences } from '$lib/stores/app'
   import type { Media, Note, Place, Video } from '$lib/types'
   import { createEmptyRatings } from '$lib/types'
@@ -384,7 +384,20 @@
       // issuesHasMore = result.hasMore // Reserved for pagination
     } catch (err) {
       console.error('Failed to load issues:', err)
-      toast.error('Failed to load issues')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load issues'
+      toast.error(errorMessage)
+      
+      // Test token if we got an auth error (401 or 403 status code)
+      if (err && typeof err === 'object' && 'status' in err) {
+        const apiError = err as GitHubApiError
+        if (apiError.status === 401 || apiError.status === 403) {
+          const tokenTest = await testGitHubToken()
+          if (!tokenTest.valid) {
+            console.error('Token validation failed:', tokenTest.error)
+            toast.error(`Token issue: ${tokenTest.error}`)
+          }
+        }
+      }
     } finally {
       issuesLoading = false
     }
@@ -1068,7 +1081,6 @@
                 onclick={() => { showEditIssue = false; editIssueTitle = ''; editIssueBody = '' }}
                 class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
                 aria-label="Close edit issue form"
-
               >
                 <X size={16} />
               </button>
