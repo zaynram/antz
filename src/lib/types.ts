@@ -19,6 +19,21 @@ export type LocationMode = "auto" | "manual" | "off"
 
 export type UnitSystem = "metric" | "imperial"
 
+export type VideoSyncPlatform = "none" | "youtube" | "grayjay"
+
+export interface YouTubeAuthTokens {
+    accessToken: string
+    refreshToken: string
+    expiresAt: number // Timestamp when access token expires
+}
+
+export interface GrayjayConfig {
+    // Configuration for Grayjay integration
+    // This could include plugin settings or API endpoints
+    enabled: boolean
+    customSettings?: Record<string, unknown>
+}
+
 export interface GeoLocation {
     lat: number
     lng: number
@@ -36,6 +51,11 @@ export interface UserPreferences {
     currentLocation?: GeoLocation // Auto-detected or manually set
     referenceLocation?: GeoLocation // For "suggest places near X"
     searchRadius: number // meters (default 5000)
+    // Video sync settings
+    videoSyncPlatform?: VideoSyncPlatform // Platform to sync video queue with
+    youtubeAuth?: YouTubeAuthTokens // YouTube OAuth tokens
+    youtubePlaylistId?: string // ID of the YouTube playlist to sync with
+    grayjayConfig?: GrayjayConfig // Grayjay configuration
     lastUpdated?: number // Timestamp for conflict resolution
 }
 

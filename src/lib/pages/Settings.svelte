@@ -4,9 +4,10 @@
   import { deleteProfilePicture, logOut, uploadProfilePicture } from '$lib/firebase'
   import { hapticLight } from '$lib/haptics'
   import { activeUser, currentPreferences, displayAbbreviations, immediateSavePreferences, userPreferences } from '$lib/stores/app'
-  import type { GeoLocation, LocationMode, Theme } from '$lib/types'
-  import { Camera, Info, Loader2, LogOut, MapPin, Moon, Palette, RefreshCw, Settings, Sun, User, X } from 'lucide-svelte'
+  import type { GeoLocation, LocationMode, Theme, VideoSyncPlatform } from '$lib/types'
+  import { Camera, Info, Loader2, LogOut, MapPin, Moon, Palette, RefreshCw, Settings, Sun, User, Video, X, Download, ExternalLink as ExternalLinkIcon } from 'lucide-svelte'
   import { toast } from 'svelte-sonner'
+  import { isYouTubeAPIConfigured, requestAccessToken } from '$lib/services/youtube-sync'
 
   interface Props {
     navigate: (path: string) => void
@@ -26,10 +27,12 @@
   let localCurrentLocation = $state<GeoLocation | undefined>(undefined)
   let localReferenceLocation = $state<GeoLocation | undefined>(undefined)
   let localSearchRadius = $state(5000)
+  let localVideoSyncPlatform = $state<VideoSyncPlatform>('none')
 
   // App state
   let isReloading = $state(false)
   let updateAvailable = $state(false)
+  let showGrayjayInstructions = $state(false)
 
   // Tap-5-times for debug access
   let tapCount = 0
@@ -84,6 +87,7 @@
       localCurrentLocation = $currentPreferences.currentLocation
       localReferenceLocation = $currentPreferences.referenceLocation
       localSearchRadius = $currentPreferences.searchRadius
+      localVideoSyncPlatform = $currentPreferences.videoSyncPlatform || 'none'
       previousUser = $activeUser
     }
   })
@@ -172,6 +176,10 @@
         currentLocation: localCurrentLocation,
         referenceLocation: localReferenceLocation,
         searchRadius: localSearchRadius,
+        videoSyncPlatform: localVideoSyncPlatform,
+        youtubeAuth: prefs[$activeUser]?.youtubeAuth,
+        youtubePlaylistId: prefs[$activeUser]?.youtubePlaylistId,
+        grayjayConfig: prefs[$activeUser]?.grayjayConfig,
         lastUpdated: Date.now()
       }
     }))
@@ -229,6 +237,67 @@
 
   function handleRadiusChange(): void {
     savePreferences()
+  }
+
+  function handleVideoSyncPlatformChange(platform: VideoSyncPlatform): void {
+    hapticLight()
+    localVideoSyncPlatform = platform
+    savePreferences()
+  }
+
+  async function handleConnectYouTube(): Promise<void> {
+    if (!isYouTubeAPIConfigured()) {
+      toast.error('YouTube integration is not configured. Please add a Client ID in the app configuration.')
+      return
+    }
+    
+    try {
+      // Request access token using Google Identity Services
+      const tokens = await requestAccessToken()
+      
+      if (!tokens) {
+        toast.error('Failed to authenticate with YouTube. Please try again.')
+        return
+      }
+      
+      // Store tokens in user preferences
+      userPreferences.update(prefs => ({
+        ...prefs,
+        [$activeUser]: {
+          ...prefs[$activeUser],
+          youtubeAuth: tokens,
+          lastUpdated: Date.now()
+        }
+      }))
+      
+      await immediateSavePreferences()
+      toast.success('Successfully connected to YouTube!')
+    } catch (error) {
+      console.error('YouTube auth error:', error)
+      toast.error('Authentication failed. Please try again.')
+    }
+  }
+
+  function handleDisconnectYouTube(): void {
+    userPreferences.update(prefs => ({
+      ...prefs,
+      [$activeUser]: {
+        ...prefs[$activeUser],
+        youtubeAuth: undefined,
+        youtubePlaylistId: undefined,
+        lastUpdated: Date.now()
+      }
+    }))
+    toast.success('Disconnected from YouTube')
+  }
+
+  function handleExportForGrayjay(): void {
+    // This requires access to videos, which we'll handle in the Videos page instead
+    toast.info('Please use the export button on the Videos page')
+  }
+
+  function handleShowGrayjayInstructions(): void {
+    showGrayjayInstructions = true
   }
 
   async function reloadApp(): Promise<void> {
@@ -562,6 +631,116 @@
       {/if}
     </section>
 
+    <!-- Video Queue Integration Settings -->
+    <section class="card p-4 space-y-4">
+      <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-2">
+        <Video size={16} />
+        Video Queue Integration
+      </h2>
+
+      <div>
+        <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Sync Platform</span>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localVideoSyncPlatform === 'none' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            onclick={() => handleVideoSyncPlatformChange('none')}
+          >
+            None
+          </button>
+          <button
+            type="button"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localVideoSyncPlatform === 'youtube' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            onclick={() => handleVideoSyncPlatformChange('youtube')}
+          >
+            YouTube
+          </button>
+          <button
+            type="button"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localVideoSyncPlatform === 'grayjay' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            onclick={() => handleVideoSyncPlatformChange('grayjay')}
+          >
+            Grayjay
+          </button>
+        </div>
+      </div>
+
+      {#if localVideoSyncPlatform === 'youtube'}
+        <div class="space-y-3 pt-2">
+          <p class="text-sm text-slate-600 dark:text-slate-400">
+            Connect your YouTube account to sync your video queue with a YouTube playlist. Uses Google's secure in-app authentication.
+          </p>
+          
+          {#if !isYouTubeAPIConfigured()}
+            <div class="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <p class="text-sm text-amber-800 dark:text-amber-200">
+                YouTube integration needs configuration. Please add a Client ID in the app settings.
+              </p>
+            </div>
+          {:else if $currentPreferences?.youtubeAuth}
+            <div class="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+              <p class="text-sm text-green-800 dark:text-green-200 mb-2">
+                ✓ Connected to YouTube
+              </p>
+              <p class="text-xs text-green-700 dark:text-green-300 mb-3">
+                Token expires: {new Date($currentPreferences.youtubeAuth.expiresAt).toLocaleString()}
+              </p>
+              <button
+                type="button"
+                class="btn-secondary text-sm"
+                onclick={handleDisconnectYouTube}
+              >
+                Disconnect
+              </button>
+            </div>
+          {:else}
+            <button
+              type="button"
+              class="btn-primary w-full"
+              onclick={handleConnectYouTube}
+            >
+              <ExternalLinkIcon size={18} />
+              <span>Connect YouTube Account</span>
+            </button>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              You'll be prompted to grant permissions to manage your YouTube playlists.
+            </p>
+          {/if}
+        </div>
+      {/if}
+
+      {#if localVideoSyncPlatform === 'grayjay'}
+        <div class="space-y-3 pt-2">
+          <p class="text-sm text-slate-600 dark:text-slate-400">
+            Export your video queue for use with Grayjay. Grayjay is a privacy-focused video aggregator by FUTO.
+          </p>
+          
+          <div class="flex gap-2">
+            <button
+              type="button"
+              class="btn-secondary flex-1 text-sm"
+              onclick={handleShowGrayjayInstructions}
+            >
+              <Info size={16} />
+              <span>Instructions</span>
+            </button>
+            <button
+              type="button"
+              class="btn-secondary flex-1 text-sm"
+              onclick={handleExportForGrayjay}
+            >
+              <Download size={16} />
+              <span>Export</span>
+            </button>
+          </div>
+
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            Note: Use the Export button on the Videos page to download your queue for Grayjay.
+          </p>
+        </div>
+      {/if}
+    </section>
+
     <!-- App Settings -->
     <section class="card p-4 space-y-4">
       <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -605,3 +784,98 @@
     </section>
   </div>
 </div>
+
+<!-- Grayjay Instructions Modal -->
+{#if showGrayjayInstructions}
+  <div 
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" 
+    onclick={() => showGrayjayInstructions = false}
+    onkeydown={(e) => e.key === 'Escape' && (showGrayjayInstructions = false)}
+    role="button"
+    tabindex="-1"
+    aria-label="Close modal"
+  >
+    <div 
+      class="bg-white dark:bg-slate-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6 shadow-xl" 
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => { if (e.key === 'Escape') e.stopPropagation() }}
+      role="dialog"
+      aria-modal="true"
+      tabindex="0"
+    >
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">Grayjay Integration</h2>
+        <button
+          onclick={() => showGrayjayInstructions = false}
+          class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+        >
+          <X size={20} />
+        </button>
+      </div>
+      
+      <div class="prose prose-sm dark:prose-invert max-w-none">
+        <p class="text-slate-600 dark:text-slate-400">
+          Grayjay is a privacy-focused video aggregator by FUTO that allows you to follow creators across multiple platforms.
+        </p>
+        
+        <h3 class="text-lg font-semibold mt-4 mb-2">Integration Options</h3>
+        
+        <div class="space-y-4">
+          <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+            <h4 class="font-semibold mb-1">Option 1: Deep Links</h4>
+            <p class="text-sm text-slate-600 dark:text-slate-400">
+              Click the Grayjay icon next to any video in your queue to open it directly in the Grayjay app (if installed).
+            </p>
+          </div>
+          
+          <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+            <h4 class="font-semibold mb-1">Option 2: Export & Import</h4>
+            <p class="text-sm text-slate-600 dark:text-slate-400 mb-2">
+              Export your video queue and import it into Grayjay:
+            </p>
+            <ol class="text-sm text-slate-600 dark:text-slate-400 list-decimal list-inside space-y-1">
+              <li>Go to the Videos page</li>
+              <li>Click "Export for Grayjay"</li>
+              <li>Save the JSON file</li>
+              <li>Import the file in Grayjay (feature availability may vary)</li>
+            </ol>
+          </div>
+          
+          <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+            <h4 class="font-semibold mb-1">Option 3: URL List</h4>
+            <p class="text-sm text-slate-600 dark:text-slate-400">
+              Export a simple list of YouTube URLs to manually add to Grayjay playlists.
+            </p>
+          </div>
+        </div>
+        
+        <div class="mt-6 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <p class="text-sm text-blue-800 dark:text-blue-200">
+            <strong>Future Enhancement:</strong> When Grayjay provides an API for external integrations, this app will support automatic syncing.
+          </p>
+        </div>
+        
+        <div class="mt-4">
+          <a 
+            href="https://grayjay.app/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            class="text-accent hover:underline inline-flex items-center gap-1"
+          >
+            Learn more about Grayjay
+            <ExternalLinkIcon size={14} />
+          </a>
+        </div>
+      </div>
+      
+      <div class="flex justify-end mt-6">
+        <button
+          onclick={() => showGrayjayInstructions = false}
+          class="btn-primary"
+        >
+          Got it
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
