@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { tmdbConfig } from '$lib/config'
   import { db, subscribeToCollection } from '$lib/firebase'
   import { createComment, createIssue, formatDate, hasGitHubToken, listComments, listIssues, updateIssue, type GitHubIssue, type GitHubComment } from '$lib/github'
@@ -186,12 +186,12 @@
             productionCompanies: enriched.productionCompanies
           })
 
-          migrationLog = [...migrationLog, `  ✓ ${enriched.genres.join(', ')}`]
+          migrationLog = [...migrationLog, `  âœ“ ${enriched.genres.join(', ')}`]
           migrationStats.updated++
 
           await new Promise(r => setTimeout(r, 300))
         } catch (e) {
-          migrationLog = [...migrationLog, `  ✗ Failed: ${e}`]
+          migrationLog = [...migrationLog, `  âœ— Failed: ${e}`]
           migrationStats.failed++
         }
       }
@@ -288,7 +288,7 @@
                     tmdbId: result.tmdbId,
                     posterPath: posterPath
                   })
-                  imageMigrationLog = [...imageMigrationLog, `  ✓ Found + linked TMDB ID ${result.tmdbId}`]
+                  imageMigrationLog = [...imageMigrationLog, `  âœ“ Found + linked TMDB ID ${result.tmdbId}`]
                   imageMigrationStats.updated++
                   await new Promise(r => setTimeout(r, 300))
                   continue
@@ -299,7 +299,7 @@
 
           if (posterPath) {
             await updateDoc(doc(db, 'media', docSnap.id), { posterPath })
-            imageMigrationLog = [...imageMigrationLog, `  ✓ Updated image`]
+            imageMigrationLog = [...imageMigrationLog, `  âœ“ Updated image`]
             imageMigrationStats.updated++
           } else {
             imageMigrationLog = [...imageMigrationLog, `  - No image found`]
@@ -309,7 +309,7 @@
           // Rate limiting
           await new Promise(r => setTimeout(r, 300))
         } catch (e) {
-          imageMigrationLog = [...imageMigrationLog, `  ✗ Failed: ${e}`]
+          imageMigrationLog = [...imageMigrationLog, `  âœ— Failed: ${e}`]
           imageMigrationStats.failed++
         }
       }
@@ -350,14 +350,14 @@
             }
 
             await updateDoc(doc(db, 'videos', videoDoc.id), updates)
-            videoRatingsMigrationLog = [...videoRatingsMigrationLog, `  ✓ Updated ratings structure`]
+            videoRatingsMigrationLog = [...videoRatingsMigrationLog, `  âœ“ Updated ratings structure`]
             videoRatingsMigrationStats.updated++
           } else {
             videoRatingsMigrationLog = [...videoRatingsMigrationLog, `Skip: ${title} (already has ratings)`]
             videoRatingsMigrationStats.skipped++
           }
         } catch (e) {
-          videoRatingsMigrationLog = [...videoRatingsMigrationLog, `  ✗ Failed: ${e}`]
+          videoRatingsMigrationLog = [...videoRatingsMigrationLog, `  âœ— Failed: ${e}`]
           videoRatingsMigrationStats.failed++
         }
       }
@@ -562,28 +562,28 @@
         <p class="text-slate-400 text-xs uppercase">Media</p>
         <p class="text-xl font-bold">{dataStats.totalMedia}</p>
         <p class="text-xs text-slate-500">
-          {dataStats.movies} movies · {dataStats.tv} TV · {dataStats.games} games
+          {dataStats.movies} movies Â· {dataStats.tv} TV Â· {dataStats.games} games
         </p>
       </div>
       <div>
         <p class="text-slate-400 text-xs uppercase">Status</p>
         <p class="text-xl font-bold">{dataStats.completed}</p>
         <p class="text-xs text-slate-500">
-          completed · {dataStats.watching} watching · {dataStats.queued} queued
+          completed Â· {dataStats.watching} watching Â· {dataStats.queued} queued
         </p>
       </div>
       <div>
         <p class="text-slate-400 text-xs uppercase">Enriched</p>
         <p class="text-xl font-bold">{dataStats.withGenres}</p>
         <p class="text-xs text-slate-500">
-          with genres · {dataStats.withCollection} in collections
+          with genres Â· {dataStats.withCollection} in collections
         </p>
       </div>
       <div>
         <p class="text-slate-400 text-xs uppercase">Other</p>
         <p class="text-xl font-bold">{dataStats.notes + dataStats.places}</p>
         <p class="text-xs text-slate-500">
-          {dataStats.notes} notes · {dataStats.places} places ({dataStats.visitedPlaces} visited)
+          {dataStats.notes} notes Â· {dataStats.places} places ({dataStats.visitedPlaces} visited)
         </p>
       </div>
     </div>
@@ -606,10 +606,10 @@
         <span>Storage: {formatBytes(systemInfo.storage.used)} / {formatBytes(systemInfo.storage.quota)}</span>
       </div>
       <div class="text-xs text-slate-400 font-mono break-all">
-        {systemInfo.platform} · {systemInfo.language}
+        {systemInfo.platform} Â· {systemInfo.language}
       </div>
       <div class="text-xs text-slate-400">
-        SW: {systemInfo.serviceWorker ? 'Supported' : 'Not supported'} · User: {$activeUser}
+        SW: {systemInfo.serviceWorker ? 'Supported' : 'Not supported'} Â· User: {$activeUser}
       </div>
     </div>
   </section>
@@ -680,7 +680,7 @@
 
       <div class="bg-slate-900 text-slate-300 p-3 rounded-lg font-mono text-xs max-h-48 overflow-y-auto">
         {#each migrationLog as line}
-          <div class:text-emerald-400={line.includes('✓')} class:text-red-400={line.includes('✗')}>{line}</div>
+          <div class:text-emerald-400={line.includes('âœ“')} class:text-red-400={line.includes('âœ—')}>{line}</div>
         {/each}
       </div>
     {/if}
@@ -741,7 +741,7 @@
 
       <div class="bg-slate-900 text-slate-300 p-3 rounded-lg font-mono text-xs max-h-48 overflow-y-auto">
         {#each imageMigrationLog as line}
-          <div class:text-emerald-400={line.includes('✓')} class:text-red-400={line.includes('✗')} class:text-slate-500={line.includes('- No')}>{line}</div>
+          <div class:text-emerald-400={line.includes('âœ“')} class:text-red-400={line.includes('âœ—')} class:text-slate-500={line.includes('- No')}>{line}</div>
         {/each}
       </div>
     {/if}
@@ -778,7 +778,7 @@
 
       <div class="mt-4 bg-slate-900 text-slate-300 p-3 rounded-lg font-mono text-xs overflow-y-auto max-h-96">
         {#each videoRatingsMigrationLog as line}
-          <div class:text-emerald-400={line.includes('✓')} class:text-red-400={line.includes('✗')}>{line}</div>
+          <div class:text-emerald-400={line.includes('âœ“')} class:text-red-400={line.includes('âœ—')}>{line}</div>
         {/each}
       </div>
     {/if}
@@ -858,10 +858,10 @@
                       </div>
                       <div class="flex items-center gap-2 text-xs text-slate-500">
                         <span>#{issue.number}</span>
-                        <span>•</span>
+                        <span>â€¢</span>
                         <span>{formatDate(issue.updated_at)}</span>
                         {#if issue.comments > 0}
-                          <span>•</span>
+                          <span>â€¢</span>
                           <span class="flex items-center gap-1">
                             <MessageSquare size={12} />
                             {issue.comments}
@@ -952,7 +952,7 @@
                 onclick={() => { selectedIssue = null; issueComments = [] }}
                 class="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
               >
-                ← Back to list
+                â† Back to list
               </button>
               <div class="flex gap-2">
                 <button
@@ -984,7 +984,7 @@
               </div>
               <div class="text-xs text-slate-500 mb-3">
                 <span>#{selectedIssue.number}</span>
-                <span> • opened {formatDate(selectedIssue.created_at)}</span>
+                <span> â€¢ opened {formatDate(selectedIssue.created_at)}</span>
                 <span> by {selectedIssue.user.login}</span>
               </div>
               {#if selectedIssue.body}
@@ -1022,7 +1022,7 @@
                     <div class="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
                       <div class="text-xs text-slate-500 mb-2">
                         <span class="font-medium">{comment.user.login}</span>
-                        <span> • {formatDate(comment.created_at)}</span>
+                        <span> â€¢ {formatDate(comment.created_at)}</span>
                       </div>
                       <div class="text-sm whitespace-pre-wrap">{comment.body}</div>
                     </div>
@@ -1068,7 +1068,7 @@
                 onclick={() => { showEditIssue = false; editIssueTitle = ''; editIssueBody = '' }}
                 class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
                 aria-label="Close edit issue form"
-                aria-label="Close edit issue form"
+
               >
                 <X size={16} />
               </button>
