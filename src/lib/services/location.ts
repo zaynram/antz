@@ -35,6 +35,7 @@ export interface PlaceSuggestion {
   distance: number; // meters
   address?: string;
   tags?: Record<string, string>;
+  priceLevel?: number; // 0-4 scale for budget (not available from free OSM API)
 }
 
 // Nominatim endpoint (OSM geocoding)
