@@ -32,7 +32,11 @@
         editedNotes = media.notes || '';
         
         if (media.watchDate) {
-          watchDateInput = new Date(media.watchDate.toDate()).toISOString().split('T')[0];
+          const d = new Date(media.watchDate.toDate());
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          watchDateInput = `${year}-${month}-${day}`;
         } else {
           watchDateInput = '';
         }
@@ -43,7 +47,11 @@
       // Also sync watch date if it changed externally (e.g., real-time update from other user)
       else if (media.watchDate !== previousWatchDate) {
         if (media.watchDate) {
-          watchDateInput = new Date(media.watchDate.toDate()).toISOString().split('T')[0];
+          const d = new Date(media.watchDate.toDate());
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          watchDateInput = `${year}-${month}-${day}`;
         } else {
           watchDateInput = '';
         }
@@ -58,6 +66,7 @@
 
   function posterUrl(path: string | null): string | null {
     if (!path) return null;
+    if (path.startsWith('http')) return path;
     return `${tmdbConfig.imageBaseUrl}/w342${path}`;
   }
 
