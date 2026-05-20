@@ -2,6 +2,7 @@
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
   import PageHeader from '$lib/components/ui/PageHeader.svelte'
   import Tabs from '$lib/components/ui/Tabs.svelte'
+  import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte'
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
   import { hapticLight, hapticSuccess } from '$lib/haptics'
   import { activeUser, displayNames } from '$lib/stores/app'
@@ -126,14 +127,21 @@
     }
   }
 
+  // Confirm dialog state
+  let pendingConfirm = $state<{ message: string; onConfirm: () => void } | null>(null)
+
   async function deleteItem(id: string): Promise<void> {
-    if (confirm('Delete this item?')) {
-      try {
-        await deleteDocument('profiles', id)
-        toast.success('Item deleted')
-      } catch (e) {
-        console.error('Failed to delete:', e)
-        toast.error('Failed to delete item')
+    pendingConfirm = {
+      message: 'Delete this item?',
+      onConfirm: async () => {
+        pendingConfirm = null
+        try {
+          await deleteDocument('profiles', id)
+          toast.success('Item deleted')
+        } catch (e) {
+          console.error('Failed to delete:', e)
+          toast.error('Failed to delete item')
+        }
       }
     }
   }
@@ -507,3 +515,11 @@
     </div>
   </div>
 {/if}
+
+<ConfirmModal
+  open={pendingConfirm !== null}
+  message={pendingConfirm?.message ?? ''}
+  danger={true}
+  onConfirm={() => pendingConfirm?.onConfirm()}
+  onCancel={() => pendingConfirm = null}
+/>

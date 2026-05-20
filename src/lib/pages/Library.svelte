@@ -23,8 +23,11 @@
   import PageHeader from '$lib/components/ui/PageHeader.svelte'
   import IconButton from '$lib/components/ui/IconButton.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
+  import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte'
     import { Film, Tv, Gamepad2, Filter, Plus, Search, X } from 'lucide-svelte'
   import { hapticSuccess } from '$lib/haptics'
+  import { forceRepaint } from '$lib/pwa-utils'
+  import { cycleRating, getStarFill } from '$lib/utils'
 
   interface Props {
     type: MediaType
@@ -106,22 +109,6 @@
     discoverResults = []
     gameResults = []
   })
-
-  // Force repaint on iOS Safari PWA (only runs on iOS in standalone mode)
-  const isIOSPWA = typeof navigator !== 'undefined' &&
-    /iPad|iPhone|iPod/.test(navigator.userAgent) &&
-    typeof window !== 'undefined' &&
-    window.matchMedia('(display-mode: standalone)').matches
-
-  function forceRepaint() {
-    if (!isIOSPWA) return
-    requestAnimationFrame(() => {
-      document.body.style.transform = 'translateZ(0)'
-      requestAnimationFrame(() => {
-        document.body.style.transform = ''
-      })
-    })
-  }
 
   function toggleFilters() {
     showFilters = !showFilters
@@ -288,28 +275,6 @@
     await updateDocument<Media>('media', item.id, { status }, $activeUser)
   }
 
-  // Cycle rating: null → half → full → null
-  function cycleRating(current: number | null, starIndex: number): number | null {
-    const halfValue = starIndex - 0.5
-    const fullValue = starIndex
-
-    if (current === halfValue) {
-      return fullValue // half → full
-    } else if (current === fullValue) {
-      return null // full → clear
-    } else {
-      return halfValue // anything else → half
-    }
-  }
-
-  // Get star fill state: 'full', 'half', or 'empty'
-  function getStarFill(rating: number | null, starIndex: number): 'full' | 'half' | 'empty' {
-    if (rating === null) return 'empty'
-    if (rating >= starIndex) return 'full'
-    if (rating >= starIndex - 0.5) return 'half'
-    return 'empty'
-  }
-
   async function quickRate(item: Media, starIndex: number): Promise<void> {
     if (!item.id) return
     const currentRatings = item.ratings || { Z: null, T: null }
@@ -320,14 +285,21 @@
     }, $activeUser)
   }
 
+  // Confirm dialog state
+  let pendingConfirm = $state<{ message: string; onConfirm: () => void } | null>(null)
+
   async function removeItem(id: string): Promise<void> {
-    if (confirm('Remove this item?')) {
-      try {
-        await deleteDocument('media', id)
-        toast.success('Removed from library')
-      } catch (e) {
-        console.error('Failed to remove:', e)
-        toast.error('Failed to remove item')
+    pendingConfirm = {
+      message: 'Remove this item?',
+      onConfirm: async () => {
+        pendingConfirm = null
+        try {
+          await deleteDocument('media', id)
+          toast.success('Removed from library')
+        } catch (e) {
+          console.error('Failed to remove:', e)
+          toast.error('Failed to remove item')
+        }
       }
     }
   }
@@ -475,6 +447,14 @@
 </script>
 
 <MediaDetailModal media={selectedMedia} onClose={() => selectedMedia = null} />
+
+<ConfirmModal
+  open={pendingConfirm !== null}
+  message={pendingConfirm?.message ?? ''}
+  danger={true}
+  onConfirm={() => pendingConfirm?.onConfirm()}
+  onCancel={() => pendingConfirm = null}
+/>
 
 <div class="max-w-6xl mx-auto">
   <!-- Header with type navigation -->

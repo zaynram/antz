@@ -7,6 +7,8 @@
   import { Timestamp } from 'firebase/firestore'
   import { Film, Tv, Gamepad2 } from 'lucide-svelte'
   import { hapticLight } from '$lib/haptics'
+  import { cycleRating, getStarFill } from '$lib/utils'
+  import Modal from '$lib/components/ui/Modal.svelte'
 
   interface Props {
     media: Media | null;
@@ -81,20 +83,6 @@
     await updateDocument<Media>('media', media.id, { status }, $activeUser);
   }
 
-  // Cycle rating: null → half → full → null
-  function cycleRating(current: number | null, starIndex: number): number | null {
-    const halfValue = starIndex - 0.5
-    const fullValue = starIndex
-
-    if (current === halfValue) {
-      return fullValue // half → full
-    } else if (current === fullValue) {
-      return null // full → clear
-    } else {
-      return halfValue // anything else → half
-    }
-  }
-
   async function updateRating(userId: UserId, starIndex: number): Promise<void> {
     if (!media?.id) return;
     hapticLight();
@@ -109,13 +97,8 @@
     await updateDocument<Media>('media', media.id, { ratings: updatedRatings }, $activeUser);
   }
 
-  // Get star fill state: 'full', 'half', or 'empty'
-  function getStarFill(rating: number | null, starIndex: number): 'full' | 'half' | 'empty' {
-    if (rating === null) return 'empty'
-    if (rating >= starIndex) return 'full'
-    if (rating >= starIndex - 0.5) return 'half'
-    return 'empty'
-  }
+
+
 
   async function updateWatchDate(): Promise<void> {
     if (!media?.id) return;
@@ -155,34 +138,14 @@
     });
   }
 
-  function handleBackdropClick(e: MouseEvent): void {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  }
 
-  function handleKeydown(e: KeyboardEvent): void {
-    if (e.key === 'Escape') {
-      onClose();
-    }
-  }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
 {#if media}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-    onclick={handleBackdropClick}
-    onkeydown={handleKeydown}
-    role="dialog"
-    aria-modal="true"
-    tabindex="-1"
-  >
-    <div class="bg-surface rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+  <Modal open={true} onclose={onClose} title={media.title}>
+    {#snippet header()}
       <!-- Header with poster -->
-      <div class="relative">
+      <div class="relative shrink-0">
         {#if media.posterPath}
           <img
             src={posterUrl(media.posterPath)}
@@ -202,14 +165,14 @@
             {/if}
           </div>
         {/if}
-        
+
         <button
           class="absolute top-2 right-2 w-11 h-11 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors touch-manipulation"
           onclick={onClose}
         >
           ×
         </button>
-        
+
         <div class="absolute bottom-3 left-4 right-4 text-white">
           <h2 class="text-xl font-bold drop-shadow-lg">{media.title}</h2>
           <div class="flex items-center gap-2 text-sm opacity-90">
@@ -225,8 +188,9 @@
           </div>
         </div>
       </div>
+    {/snippet}
       
-      <div class="p-4 space-y-4">
+    <div class="space-y-4">
         <!-- Status & Rating row -->
         <div class="flex flex-wrap gap-4 items-start">
           <div class="flex-1 min-w-[120px]">
@@ -424,7 +388,6 @@
             · Updated by {getDisplayNameForUser(media.updatedBy)}
           {/if}
         </div>
-      </div>
     </div>
-  </div>
+  </Modal>
 {/if}

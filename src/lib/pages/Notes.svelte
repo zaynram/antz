@@ -3,6 +3,8 @@
   import PageHeader from '$lib/components/ui/PageHeader.svelte'
   import PhotoGallery from '$lib/components/ui/PhotoGallery.svelte'
   import Tabs from '$lib/components/ui/Tabs.svelte'
+  import Modal from '$lib/components/ui/Modal.svelte'
+  import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte'
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
   import { hapticLight, hapticSuccess } from '$lib/haptics'
   import { activeUser, displayNames } from '$lib/stores/app'
@@ -84,14 +86,21 @@
     }, $activeUser)
   }
 
+  // Confirm dialog state
+  let pendingConfirm = $state<{ message: string; onConfirm: () => void } | null>(null)
+
   async function removeNote(id: string): Promise<void> {
-    if (confirm('Delete this note permanently?')) {
-      try {
-        await deleteDocument('notes', id)
-        toast.success('Note deleted')
-      } catch (e) {
-        console.error('Failed to delete:', e)
-        toast.error('Failed to delete note')
+    pendingConfirm = {
+      message: 'Delete this note permanently?',
+      onConfirm: async () => {
+        pendingConfirm = null
+        try {
+          await deleteDocument('notes', id)
+          toast.success('Note deleted')
+        } catch (e) {
+          console.error('Failed to delete:', e)
+          toast.error('Failed to delete note')
+        }
       }
     }
   }
@@ -304,19 +313,11 @@
 </div>
 
 <!-- Note Detail Modal -->
-{#if selectedNote}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-    onclick={(e) => e.target === e.currentTarget && closeNoteDetail()}
-    onkeydown={(e) => e.key === 'Escape' && closeNoteDetail()}
-    role="dialog"
-    aria-modal="true"
-    tabindex="-1"
-  >
-    <div class="bg-surface rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+<Modal open={!!selectedNote} onclose={closeNoteDetail} title={selectedNote?.title || 'Note'}>
+  {#snippet header()}
+    {#if selectedNote}
       <!-- Header -->
-      <div class="relative bg-accent/10 p-6">
+      <div class="relative bg-accent/10 p-6 shrink-0">
         <button
           class="absolute top-2 right-2 w-11 h-11 rounded-full bg-black/20 text-white flex items-center justify-center hover:bg-black/40 transition-colors touch-manipulation"
           onclick={closeNoteDetail}
@@ -344,43 +345,53 @@
           </div>
         </div>
       </div>
+    {/if}
+  {/snippet}
 
-      <div class="p-4 space-y-5">
-        <!-- Content -->
-        {#if selectedNote.content}
-          <div>
-            <p class="whitespace-pre-wrap text-slate-700 dark:text-slate-300">{selectedNote.content}</p>
-          </div>
-        {/if}
-
-        <!-- Photos -->
-        {#if selectedNote.id}
-          <div>
-            <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Photos</span>
-            <PhotoGallery
-              photos={selectedNote.photos}
-              folderPath={['notes']}
-              onUpdate={async (photos) => {
-                if (selectedNote?.id) {
-                  await updatePhotos(selectedNote.id, photos)
-                }
-              }}
-              maxPhotos={20}
-            />
-          </div>
-        {/if}
-
-        <!-- Metadata -->
-        <div class="text-xs text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
-          {getDisplayNameForUser(selectedNote.createdBy)} · {formatDate(selectedNote.createdAt)}
-          {#if selectedNote.read && selectedNote.readAt}
-            · Read {formatDate(selectedNote.readAt)}
-          {/if}
+  {#if selectedNote}
+    <div class="space-y-5">
+      <!-- Content -->
+      {#if selectedNote.content}
+        <div>
+          <p class="whitespace-pre-wrap text-slate-700 dark:text-slate-300">{selectedNote.content}</p>
         </div>
+      {/if}
+
+      <!-- Photos -->
+      {#if selectedNote.id}
+        <div>
+          <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Photos</span>
+          <PhotoGallery
+            photos={selectedNote.photos}
+            folderPath={['notes']}
+            onUpdate={async (photos) => {
+              if (selectedNote?.id) {
+                await updatePhotos(selectedNote.id, photos)
+              }
+            }}
+            maxPhotos={20}
+          />
+        </div>
+      {/if}
+
+      <!-- Metadata -->
+      <div class="text-xs text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
+        {getDisplayNameForUser(selectedNote.createdBy)} · {formatDate(selectedNote.createdAt)}
+        {#if selectedNote.read && selectedNote.readAt}
+          · Read {formatDate(selectedNote.readAt)}
+        {/if}
       </div>
     </div>
-  </div>
-{/if}
+  {/if}
+</Modal>
+
+<ConfirmModal
+  open={pendingConfirm !== null}
+  message={pendingConfirm?.message ?? ''}
+  danger={true}
+  onConfirm={() => pendingConfirm?.onConfirm()}
+  onCancel={() => pendingConfirm = null}
+/>
 
 <style>
   /* Safari SVG rendering fix - force GPU layer for icons */
