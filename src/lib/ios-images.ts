@@ -7,7 +7,7 @@
  * Handles both thumbnailLink and uc?export=view formats
  * For GIFs, uses uc?export=view to preserve animation
  */
-export function getIOSCompatibleImageUrl(url: string): string {
+export function getIOSCompatibleImageUrl(url: string, forceReload?: boolean): string {
     if (!url) return url
 
     // Extract file ID from various Google Drive URL formats
@@ -39,8 +39,9 @@ export function getIOSCompatibleImageUrl(url: string): string {
 
     // If we found a file ID, return iOS-compatible URL
     if (fileId) {
-        const timestamp = Date.now()
-        
+        // Only append timestamp when explicitly requested (to allow browser caching by default)
+        const timestampSuffix = forceReload ? `&timestamp=${Date.now()}` : ""
+
         // Check if this is a GIF based on:
         // 1. The ext parameter in the URL (added by uploadFileToDrive)
         // 2. Filename hints in the URL
@@ -58,14 +59,14 @@ export function getIOSCompatibleImageUrl(url: string): string {
         
         if (isGif) {
             // Use uc?export=view for GIFs to preserve animation
-            return `https://drive.google.com/uc?export=view&id=${fileId}&timestamp=${timestamp}`
+            return `https://drive.google.com/uc?export=view&id=${fileId}${timestampSuffix}`
         } else if (isPreviewUrl) {
             // Use uc?export=view for preview environments to avoid CORS issues
             // The thumbnail endpoint may have stricter domain restrictions
-            return `https://drive.google.com/uc?export=view&id=${fileId}&timestamp=${timestamp}`
+            return `https://drive.google.com/uc?export=view&id=${fileId}${timestampSuffix}`
         } else {
             // Use thumbnail endpoint for other images in production (better performance)
-            return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400&timestamp=${timestamp}`
+            return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400${timestampSuffix}`
         }
     }
 

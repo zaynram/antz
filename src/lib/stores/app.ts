@@ -258,36 +258,38 @@ export async function initPreferencesSync(): Promise<void> {
         console.warn("Failed to load preferences from Firestore:", err)
     }
 
-    // Subscribe to remote changes
-    unsubscribeFirestore = subscribeToPreferences(remotePrefs => {
-        const localPrefs = get(userPreferences)
-        // Only update if different (avoid loops) - use shallow comparison instead of JSON.stringify
-        if (!prefsEqual(remotePrefs, localPrefs)) {
-            isRemoteUpdate = true
-            userPreferences.set({
-                Z: mergePreferencesWithTimestamp(
-                    DEFAULT_PREFERENCES.Z,
-                    localPrefs.Z,
-                    remotePrefs.Z
-                ),
-                T: mergePreferencesWithTimestamp(
-                    DEFAULT_PREFERENCES.T,
-                    localPrefs.T,
-                    remotePrefs.T
-                ),
-            })
-            isRemoteUpdate = false
+    try {
+        // Subscribe to remote changes
+        unsubscribeFirestore = subscribeToPreferences(remotePrefs => {
+            const localPrefs = get(userPreferences)
+            // Only update if different (avoid loops) - use shallow comparison instead of JSON.stringify
+            if (!prefsEqual(remotePrefs, localPrefs)) {
+                isRemoteUpdate = true
+                userPreferences.set({
+                    Z: mergePreferencesWithTimestamp(
+                        DEFAULT_PREFERENCES.Z,
+                        localPrefs.Z,
+                        remotePrefs.Z
+                    ),
+                    T: mergePreferencesWithTimestamp(
+                        DEFAULT_PREFERENCES.T,
+                        localPrefs.T,
+                        remotePrefs.T
+                    ),
+                })
+                isRemoteUpdate = false
+            }
+        })
+
+        // Subscribe to local changes and sync to Firestore
+        // Clean up any existing subscription first to prevent duplicates on re-auth
+        if (unsubscribeLocalPrefs) {
+            unsubscribeLocalPrefs()
         }
-    })
-
-    // Subscribe to local changes and sync to Firestore
-    // Clean up any existing subscription first to prevent duplicates on re-auth
-    if (unsubscribeLocalPrefs) {
-        unsubscribeLocalPrefs()
+        unsubscribeLocalPrefs = userPreferences.subscribe(debouncedSaveToFirestore)
+    } finally {
+        isSyncInitializing = false
     }
-    unsubscribeLocalPrefs = userPreferences.subscribe(debouncedSaveToFirestore)
-
-    isSyncInitializing = false
 }
 
 // Cleanup sync subscription
