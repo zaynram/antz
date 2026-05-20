@@ -203,19 +203,19 @@
     <!-- View mode toggle -->
     <div class="flex gap-2 justify-center">
       <button
-        class="btn-secondary {viewMode === 'both' ? '!bg-accent !text-white' : ''} touch-manipulation"
+        class="{viewMode === 'both' ? 'btn-primary' : 'btn-secondary'} touch-manipulation"
         onclick={() => { viewMode = 'both'; hapticLight() }}
       >
         Both
       </button>
       <button
-        class="btn-secondary {viewMode === 'mine' ? '!bg-accent !text-white' : ''} touch-manipulation"
+        class="{viewMode === 'mine' ? 'btn-primary' : 'btn-secondary'} touch-manipulation"
         onclick={() => { viewMode = 'mine'; hapticLight() }}
       >
         Mine
       </button>
       <button
-        class="btn-secondary {viewMode === 'theirs' ? '!bg-accent !text-white' : ''} touch-manipulation"
+        class="{viewMode === 'theirs' ? 'btn-primary' : 'btn-secondary'} touch-manipulation"
         onclick={() => { viewMode = 'theirs'; hapticLight() }}
       >
         Theirs
@@ -485,7 +485,7 @@
         class="w-4 h-4 accent-accent"
       />
       <label for="favorite" class="text-sm text-slate-700 dark:text-slate-300">
-        Mark as favourite
+        Mark as favorite
       </label>
     </div>
   </div>
