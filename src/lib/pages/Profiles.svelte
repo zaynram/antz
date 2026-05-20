@@ -2,12 +2,13 @@
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
   import PageHeader from '$lib/components/ui/PageHeader.svelte'
   import Tabs from '$lib/components/ui/Tabs.svelte'
+  import Modal from '$lib/components/ui/Modal.svelte'
   import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte'
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
   import { hapticLight, hapticSuccess } from '$lib/haptics'
   import { activeUser, displayNames } from '$lib/stores/app'
   import type { ProfileItem, ProfileCategory, UserId } from '$lib/types'
-  import { Heart, Plus, Star, Trash2, X, Gift, Coffee, Music, Film, BookOpen, Zap, Sparkles, Palette, Users, MapPin, Utensils } from 'lucide-svelte'
+  import { Heart, Pencil, Plus, Star, Trash2, Gift, Coffee, Music, Film, BookOpen, Zap, Sparkles, Palette, Users, MapPin, Utensils } from 'lucide-svelte'
   import { onMount } from 'svelte'
   import { toast } from 'svelte-sonner'
 
@@ -191,53 +192,63 @@
   }
 </script>
 
-<PageHeader title="Partner Profiles" subtitle="Keep track of things we like" />
+<div class="max-w-2xl mx-auto">
 
-<!-- View mode toggle -->
-<div class="mb-4 flex gap-2 justify-center">
-  <button
-    class="px-4 py-2 rounded-lg font-medium transition-colors {viewMode === 'both' ? 'bg-accent text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}"
-    onclick={() => { viewMode = 'both'; hapticLight() }}
-  >
-    Both
-  </button>
-  <button
-    class="px-4 py-2 rounded-lg font-medium transition-colors {viewMode === 'mine' ? 'bg-accent text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}"
-    onclick={() => { viewMode = 'mine'; hapticLight() }}
-  >
-    Mine
-  </button>
-  <button
-    class="px-4 py-2 rounded-lg font-medium transition-colors {viewMode === 'theirs' ? 'bg-accent text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}"
-    onclick={() => { viewMode = 'theirs'; hapticLight() }}
-  >
-    Theirs
-  </button>
-</div>
+<PageHeader
+  title="Partner Profiles"
+  subtitle="Keep track of things we like"
+  icon={Heart}
+>
+  {#snippet children()}
+    <!-- View mode toggle -->
+    <div class="flex gap-2 justify-center">
+      <button
+        class="btn-secondary {viewMode === 'both' ? '!bg-accent !text-white' : ''} touch-manipulation"
+        onclick={() => { viewMode = 'both'; hapticLight() }}
+      >
+        Both
+      </button>
+      <button
+        class="btn-secondary {viewMode === 'mine' ? '!bg-accent !text-white' : ''} touch-manipulation"
+        onclick={() => { viewMode = 'mine'; hapticLight() }}
+      >
+        Mine
+      </button>
+      <button
+        class="btn-secondary {viewMode === 'theirs' ? '!bg-accent !text-white' : ''} touch-manipulation"
+        onclick={() => { viewMode = 'theirs'; hapticLight() }}
+      >
+        Theirs
+      </button>
+    </div>
+  {/snippet}
+</PageHeader>
 
-<!-- Category tabs -->
-<Tabs
-  tabs={[
-    { key: 'all', label: 'All', badge: profileItems.length },
-    ...Object.entries(categoryInfo).map(([key, info]) => ({
-      key,
-      label: info.label,
-      badge: profileItems.filter(i => i.category === key).length
-    }))
-  ]}
-  active={activeTab}
-  onchange={(key: string) => { activeTab = key as TabKey; hapticLight() }}
-/>
-
-<!-- Add button -->
-<div class="mb-6 flex justify-end">
-  <button
-    onclick={() => openAddModal(activeTab === 'all' ? undefined : activeTab)}
-    class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
-  >
-    <Plus size={20} />
-    Add Item
-  </button>
+<!-- Category tabs + Add button -->
+<div class="flex items-center gap-2">
+  <div class="flex-1 min-w-0">
+    <Tabs
+      tabs={[
+        { key: 'all', label: 'All', badge: profileItems.length },
+        ...Object.entries(categoryInfo).map(([key, info]) => ({
+          key,
+          label: info.label,
+          badge: profileItems.filter(i => i.category === key).length
+        }))
+      ]}
+      active={activeTab}
+      onchange={(key: string) => { activeTab = key as TabKey; hapticLight() }}
+    />
+  </div>
+  <div class="shrink-0 pb-4">
+    <button
+      onclick={() => openAddModal(activeTab === 'all' ? undefined : activeTab)}
+      class="btn-primary"
+    >
+      <Plus size={18} />
+      Add
+    </button>
+  </div>
 </div>
 
 <!-- Items list -->
@@ -260,7 +271,7 @@
         </h3>
         <div class="grid gap-3 md:grid-cols-2">
           {#each userItems as item (item.id)}
-            <div class="bg-surface border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+            <div class="card p-4">
               <div class="flex items-start justify-between mb-2">
                 <div class="flex items-center gap-2 flex-1">
                   <span class="text-2xl">{categoryInfo[item.category].emoji}</span>
@@ -271,24 +282,24 @@
                     {/if}
                   </div>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1">
                   {#if item.isFavorite}
-                    <Star size={16} class="text-yellow-500 fill-yellow-500" />
+                    <Star size={16} class="text-yellow-500 fill-yellow-500 mx-1" />
                   {/if}
                   {#if item.createdBy === $activeUser}
                     <button
                       onclick={() => openEditModal(item)}
-                      class="text-slate-400 hover:text-accent"
+                      class="btn-icon-sm"
                       aria-label="Edit"
                     >
-                      <Heart size={16} />
+                      <Pencil size={15} />
                     </button>
                     <button
                       onclick={() => item.id && deleteItem(item.id)}
-                      class="text-slate-400 hover:text-red-500"
+                      class="btn-icon-sm hover:text-red-500"
                       aria-label="Delete"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={15} />
                     </button>
                   {/if}
                 </div>
@@ -316,7 +327,7 @@
   <!-- Regular list view -->
   <div class="grid gap-3 md:grid-cols-2">
     {#each filteredItems as item (item.id)}
-      <div class="bg-surface border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+      <div class="card p-4">
         <div class="flex items-start justify-between mb-2">
           <div class="flex items-center gap-2 flex-1">
             <span class="text-2xl">{categoryInfo[item.category].emoji}</span>
@@ -327,24 +338,24 @@
               {/if}
             </div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1">
             {#if item.isFavorite}
-              <Star size={16} class="text-yellow-500 fill-yellow-500" />
+              <Star size={16} class="text-yellow-500 fill-yellow-500 mx-1" />
             {/if}
             {#if item.createdBy === $activeUser}
               <button
                 onclick={() => openEditModal(item)}
-                class="text-slate-400 hover:text-accent"
+                class="btn-icon-sm"
                 aria-label="Edit"
               >
-                <Heart size={16} />
+                <Pencil size={15} />
               </button>
               <button
                 onclick={() => item.id && deleteItem(item.id)}
-                class="text-slate-400 hover:text-red-500"
+                class="btn-icon-sm hover:text-red-500"
                 aria-label="Delete"
               >
-                <Trash2 size={16} />
+                <Trash2 size={15} />
               </button>
             {/if}
           </div>
@@ -368,153 +379,126 @@
 {/if}
 
 <!-- Add/Edit Modal -->
-{#if showAddModal}
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-    role="dialog"
-    aria-modal="true"
-    onkeydown={(event) => {
-      if (event.key === 'Escape') {
-        event.stopPropagation();
-        closeModal();
-      }
-    }}
-  >
-    <div class="bg-surface rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-      <div class="sticky top-0 bg-surface border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
-        <h2 class="text-xl font-bold">
-          {editingItem ? 'Edit Item' : 'Add Item'}
-        </h2>
-        <button
-          onclick={closeModal}
-          class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-          aria-label="Close"
-        >
-          <X size={24} />
-        </button>
-      </div>
+<Modal
+  open={showAddModal}
+  title={editingItem ? 'Edit Item' : 'Add Item'}
+  onclose={closeModal}
+  size="sm"
+>
+  <div class="space-y-4">
+    <!-- Category -->
+    <div>
+      <label for="category-select" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+        Category
+      </label>
+      <select
+        id="category-select"
+        bind:value={newItem.category}
+        class="input-sm"
+      >
+        {#each Object.entries(categoryInfo) as [key, info]}
+          <option value={key}>{info.emoji} {info.label}</option>
+        {/each}
+      </select>
+    </div>
 
-      <div class="p-4 space-y-4">
-        <!-- Category -->
-        <div>
-          <label for="category-select" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Category
-          </label>
-          <select
-            id="category-select"
-            bind:value={newItem.category}
-            class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+    <!-- Title -->
+    <div>
+      <label for="item-title" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+        Title *
+      </label>
+      <input
+        id="item-title"
+        type="text"
+        bind:value={newItem.title}
+        placeholder="e.g., Margherita Pizza"
+        class="input"
+      />
+    </div>
+
+    <!-- Description -->
+    <div>
+      <label for="item-description" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+        Description
+      </label>
+      <input
+        id="item-description"
+        type="text"
+        bind:value={newItem.description}
+        placeholder="Brief description"
+        class="input"
+      />
+    </div>
+
+    <!-- Rating -->
+    <div>
+      <label for="item-rating" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+        Rating (1–5)
+      </label>
+      <div id="item-rating" class="flex gap-1" role="group" aria-label="Rating selection">
+        {#each [1, 2, 3, 4, 5] as rating}
+          <button
+            type="button"
+            onclick={() => { newItem.rating = rating; hapticLight() }}
+            class="btn-icon-sm"
+            aria-label={`Rate ${rating} stars`}
+            aria-pressed={newItem.rating === rating}
           >
-            {#each Object.entries(categoryInfo) as [key, info]}
-              <option value={key}>{info.emoji} {info.label}</option>
-            {/each}
-          </select>
-        </div>
-
-        <!-- Title -->
-        <div>
-          <label for="item-title" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Title *
-          </label>
-          <input
-            id="item-title"
-            type="text"
-            bind:value={newItem.title}
-            placeholder="e.g., Margherita Pizza"
-            class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-          />
-        </div>
-
-        <!-- Description -->
-        <div>
-          <label for="item-description" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Description
-          </label>
-          <input
-            id="item-description"
-            type="text"
-            bind:value={newItem.description}
-            placeholder="Brief description"
-            class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-          />
-        </div>
-
-        <!-- Rating -->
-        <div>
-          <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Rating (1-5)
-          </label>
-          <div class="flex gap-2" role="group" aria-label="Rating selection">
-            {#each [1, 2, 3, 4, 5] as rating}
-              <button
-                type="button"
-                onclick={() => { newItem.rating = rating; hapticLight() }}
-                class="p-2"
-                aria-label={`Rate ${rating} stars`}
-              >
-                <Star
-                  size={24}
-                  class={newItem.rating && rating <= newItem.rating ? 'text-yellow-500 fill-yellow-500' : 'text-slate-300 dark:text-slate-600'}
-                />
-              </button>
-            {/each}
-            {#if newItem.rating}
-              <button
-                type="button"
-                onclick={() => { newItem.rating = undefined; hapticLight() }}
-                class="ml-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-              >
-                Clear
-              </button>
-            {/if}
-          </div>
-        </div>
-
-        <!-- Notes -->
-        <div>
-          <label for="item-notes" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Notes
-          </label>
-          <textarea
-            id="item-notes"
-            bind:value={newItem.notes}
-            placeholder="Additional notes..."
-            rows="3"
-            class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white resize-none"
-          ></textarea>
-        </div>
-
-        <!-- Favorite toggle -->
-        <div class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="favorite"
-            bind:checked={newItem.isFavorite}
-            class="w-4 h-4"
-          />
-          <label for="favorite" class="text-sm text-slate-700 dark:text-slate-300">
-            Mark as favorite
-          </label>
-        </div>
-      </div>
-
-      <div class="sticky bottom-0 bg-surface border-t border-slate-200 dark:border-slate-700 p-4 flex gap-3">
-        <button
-          onclick={closeModal}
-          class="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-        >
-          Cancel
-        </button>
-        <button
-          onclick={saveItem}
-          class="flex-1 px-4 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90"
-        >
-          {editingItem ? 'Update' : 'Add'}
-        </button>
+            <Star
+              size={22}
+              class={newItem.rating && rating <= newItem.rating ? 'text-yellow-500 fill-yellow-500' : 'text-slate-300 dark:text-slate-600'}
+            />
+          </button>
+        {/each}
+        {#if newItem.rating}
+          <button
+            type="button"
+            onclick={() => { newItem.rating = undefined; hapticLight() }}
+            class="btn-ghost text-sm px-3 py-1.5"
+          >
+            Clear
+          </button>
+        {/if}
       </div>
     </div>
+
+    <!-- Notes -->
+    <div>
+      <label for="item-notes" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+        Notes
+      </label>
+      <textarea
+        id="item-notes"
+        bind:value={newItem.notes}
+        placeholder="Additional notes..."
+        rows="3"
+        class="input resize-none"
+      ></textarea>
+    </div>
+
+    <!-- Favorite toggle -->
+    <div class="flex items-center gap-2">
+      <input
+        type="checkbox"
+        id="favorite"
+        bind:checked={newItem.isFavorite}
+        class="w-4 h-4 accent-accent"
+      />
+      <label for="favorite" class="text-sm text-slate-700 dark:text-slate-300">
+        Mark as favourite
+      </label>
+    </div>
   </div>
-{/if}
+
+  {#snippet footer()}
+    <div class="flex gap-3">
+      <button onclick={closeModal} class="btn-secondary flex-1">Cancel</button>
+      <button onclick={saveItem} class="btn-primary flex-1">
+        {editingItem ? 'Update' : 'Add'}
+      </button>
+    </div>
+  {/snippet}
+</Modal>
 
 <ConfirmModal
   open={pendingConfirm !== null}
@@ -523,3 +507,5 @@
   onConfirm={() => pendingConfirm?.onConfirm()}
   onCancel={() => pendingConfirm = null}
 />
+
+</div>
