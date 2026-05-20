@@ -13,10 +13,12 @@
   import IconButton from '$lib/components/ui/IconButton.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
   import Tabs from '$lib/components/ui/Tabs.svelte'
+  import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte'
   import type { PlaceSuggestion } from '$lib/services/location'
   import { UtensilsCrossed, Coffee, Wine, Sparkles, Trees, MapPin, Check, X, Plus, Filter } from 'lucide-svelte'
   import type { ComponentType } from 'svelte'
   import { hapticSuccess, hapticLight } from '$lib/haptics'
+  import { forceRepaint } from '$lib/pwa-utils'
 
   const categoryIcons: Record<PlaceCategory, ComponentType> = {
     restaurant: UtensilsCrossed,
@@ -61,22 +63,6 @@
     { field: 'rating', label: 'Rating' },
     { field: 'visits', label: 'Visits' }
   ]
-
-  // Force repaint for iOS Safari PWA (only runs on iOS in standalone mode)
-  const isIOSPWA = typeof navigator !== 'undefined' &&
-    /iPad|iPhone|iPod/.test(navigator.userAgent) &&
-    typeof window !== 'undefined' &&
-    window.matchMedia('(display-mode: standalone)').matches
-
-  function forceRepaint() {
-    if (!isIOSPWA) return
-    requestAnimationFrame(() => {
-      document.body.style.transform = 'translateZ(0)'
-      requestAnimationFrame(() => {
-        document.body.style.transform = ''
-      })
-    })
-  }
 
   onMount(() => {
     unsubscribe = subscribeToCollection<Place>('places', (items) => {
@@ -164,14 +150,21 @@
     )
   }
 
+  // Confirm dialog state
+  let pendingConfirm = $state<{ message: string; onConfirm: () => void } | null>(null)
+
   async function remove(id: string): Promise<void> {
-    if (confirm('Remove this place?')) {
-      try {
-        await deleteDocument('places', id)
-        toast.success('Place removed')
-      } catch (e) {
-        console.error('Failed to remove:', e)
-        toast.error('Failed to remove place')
+    pendingConfirm = {
+      message: 'Remove this place?',
+      onConfirm: async () => {
+        pendingConfirm = null
+        try {
+          await deleteDocument('places', id)
+          toast.success('Place removed')
+        } catch (e) {
+          console.error('Failed to remove:', e)
+          toast.error('Failed to remove place')
+        }
       }
     }
   }
@@ -302,6 +295,14 @@
 </script>
 
 <PlaceDetailModal place={selectedPlace} onClose={() => selectedPlace = null} />
+
+<ConfirmModal
+  open={pendingConfirm !== null}
+  message={pendingConfirm?.message ?? ''}
+  danger={true}
+  onConfirm={() => pendingConfirm?.onConfirm()}
+  onCancel={() => pendingConfirm = null}
+/>
 
 <div class="max-w-4xl mx-auto">
   <PageHeader

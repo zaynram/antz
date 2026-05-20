@@ -3,6 +3,7 @@
   import { hapticLight } from '$lib/haptics'
   import { Image as ImageIcon, Loader2, Upload, X } from 'lucide-svelte'
   import { toast } from 'svelte-sonner'
+  import ConfirmModal from './ConfirmModal.svelte'
 
   interface Props {
     photos?: string[]
@@ -16,6 +17,7 @@
   let fileInput = $state<HTMLInputElement>()
   let uploading = $state(false)
   let selectedPhotoIndex = $state<number | null>(null)
+  let pendingConfirm = $state<{ message: string; onConfirm: () => void } | null>(null)
 
   async function handleFileSelect(e: Event): Promise<void> {
     const input = e.target as HTMLInputElement
@@ -70,22 +72,20 @@
   }
 
   async function removePhoto(_photoUrl: string, index: number): Promise<void> {
-    if (!confirm('Remove this photo?')) return
-
-    hapticLight()
-
-    try {
-      // Extract filename from URL (we can't delete by file ID with current implementation)
-      // Just remove from the array
-
-      // Remove from photos array
-      const updatedPhotos = photos.filter((_, i) => i !== index)
-      await onUpdate(updatedPhotos)
-
-      toast.success('Photo removed')
-    } catch (error) {
-      console.error('Failed to remove photo:', error)
-      toast.error('Failed to remove photo')
+    pendingConfirm = {
+      message: 'Remove this photo?',
+      onConfirm: async () => {
+        pendingConfirm = null
+        hapticLight()
+        try {
+          const updatedPhotos = photos.filter((_, i) => i !== index)
+          await onUpdate(updatedPhotos)
+          toast.success('Photo removed')
+        } catch (error) {
+          console.error('Failed to remove photo:', error)
+          toast.error('Failed to remove photo')
+        }
+      }
     }
   }
 
@@ -247,3 +247,11 @@
     {/if}
   </div>
 {/if}
+
+<ConfirmModal
+  open={pendingConfirm !== null}
+  message={pendingConfirm?.message ?? ''}
+  danger={true}
+  onConfirm={() => pendingConfirm?.onConfirm()}
+  onCancel={() => pendingConfirm = null}
+/>

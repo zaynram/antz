@@ -1,6 +1,7 @@
 <script lang="ts">
   import LocationPicker from '$lib/components/LocationPicker.svelte'
   import PhotoGallery from '$lib/components/ui/PhotoGallery.svelte'
+  import Modal from '$lib/components/ui/Modal.svelte'
   import { updateDocument } from '$lib/firebase'
   import { hapticLight } from '$lib/haptics'
   import { activeUser, displayNames } from '$lib/stores/app'
@@ -9,6 +10,7 @@
   import { Timestamp } from 'firebase/firestore'
   import { Calendar, Check, Coffee, ExternalLink, MapPin, Sparkles, Trees, UtensilsCrossed, Wine, X } from 'lucide-svelte'
   import type { ComponentType } from 'svelte'
+  import { cycleRating, getStarFill } from '$lib/utils'
 
   interface Props {
     place: Place | null
@@ -75,28 +77,6 @@
   async function updateLocation(location: { lat: number; lng: number; address?: string } | undefined): Promise<void> {
     if (!place?.id) return
     await updateDocument<Place>('places', place.id, { location }, $activeUser)
-  }
-
-  // Cycle rating: null → half → full → null
-  function cycleRating(current: number | null, starIndex: number): number | null {
-    const halfValue = starIndex - 0.5
-    const fullValue = starIndex
-
-    if (current === halfValue) {
-      return fullValue // half → full
-    } else if (current === fullValue) {
-      return null // full → clear
-    } else {
-      return halfValue // anything else → half
-    }
-  }
-
-  // Get star fill state: 'full', 'half', or 'empty'
-  function getStarFill(rating: number | null, starIndex: number): 'full' | 'half' | 'empty' {
-    if (rating === null) return 'empty'
-    if (rating >= starIndex) return 'full'
-    if (rating >= starIndex - 0.5) return 'half'
-    return 'empty'
   }
 
   async function updateRating(userId: UserId, starIndex: number): Promise<void> {
@@ -215,18 +195,6 @@
     })
   }
 
-  function handleBackdropClick(e: MouseEvent): void {
-    if (e.target === e.currentTarget) {
-      onClose()
-    }
-  }
-
-  function handleKeydown(e: KeyboardEvent): void {
-    if (e.key === 'Escape') {
-      onClose()
-    }
-  }
-
   function openInMaps(): void {
     if (!place?.location) return
     const { lat, lng } = place.location
@@ -235,22 +203,12 @@
   }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
 {#if place}
   {@const CategoryIcon = categoryIcons[place.category]}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-    onclick={handleBackdropClick}
-    onkeydown={handleKeydown}
-    role="dialog"
-    aria-modal="true"
-    tabindex="-1"
-  >
-    <div class="bg-surface rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+  <Modal open={true} onclose={onClose} title={place.name}>
+    {#snippet header()}
       <!-- Header -->
-      <div class="relative bg-accent/10 p-6">
+      <div class="relative bg-accent/10 p-6 shrink-0">
         <button
           class="absolute top-2 right-2 w-11 h-11 rounded-full bg-black/20 text-white flex items-center justify-center hover:bg-black/40 transition-colors touch-manipulation"
           onclick={onClose}
@@ -291,8 +249,9 @@
           </div>
         {/if}
       </div>
+    {/snippet}
 
-      <div class="p-4 space-y-5">
+    <div class="space-y-5">
         <!-- Status & Actions -->
         <div class="flex items-center gap-3">
           <button
@@ -580,7 +539,6 @@
             · Updated by {getDisplayNameForUser(place.updatedBy)}
           {/if}
         </div>
-      </div>
     </div>
-  </div>
+  </Modal>
 {/if}

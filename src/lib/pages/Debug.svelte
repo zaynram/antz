@@ -10,6 +10,7 @@
   import { Bug, Cpu, Database, Download, Edit, ExternalLink, GitBranch, HardDrive, Image, MessageSquare, Plus, RefreshCw, Trash2, Upload, Wifi, X } from 'lucide-svelte'
   import { onMount } from 'svelte'
   import { toast } from 'svelte-sonner'
+  import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte'
 
   // Data stats
   let media = $state<Media[]>([])
@@ -512,29 +513,36 @@
     showEditIssue = true
   }
 
+  // Confirm dialog state
+  let pendingConfirm = $state<{ message: string; onConfirm: () => void } | null>(null)
+
   // Cache management
   async function clearCache() {
-    if (!confirm('Clear all cached data? This will reload the page.')) return
+    pendingConfirm = {
+      message: 'Clear all cached data? This will reload the page.',
+      onConfirm: async () => {
+        pendingConfirm = null
+        try {
+          // Clear localStorage
+          localStorage.clear()
 
-    try {
-      // Clear localStorage
-      localStorage.clear()
+          // Clear service worker caches
+          if ('caches' in window) {
+            const keys = await caches.keys()
+            await Promise.all(keys.map(key => caches.delete(key)))
+          }
 
-      // Clear service worker caches
-      if ('caches' in window) {
-        const keys = await caches.keys()
-        await Promise.all(keys.map(key => caches.delete(key)))
+          // Unregister service worker
+          if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations()
+            await Promise.all(registrations.map(reg => reg.unregister()))
+          }
+
+          window.location.reload()
+        } catch (e) {
+          console.error('Failed to clear cache:', e)
+        }
       }
-
-      // Unregister service worker
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations()
-        await Promise.all(registrations.map(reg => reg.unregister()))
-      }
-
-      window.location.reload()
-    } catch (e) {
-      console.error('Failed to clear cache:', e)
     }
   }
 
@@ -1143,3 +1151,11 @@
     <pre class="bg-slate-900 text-slate-300 p-3 rounded-lg font-mono text-xs overflow-x-auto">{JSON.stringify($currentPreferences, null, 2)}</pre>
   </section>
 </div>
+
+<ConfirmModal
+  open={pendingConfirm !== null}
+  message={pendingConfirm?.message ?? ''}
+  danger={true}
+  onConfirm={() => pendingConfirm?.onConfirm()}
+  onCancel={() => pendingConfirm = null}
+/>

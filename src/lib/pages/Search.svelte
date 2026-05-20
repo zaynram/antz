@@ -13,6 +13,7 @@
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
   import PlaceDetailModal from '$lib/components/PlaceDetailModal.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
+  import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte'
   import { updateDocument } from '$lib/firebase'
   import { Timestamp } from 'firebase/firestore'
   import { searchMovies, searchTV, type TMDBSearchResult } from '$lib/tmdb'
@@ -425,16 +426,23 @@
     toast.success(note.archived ? 'Note unarchived' : 'Note archived')
   }
 
+  // Confirm dialog state
+  let pendingConfirm = $state<{ message: string; onConfirm: () => void } | null>(null)
+
   async function deleteNote(note: Note) {
     if (!note.id) return
-    if (confirm('Delete this note permanently?')) {
-      try {
-        await deleteDocument('notes', note.id)
-        expandedNoteId = null
-        toast.success('Note deleted')
-      } catch (e) {
-        console.error('Failed to delete note:', e)
-        toast.error('Failed to delete note')
+    pendingConfirm = {
+      message: 'Delete this note permanently?',
+      onConfirm: async () => {
+        pendingConfirm = null
+        try {
+          await deleteDocument('notes', note.id!)
+          expandedNoteId = null
+          toast.success('Note deleted')
+        } catch (e) {
+          console.error('Failed to delete note:', e)
+          toast.error('Failed to delete note')
+        }
       }
     }
   }
@@ -985,3 +993,11 @@
 
 <!-- Place Detail Modal -->
 <PlaceDetailModal place={selectedPlace} onClose={closePlaceDetail} />
+
+<ConfirmModal
+  open={pendingConfirm !== null}
+  message={pendingConfirm?.message ?? ''}
+  danger={true}
+  onConfirm={() => pendingConfirm?.onConfirm()}
+  onCancel={() => pendingConfirm = null}
+/>

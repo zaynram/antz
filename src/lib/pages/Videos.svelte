@@ -8,6 +8,7 @@
   import { hapticLight, hapticSuccess, hapticError } from '$lib/haptics'
   import { toast } from 'svelte-sonner'
   import VideoDetailModal from '$lib/components/VideoDetailModal.svelte'
+  import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte'
   import { syncVideoQueue, isSyncAvailable, getSyncStatusMessage, getPlatformDisplayName } from '$lib/services/video-sync'
   import { exportForGrayjay, exportVideoUrlList, createShareableVideoList, downloadExportFile, copyToClipboard } from '$lib/services/grayjay-sync'
 
@@ -120,17 +121,24 @@
     selectedVideo = null
   }
 
+  // Confirm dialog state
+  let pendingConfirm = $state<{ message: string; onConfirm: () => void } | null>(null)
+
   async function deleteVideo(videoId: string) {
-    if (!confirm('Are you sure you want to delete this video?')) return
-    
-    try {
-      await deleteDocument('videos', videoId)
-      hapticLight()
-      toast.success('Video deleted')
-    } catch (error) {
-      console.error('Error deleting video:', error)
-      hapticError()
-      toast.error('Failed to delete video')
+    pendingConfirm = {
+      message: 'Are you sure you want to delete this video?',
+      onConfirm: async () => {
+        pendingConfirm = null
+        try {
+          await deleteDocument('videos', videoId)
+          hapticLight()
+          toast.success('Video deleted')
+        } catch (error) {
+          console.error('Error deleting video:', error)
+          hapticError()
+          toast.error('Failed to delete video')
+        }
+      }
     }
   }
 
@@ -542,3 +550,11 @@
 {#if selectedVideo}
   <VideoDetailModal video={selectedVideo} onClose={closeVideoDetail} />
 {/if}
+
+<ConfirmModal
+  open={pendingConfirm !== null}
+  message={pendingConfirm?.message ?? ''}
+  danger={true}
+  onConfirm={() => pendingConfirm?.onConfirm()}
+  onCancel={() => pendingConfirm = null}
+/>
