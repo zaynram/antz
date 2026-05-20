@@ -14,6 +14,11 @@
 import type { MediaType, MediaStatus, UserId } from './types'
 import { fuzzyScore } from './fuzzy'
 
+// Minimum fuzzy score (0–100) required for a term to be considered a match.
+// A score of 50 requires at least a full subsequence match, tolerating minor
+// typos while excluding low-confidence partial matches.
+const FUZZY_MATCH_THRESHOLD = 50
+
 // ─────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────
@@ -383,7 +388,7 @@ export function matchesQuery(item: SearchableItem, query: ParsedQuery): number {
 
   // Required terms (AND) - all must match
   for (const term of query.terms) {
-    if (fuzzyScore(term, searchText) < 50) {
+    if (fuzzyScore(term, searchText) < FUZZY_MATCH_THRESHOLD) {
       return 0
     }
     // Bonus for title match
@@ -396,7 +401,7 @@ export function matchesQuery(item: SearchableItem, query: ParsedQuery): number {
 
   // OR groups - at least one term from each group must match
   for (const orGroup of query.orGroups) {
-    const hasMatch = orGroup.some(term => fuzzyScore(term, searchText) >= 50)
+    const hasMatch = orGroup.some(term => fuzzyScore(term, searchText) >= FUZZY_MATCH_THRESHOLD)
     if (!hasMatch) {
       return 0
     }
