@@ -12,6 +12,7 @@
  */
 
 import type { MediaType, MediaStatus, UserId } from './types'
+import { fuzzyScore } from './fuzzy'
 
 // ─────────────────────────────────────────────────────────────────
 // Types
@@ -382,7 +383,7 @@ export function matchesQuery(item: SearchableItem, query: ParsedQuery): number {
 
   // Required terms (AND) - all must match
   for (const term of query.terms) {
-    if (!searchText.includes(term)) {
+    if (fuzzyScore(term, searchText) < 50) {
       return 0
     }
     // Bonus for title match
@@ -395,7 +396,7 @@ export function matchesQuery(item: SearchableItem, query: ParsedQuery): number {
 
   // OR groups - at least one term from each group must match
   for (const orGroup of query.orGroups) {
-    const hasMatch = orGroup.some(term => searchText.includes(term))
+    const hasMatch = orGroup.some(term => fuzzyScore(term, searchText) >= 50)
     if (!hasMatch) {
       return 0
     }

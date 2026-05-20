@@ -4,7 +4,6 @@
   import { parseYouTubeUrl, getYouTubeThumbnail } from '$lib/youtube'
   import type { Video, VideoStatus } from '$lib/types'
   import { getVideoDisplayRating, createEmptyRatings } from '$lib/types'
-  import { Timestamp } from 'firebase/firestore'
   import { Plus, ExternalLink, Trash2, Video as VideoIcon, RefreshCw, Download, Share2, Info } from 'lucide-svelte'
   import { hapticLight, hapticSuccess, hapticError } from '$lib/haptics'
   import { toast } from 'svelte-sonner'
@@ -91,7 +90,7 @@
     }
 
     try {
-      const video: Omit<Video, 'id'> = {
+      const video: Omit<Video, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'> = {
         title: newVideoTitle.trim() || 'Untitled Video',
         url: videoInfo.url,
         videoId: videoInfo.videoId,
@@ -100,9 +99,6 @@
         rating: null,
         ratings: createEmptyRatings(),
         notes: '',
-        createdBy: $activeUser,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
       }
 
       await addDocument('videos', video, $activeUser)
