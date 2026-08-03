@@ -276,7 +276,7 @@
                   {formatDate(date)}
                   <button
                     type="button"
-                    class="w-4 h-4 rounded-full hover:bg-red-500 hover:text-white text-slate-400 flex items-center justify-center opacity-0 group-hover/visit:opacity-100 transition-opacity"
+                    class="w-4 h-4 rounded-full hover:bg-red-500 hover:text-white text-slate-400 flex items-center justify-center opacity-0 group-hover/visit:opacity-100 [@media(pointer:coarse)]:opacity-100 transition-opacity"
                     onclick={() => removeVisit(index)}
                     aria-label="Remove visit"
                   >
