@@ -131,12 +131,34 @@
     }, $activeUser)
   }
 
+  function parseDateLocal(dateStr: string): Date {
+    // Parse YYYY-MM-DD as local time to avoid UTC off-by-one
+    const [year, month, day] = dateStr.split('-').map(Number)
+    return new Date(year, month - 1, day)
+  }
+
+  async function addSingleDateVisit(): Promise<void> {
+    if (!place?.id || !singleDate) return
+    hapticLight()
+
+    const date = Timestamp.fromDate(parseDateLocal(singleDate))
+    const visitDates = [...(place.visitDates || []), date]
+
+    await updateDocument<Place>('places', place.id, {
+      visited: true,
+      visitDates
+    }, $activeUser)
+
+    singleDate = ''
+    showMode = null
+  }
+
   async function addDateRangeVisit(): Promise<void> {
     if (!place?.id || !rangeStartDate || !rangeEndDate) return
     hapticLight()
 
-    const start = Timestamp.fromDate(new Date(rangeStartDate))
-    const end = Timestamp.fromDate(new Date(rangeEndDate))
+    const start = Timestamp.fromDate(parseDateLocal(rangeStartDate))
+    const end = Timestamp.fromDate(parseDateLocal(rangeEndDate))
 
     // Add all dates in range (for trips spanning multiple days)
     const visitDates = [...(place.visitDates || []), start]
@@ -153,10 +175,11 @@
     // Reset the date inputs
     rangeStartDate = ''
     rangeEndDate = ''
-    showDateRange = false
+    showMode = null
   }
 
-  let showDateRange = $state(false)
+  let showMode = $state<'single' | 'range' | null>(null)
+  let singleDate = $state('')
   let rangeStartDate = $state('')
   let rangeEndDate = $state('')
 
@@ -288,10 +311,39 @@
           </div>
         {/if}
 
-        <!-- Add visit with date range -->
+        <!-- Add visit with date options -->
         {#if place.visited}
           <div>
-            {#if showDateRange}
+            {#if showMode === 'single'}
+              <div class="flex flex-wrap gap-2 items-end">
+                <div class="flex-1 min-w-[140px]">
+                  <label for="single-date" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Date</label>
+                  <input
+                    id="single-date"
+                    type="date"
+                    bind:value={singleDate}
+                    class="input-sm w-full"
+                  />
+                </div>
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    class="px-3 py-2 text-sm bg-accent text-white rounded-lg disabled:opacity-50 touch-manipulation"
+                    onclick={addSingleDateVisit}
+                    disabled={!singleDate}
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    class="px-3 py-2 text-sm bg-slate-100 dark:bg-slate-700 rounded-lg touch-manipulation"
+                    onclick={() => showMode = null}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            {:else if showMode === 'range'}
               <div class="flex flex-wrap gap-2 items-end">
                 <div class="flex-1 min-w-[120px]">
                   <label for="range-start" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Start Date</label>
@@ -323,14 +375,14 @@
                   <button
                     type="button"
                     class="px-3 py-2 text-sm bg-slate-100 dark:bg-slate-700 rounded-lg touch-manipulation"
-                    onclick={() => showDateRange = false}
+                    onclick={() => showMode = null}
                   >
                     Cancel
                   </button>
                 </div>
               </div>
             {:else}
-              <div class="flex gap-2">
+              <div class="flex gap-2 flex-wrap">
                 <button
                   type="button"
                   class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-accent/10 text-accent font-medium hover:bg-accent/20 transition-colors touch-manipulation"
@@ -342,7 +394,15 @@
                 <button
                   type="button"
                   class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors touch-manipulation"
-                  onclick={() => showDateRange = true}
+                  onclick={() => showMode = 'single'}
+                >
+                  <Calendar size={16} />
+                  <span>Add Date</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors touch-manipulation"
+                  onclick={() => showMode = 'range'}
                 >
                   <span>Add Date Range</span>
                 </button>
