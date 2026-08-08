@@ -210,7 +210,7 @@ Replace centered dialog modals with bottom sheets for detail views on mobile. Mo
 Pattern:
 ```svelte
 <div class="fixed inset-x-0 bottom-0 z-50 bg-surface rounded-t-3xl shadow-2xl
-            max-h-[90vh] overflow-y-auto pb-safe">
+            max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
   <!-- drag handle -->
   <div class="w-10 h-1 bg-stone-200 dark:bg-zinc-700 rounded-full mx-auto mt-3 mb-4"></div>
   <!-- content -->
