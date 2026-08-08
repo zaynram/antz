@@ -69,6 +69,8 @@ export interface BaseDocument {
     updatedBy?: UserId
 }
 
+export type NoteColor = "yellow" | "pink" | "blue" | "green" | "purple" | "orange"
+
 export interface Note extends BaseDocument {
     type: "note"
     title: string
@@ -78,6 +80,8 @@ export interface Note extends BaseDocument {
     readAt?: Timestamp
     archived?: boolean
     photos?: string[] // URLs to photos in Google Drive
+    color?: NoteColor // Sticky note color for corkboard display
+    pinned?: boolean // Pinned to top of corkboard
 }
 
 export type MediaType = "tv" | "movie" | "game"
