@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft starter spec based on `/home/runner/work/antz/antz/docs/ui/redesign-plan.md`.
+Draft starter spec based on `docs/ui/redesign-plan.md`.
 
 ---
 
