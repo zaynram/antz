@@ -18,7 +18,7 @@ The current design is functional but generic. It looks like a SaaS dashboard rat
 
 4. **Cards everywhere** — Every page uses the same border + rounded-xl card pattern. The Notes corkboard was a smart departure but it's isolated.
 
-5. **The identity switch is hidden** — Switching between Z and T is a tap in the sidebar. This is a core interaction that deserves a prominent, delightful home.
+5. **The identity switch is hidden** — Switching between Z and T is currently a tap in the sidebar. Even if this is used infrequently, it should be easier to find while staying discreet and non-intrusive.
 
 6. **Search as the home page is odd** — The app's soul is in the Library, Notes, and Places. Landing on a search page feels utilitarian.
 
@@ -66,9 +66,9 @@ The current top bar has a hamburger (left) and search (right). The sidebar slide
 ```
 
 - Left: Page title (changes as you navigate)
-- Right: User identity toggle — a pill with Z and T, tapping switches active user with a smooth animation
+- Right: A subtle identity switch entrypoint that opens the Z/T pill on demand (popover/hover/floating trigger), keeping it discoverable but low-noise
 
-This moves identity switching from the buried sidebar to always-visible, which matches how frequently it's used.
+This moves identity switching out of the buried sidebar while keeping it discreet for real usage patterns.
 
 ---
 
@@ -115,6 +115,8 @@ The per-user accent color system stays. Default accent changes from cold indigo 
 - `Nunito` (rounded, warm) — Google Fonts, good PWA support
 - `Plus Jakarta Sans` (clean but friendly)
 - `DM Sans` (humanist, slightly quirky)
+
+Make typography style a user setting so people can switch between a warmer rounded option and a more refined/system-lean option.
 
 **Body font:** Slightly different weight of the same typeface, or a clean companion.
 
@@ -221,12 +223,12 @@ Pattern:
 
 **Current:** Button inside sidebar that says "Tap to switch user"
 
-**Proposed:** Pill in the header:
+**Proposed:** Discreet trigger in the header that opens the pill:
 ```
-  [ Z | T ]   ← pill with the active user highlighted
+  [ user chip ] → opens [ Z | T ] pill with the active user highlighted
 ```
 
-Tapping the pill toggles with a spring animation. The pill bg is the active user's accent color.
+Tapping the pill toggles with a spring animation. The pill bg is the active user's accent color. If needed, this can be accessed from a small floating element to reduce header intrusion.
 
 ---
 
@@ -290,10 +292,10 @@ The warm stone palette should be checked against contrast requirements. Stone-50
 
 ---
 
-## Open Questions (for human review)
+## Decisions From Feedback
 
-1. **Font:** Which font direction — Nunito (very rounded/cute) vs Plus Jakarta Sans (more refined) vs keeping system font?
-2. **Home page:** Should the landing page be a dashboard/home or stay as search? The search-first approach might be intentional.
-3. **Sidebar:** Fully remove in favor of bottom tabs + header? Or keep sidebar for desktop/tablet and add bottom tabs for mobile only?
-4. **Bottom sheets vs modals:** Are bottom sheets the right call for all detail views, or only on mobile?
-5. **Default accent colors:** Change the default Z/T accent colors to something warmer (rose, violet) or keep user-defined as-is?
+1. **Font:** Support both directions via a settings toggle (rounded/friendly vs refined/system-lean).
+2. **Home page:** Use a dashboard/home as the landing page.
+3. **Navigation surfaces:** Support both sidebar and bottom-tab patterns as a toggleable setting, with bottom tabs fully removable.
+4. **Bottom sheets vs modals:** Use bottom sheets on mobile only.
+5. **Default accent colors:** Use warmer default Z/T accents.
