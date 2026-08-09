@@ -245,7 +245,7 @@ interface ContextHeaderProps {
 
 Behaviour:
 - Left: page title.
-- Right: `IdentityPill` trigger (see §13.3).
+- Right: no persistent identity control in header. The `IdentityPill` is accessed via a floating mini-trigger (see §13.3).
 - No hamburger when `navMode === "bottom-tabs"`.
 - Hamburger visible when `navMode === "sidebar"`.
 
@@ -260,6 +260,7 @@ interface IdentityPillProps {
 ```
 
 Behaviour:
+- Rendered as a small floating button (bottom-right or top-right corner) that appears after the initial page load animation.
 - Displays active user abbreviation (first letter of display name, from `displayAbbreviations` store).
 - Tap opens an in-place Z/T selection pill with slide animation (≤ 200ms).
 - Selecting the other user calls `setActiveUser(userId)` from the app store.
@@ -282,7 +283,7 @@ interface BottomSheetProps {
 ```
 
 Behaviour:
-- Only rendered on mobile (`pointer: coarse` or viewport width < 768px); on non-mobile, acts as a transparent pass-through that renders children in a centered modal instead.
+- Used on all touch/mobile viewports. On non-touch desktop (pointer: fine, width ≥ 1024px), acts as a centered modal instead.
 - Drag handle displayed at top center.
 - Drag-down ≥ 50% of sheet height triggers close.
 - Backdrop click triggers close.
@@ -417,8 +418,8 @@ New CSS custom properties to define in `src/app.css` (replacing current slate-ba
   --color-surface-2:  #f5f5f4;   /* stone-100 */
   --color-border:     #e7e5e0;   /* stone-200 */
   --color-text:       #1c1917;   /* stone-900 */
-  --color-text-muted: #78716c;   /* stone-500 */
-  --color-text-hint:  #a8a29e;   /* stone-400 */
+  --color-text-muted: #57534e;   /* stone-600 — use for body/secondary text (AA compliant) */
+  --color-text-hint:  #78716c;   /* stone-500 — decorative/non-essential copy only */
 }
 
 /* Dark mode */
@@ -541,7 +542,7 @@ Settings page layout change: grouped sections with inset cards (visual only, no 
 |----------|-------------------|
 | User switches nav mode mid-session | New nav renders immediately; active route preserved |
 | Bottom tabs + sidebar mode disabled | Floating back button visible on non-home pages |
-| BottomSheet open + screen rotated to landscape | Sheet collapses to modal behavior (width ≥ 768px) |
+| BottomSheet open + screen rotated to landscape on tablet | Sheet remains a sheet (tablet uses bottom tabs/sheet pattern) |
 | Identity pill open + user presses Escape | Pill closes, focus returns to trigger |
 | Home activity item deleted by other user | Item disappears from feed on next Firestore snapshot |
 | Font preset switched | `data-font` attribute updates; fonts swap via CSS; no page reload |
@@ -567,7 +568,7 @@ Each row maps to an acceptance criterion (§10) or a key interaction.
 | T9 | IdentityPill closes on Escape key | Unit | `src/lib/components/IdentityPill.test.ts` |
 | T10 | IdentityPill calls setActiveUser on user select | Unit | `src/lib/components/IdentityPill.test.ts` |
 | T11 | BottomSheet renders children on mobile | Unit | `src/lib/components/ui/BottomSheet.test.ts` |
-| T12 | BottomSheet renders modal on desktop (width ≥ 768) | Unit | `src/lib/components/ui/BottomSheet.test.ts` |
+| T12 | BottomSheet renders modal on non-touch desktop (width ≥ 1024, pointer: fine) | Unit | `src/lib/components/ui/BottomSheet.test.ts` |
 | T13 | BottomSheet closes on backdrop click | Unit | `src/lib/components/ui/BottomSheet.test.ts` |
 | T14 | BottomSheet closes on Escape | Unit | `src/lib/components/ui/BottomSheet.test.ts` |
 | T15 | Settings nav mode toggle persists to preferences | Unit | `src/lib/pages/Settings.test.ts` |
@@ -583,10 +584,12 @@ Each row maps to an acceptance criterion (§10) or a key interaction.
 
 ---
 
-## 19. Open Questions
+## 19. Resolved Decisions
 
-1. **Identity switch trigger:** Header chip (always visible abbreviation) vs. a floating mini-trigger that only appears after some navigation. Decision needed before implementing `IdentityPill` trigger placement.
-2. **Tablet breakpoint for nav:** At what width does bottom-tabs → sidebar automatically happen (if at all)? Or is it purely user-controlled?
-3. **Warm palette contrast audit:** Stone-500 on stone-50 background needs contrast check (likely fails AA). Confirm stone-600/700 for body text in light mode.
-4. **Font loading:** Nunito via Google Fonts vs. self-hosted for offline/PWA support. Self-hosting recommended given PWA offline requirements.
-5. **`/search` route:** Is the old `/` Search page preserved at `/search`, or is it fully replaced by the Home dashboard? (Current spec moves search to a tab entry in the More sheet.)
+Previously open questions, now resolved:
+
+1. **Identity switch trigger:** Use the **floating mini-trigger** pattern — a small floating element that appears after initial navigation, keeping the header clean.
+2. **Tablet breakpoint for nav:** Bottom tabs are used at **all** viewport widths including tablet. No automatic breakpoint switch; nav mode remains purely user-controlled.
+3. **Warm palette contrast audit:** Confirmed. Stone-600/700 for body text in light mode. Stone-500 muted text acceptable for decorative/non-essential copy only.
+4. **Font loading:** Use **Google Fonts** for now given the existing Firebase dependency. Self-hosting should be revisited as part of the Firebase migration issue (track there).
+5. **`/search` route:** The old Search page is **preserved at `/search`**. Home (`/`) becomes the new landing page; Search is accessible from the More sheet in bottom-tabs mode.
