@@ -44,7 +44,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent): void {
-    if (e.key === 'Escape') onClose()
+    if (open && e.key === 'Escape') onClose()
   }
 
   let dragOffset = $derived(isDragging ? Math.max(0, dragCurrentY - dragStartY) : 0)

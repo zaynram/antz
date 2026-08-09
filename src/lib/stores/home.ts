@@ -36,6 +36,7 @@ function rebuildActivity(): void {
         createdBy: m.createdBy,
         updatedAt: m.updatedAt,
         posterPath: m.posterPath,
+        mediaType: m.type,
     }))
 
     const noteItems: HomeActivity[] = latestNotes.map(n => ({
@@ -76,6 +77,11 @@ function rebuildActivity(): void {
 }
 
 export function initHomeStore(): void {
+    // Clean up any existing subscriptions before creating new ones
+    if (unsubscribeMedia) { unsubscribeMedia(); unsubscribeMedia = null }
+    if (unsubscribeNotes) { unsubscribeNotes(); unsubscribeNotes = null }
+    if (unsubscribePlaces) { unsubscribePlaces(); unsubscribePlaces = null }
+
     _dashboardState.set(INITIAL_STATE)
 
     unsubscribeMedia = subscribeToCollection<Media>("media", items => {

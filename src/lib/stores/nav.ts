@@ -1,15 +1,22 @@
 import { derived, writable } from "svelte/store"
 import { currentPreferences } from "./app"
-import type { NavMode } from "../types"
+import type { NavMode, UserPreferences } from "../types"
 
 export const currentRoute = writable<string>(
     typeof window !== "undefined" ? window.location.pathname : "/"
 )
 
-// Derive navMode from the active user's preferences, falling back to "bottom-tabs"
+function defaultNavMode(): NavMode {
+    if (typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches) {
+        return "bottom-tabs"
+    }
+    return "sidebar"
+}
+
+// Derive navMode from the active user's preferences, falling back to device-appropriate default
 export const navMode = derived<typeof currentPreferences, NavMode>(
     currentPreferences,
-    $prefs => $prefs?.navMode ?? "bottom-tabs"
+    ($prefs: UserPreferences | null) => $prefs?.navMode ?? defaultNavMode()
 )
 
 export function navigate(route: string): void {

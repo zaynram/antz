@@ -366,4 +366,5 @@ export interface HomeActivity {
     createdBy: UserId
     updatedAt: Timestamp
     posterPath?: string | null // Media poster, if available
+    mediaType?: MediaType      // Only set when type === "media"
 }

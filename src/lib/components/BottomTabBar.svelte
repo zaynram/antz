@@ -41,7 +41,6 @@
 {#if $navMode === 'bottom-tabs'}
   <nav
     class="fixed bottom-0 left-0 right-0 z-40 bg-surface border-t border-slate-200 dark:border-slate-700 safe-area-bottom"
-    role="tablist"
     aria-label="Main navigation"
   >
     <div class="flex items-stretch h-14">
@@ -49,8 +48,7 @@
         {@const active = isActive(tab)}
         <button
           type="button"
-          role="tab"
-          aria-selected={active}
+          aria-current={active ? 'page' : undefined}
           aria-label={tab.label}
           class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors touch-manipulation
             {active ? 'text-accent' : 'text-slate-500 dark:text-slate-400'}"
@@ -64,8 +62,6 @@
       <!-- More button -->
       <button
         type="button"
-        role="tab"
-        aria-selected={false}
         aria-label="More"
         class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors touch-manipulation text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
         onclick={() => { moreOpen = true }}

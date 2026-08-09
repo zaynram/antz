@@ -16,13 +16,16 @@
   let userName = $derived($currentPreferences?.name || 'there')
 
   function handleActivityClick(item: HomeActivity): void {
-    if (item.type === 'media') navigate(`/library/movies`)
-    else if (item.type === 'note') navigate('/notes')
+    if (item.type === 'media') {
+      const route = item.mediaType === 'tv' ? '/library/tv' : item.mediaType === 'game' ? '/library/games' : '/library/movies'
+      navigate(route)
+    } else if (item.type === 'note') navigate('/notes')
     else if (item.type === 'place') navigate('/places')
   }
 
-  function handleMediaClick(_item: Media): void {
-    navigate('/library/movies')
+  function handleMediaClick(item: Media): void {
+    const route = item.type === 'tv' ? '/library/tv' : item.type === 'game' ? '/library/games' : '/library/movies'
+    navigate(route)
   }
 
   function handleAddNote(): void {
