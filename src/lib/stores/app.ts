@@ -131,6 +131,8 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
         "searchRadius",
         "videoSyncPlatform",
         "youtubePlaylistId",
+        "navMode",
+        "fontPreset",
     ]
 
     for (const userId of ["Z", "T"] as const) {
