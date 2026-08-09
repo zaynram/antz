@@ -5,11 +5,13 @@
   import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte'
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
   import { hapticLight, hapticMedium, hapticSuccess } from '$lib/haptics'
-  import { activeUser, displayNames } from '$lib/stores/app'
+  import { activeUser, currentPreferences, displayNames, userPreferences } from '$lib/stores/app'
   import { consumeQueryParam } from '$lib/stores/nav'
+  import { getNotePalette, resolveNoteTone, resolveToneShift, NOTE_TONE_KEYS, type NoteTone } from '$lib/notePalette'
+  import { DEFAULT_ACCENT } from '$lib/accents'
   import type { Note, NoteColor, UserId } from '$lib/types'
   import { Timestamp, type Timestamp as TimestampType } from 'firebase/firestore'
-  import { Archive, ArchiveRestore, Check, Image as ImageIcon, Pencil, Pin, StickyNote, Trash2, X } from 'lucide-svelte'
+  import { Archive, ArchiveRestore, Check, Image as ImageIcon, Pencil, Pin, Search, SlidersHorizontal, ArrowUpDown, StickyNote, Trash2, X } from 'lucide-svelte'
   import { onMount } from 'svelte'
   import { toast } from 'svelte-sonner'
 
@@ -20,11 +22,19 @@
 
   // Compose form state
   let composing = $state(false)
-  let newNote = $state({ title: '', content: '', color: 'yellow' as NoteColor })
+  let newNote = $state({ title: '', content: '', color: 't0' as NoteColor })
 
   // View: 'corkboard' | 'archive'
   type ViewKey = 'corkboard' | 'archive'
   let activeView = $state<ViewKey>('corkboard')
+
+  // Filter / sort state
+  let showFilters = $state(false)
+  let searchText = $state('')
+  let authorFilter = $state<'all' | UserId>('all')
+  let unreadOnly = $state(false)
+  type SortMode = 'newest' | 'oldest' | 'author'
+  let sortMode = $state<SortMode>('newest')
 
   // Cached timestamp for relative time calculations - updates every 60 seconds
   let now = $state(Date.now())
@@ -32,12 +42,40 @@
   // Get the other user's ID
   let otherUserId = $derived<UserId>($activeUser === 'Z' ? 'T' : 'Z')
 
-  const NOTE_COLORS: NoteColor[] = ['yellow', 'pink', 'blue', 'green', 'purple', 'orange']
+  // ===== Per-identity note palettes =====
+  // Each note is coloured from its author's accent so authorship reads at a
+  // glance; when both accents collide, one family is auto hue-shifted.
+  let toneShift = $derived(
+    resolveToneShift($userPreferences, $currentPreferences?.noteAutoToneShift ?? true)
+  )
+  let isDark = $derived(($currentPreferences?.theme ?? 'dark') === 'dark')
+  let myAccent = $derived($userPreferences[$activeUser]?.accentColor ?? DEFAULT_ACCENT)
+  let myPalette = $derived(getNotePalette(myAccent, toneShift[$activeUser] ?? 0))
+  let composeTone = $derived(
+    myPalette[Math.max(0, (NOTE_TONE_KEYS as readonly string[]).indexOf(newNote.color))]
+  )
+
+  function toneOf(note: Note): NoteTone {
+    return resolveNoteTone(note.createdBy, note.color, $userPreferences, toneShift)
+  }
+
+  function swatchBg(tone: NoteTone): string {
+    return isDark ? tone.bgDark : tone.bgLight
+  }
+
+  function noteVars(tone: NoteTone): string {
+    const bg = isDark ? tone.bgDark : tone.bgLight
+    const ink = isDark ? tone.inkDark : tone.inkLight
+    return `--note-bg:${bg};--note-ink:${ink};--note-tack:${tone.tack};`
+  }
+
+  function signatureFor(userId: UserId): string {
+    return ($userPreferences[userId]?.noteSignature ?? '').trim()
+  }
 
   // Deterministic rotation based on note id - slight tilt for realism
   function getNoteRotation(noteId: string | undefined): number {
     if (!noteId) return 0
-    // Hash the id to a stable rotation in range [-3, 3] degrees
     let hash = 0
     for (let i = 0; i < noteId.length; i++) {
       hash = (hash * 31 + noteId.charCodeAt(i)) & 0xffffffff
@@ -80,7 +118,7 @@
         },
         $activeUser
       )
-      newNote = { title: '', content: '', color: 'yellow' }
+      newNote = { title: '', content: '', color: 't0' }
       composing = false
       hapticSuccess()
       toast.success('Note pinned to board')
@@ -200,92 +238,179 @@
     selectedNote = null
   }
 
-  // Board notes: unarchived, pinned first then chronological
+  function resetFilters(): void {
+    searchText = ''
+    authorFilter = 'all'
+    unreadOnly = false
+    sortMode = 'newest'
+  }
+
+  let activeFilterCount = $derived(
+    (authorFilter !== 'all' ? 1 : 0) + (unreadOnly ? 1 : 0) + (searchText.trim() ? 1 : 0) + (sortMode !== 'newest' ? 1 : 0)
+  )
+
+  // Board notes: filtered + sorted, pinned first
   let boardNotes = $derived.by(() => {
-    const active = notes.filter(n => !n.archived)
-    return [...active].sort((a, b) => {
+    const q = searchText.trim().toLowerCase()
+    let list = notes.filter(n => !n.archived)
+    if (authorFilter !== 'all') list = list.filter(n => n.createdBy === authorFilter)
+    if (unreadOnly) list = list.filter(n => !n.read && n.createdBy !== $activeUser)
+    if (q) list = list.filter(n =>
+      (n.title ?? '').toLowerCase().includes(q) || (n.content ?? '').toLowerCase().includes(q)
+    )
+    return [...list].sort((a, b) => {
       if (a.pinned && !b.pinned) return -1
       if (!a.pinned && b.pinned) return 1
-      // Newest first
+      if (sortMode === 'author' && a.createdBy !== b.createdBy) {
+        return a.createdBy < b.createdBy ? -1 : 1
+      }
       const ta = a.createdAt?.toMillis?.() ?? 0
       const tb = b.createdAt?.toMillis?.() ?? 0
-      return tb - ta
+      return sortMode === 'oldest' ? ta - tb : tb - ta
     })
   })
 
+  let totalBoardCount = $derived(notes.filter(n => !n.archived).length)
   let archivedNotes = $derived(notes.filter(n => n.archived))
 
   // Unread count from other user
   let unreadCount = $derived(
     notes.filter(n => n.createdBy === otherUserId && !n.read && !n.archived).length
   )
+
+  const authorChips: Array<{ value: 'all' | UserId; label: string }> = [
+    { value: 'all', label: 'Everyone' },
+    { value: 'Z', label: 'Z' },
+    { value: 'T', label: 'T' },
+  ]
 </script>
 
-<!-- Cork board page -->
+<!-- Full-bleed cork backdrop (fixed behind the page content) -->
+<div class="cork-backdrop" aria-hidden="true"></div>
+
 <div class="corkboard-page">
-  <!-- Header bar -->
-  <div class="corkboard-header">
-    <div class="flex items-center gap-3">
+  <!-- Wooden control rail — the board's "tack & pen bin" -->
+  <div class="cork-rail">
+    <div class="flex items-center gap-2.5 min-w-0">
       <div class="corkboard-pin-icon">
-        <Pin size={18} />
+        <Pin size={16} />
       </div>
-      <div>
-        <h1 class="text-lg font-bold text-slate-800 dark:text-slate-100 leading-tight">Our Board</h1>
-        <p class="text-xs text-slate-500 dark:text-slate-400">{boardNotes.length} note{boardNotes.length === 1 ? '' : 's'} pinned</p>
+      <div class="min-w-0">
+        <h1 class="cork-title">Our Board</h1>
+        <p class="cork-subtitle">
+          {#if activeView === 'corkboard'}
+            {boardNotes.length}{boardNotes.length !== totalBoardCount ? `/${totalBoardCount}` : ''} note{totalBoardCount === 1 ? '' : 's'}
+          {:else}
+            {archivedNotes.length} archived
+          {/if}
+        </p>
       </div>
     </div>
 
-    <div class="flex items-center gap-2">
-      {#if unreadCount > 0}
+    <div class="flex items-center gap-1.5">
+      {#if unreadCount > 0 && activeView === 'corkboard'}
         <span class="unread-bubble">{unreadCount} new</span>
       {/if}
 
-      <!-- View toggle -->
-      <button
-        type="button"
-        class="btn-ghost text-sm px-3 py-2 {activeView === 'archive' ? 'text-accent' : ''}"
-        onclick={() => { activeView = activeView === 'corkboard' ? 'archive' : 'corkboard'; hapticLight(); }}
-      >
-        {#if activeView === 'archive'}
-          <StickyNote size={16} />
-          <span>Board</span>
-        {:else}
-          <Archive size={16} />
-          <span>Archive {archivedNotes.length > 0 ? `(${archivedNotes.length})` : ''}</span>
-        {/if}
-      </button>
-
-      <!-- Add note button -->
       {#if activeView === 'corkboard'}
         <button
           type="button"
-          class="btn-primary text-sm"
+          class="rail-btn {showFilters || activeFilterCount > 0 ? 'is-active' : ''}"
+          onclick={() => { showFilters = !showFilters; hapticLight(); }}
+          aria-label="Filter and sort"
+          aria-pressed={showFilters}
+        >
+          <SlidersHorizontal size={16} />
+          {#if activeFilterCount > 0}<span class="rail-badge">{activeFilterCount}</span>{/if}
+        </button>
+      {/if}
+
+      <button
+        type="button"
+        class="rail-btn {activeView === 'archive' ? 'is-active' : ''}"
+        onclick={() => { activeView = activeView === 'corkboard' ? 'archive' : 'corkboard'; hapticLight(); }}
+        aria-label={activeView === 'archive' ? 'Back to board' : 'Open archive'}
+      >
+        {#if activeView === 'archive'}
+          <StickyNote size={16} />
+        {:else}
+          <Archive size={16} />
+          {#if archivedNotes.length > 0}<span class="rail-badge">{archivedNotes.length}</span>{/if}
+        {/if}
+      </button>
+
+      {#if activeView === 'corkboard'}
+        <button
+          type="button"
+          class="rail-pen"
           onclick={() => { composing = !composing; hapticLight(); }}
           aria-label="Write a note"
         >
-          <Pencil size={16} />
+          <Pencil size={15} />
           <span class="hidden sm:inline">Write</span>
         </button>
       {/if}
     </div>
   </div>
 
-  <!-- Cork texture board area -->
-  {#if activeView === 'corkboard'}
-    <div class="cork-surface">
+  <!-- Filter / sort tray -->
+  {#if activeView === 'corkboard' && showFilters}
+    <div class="filter-tray">
+      <div class="relative flex-1 min-w-[10rem]">
+        <Search size={15} class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+        <input
+          type="search"
+          placeholder="Search notes…"
+          class="tray-input pl-9"
+          bind:value={searchText}
+        />
+      </div>
 
+      <div class="tray-chips" role="group" aria-label="Filter by author">
+        {#each authorChips as chip}
+          <button
+            type="button"
+            class="tray-chip {authorFilter === chip.value ? 'is-on' : ''}"
+            onclick={() => { authorFilter = chip.value; hapticLight(); }}
+          >{chip.label}</button>
+        {/each}
+      </div>
+
+      <button
+        type="button"
+        class="tray-chip {unreadOnly ? 'is-on' : ''}"
+        onclick={() => { unreadOnly = !unreadOnly; hapticLight(); }}
+      >Unread</button>
+
+      <label class="tray-sort">
+        <ArrowUpDown size={14} class="text-slate-400" />
+        <select bind:value={sortMode} aria-label="Sort notes">
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="author">By author</option>
+        </select>
+      </label>
+
+      {#if activeFilterCount > 0}
+        <button type="button" class="tray-clear" onclick={resetFilters}>Clear</button>
+      {/if}
+    </div>
+  {/if}
+
+  {#if activeView === 'corkboard'}
+    <div class="notes-board">
       <!-- Compose sticky inline -->
       {#if composing}
-        <div class="compose-sticky note-{newNote.color}">
+        <div class="compose-sticky" style={noteVars(composeTone)}>
           <div class="sticky-top-tape"></div>
           <div class="p-4 pt-5 space-y-2">
             <div class="flex items-center justify-between mb-1">
-              <span class="text-xs font-semibold uppercase tracking-wider" style="color: rgba(0,0,0,0.55)">New note</span>
+              <span class="compose-eyebrow">New note · {$displayNames[$activeUser]}</span>
               <button
                 type="button"
-                class="transition-colors"
-                style="color: rgba(0,0,0,0.5)"
-                onclick={() => { composing = false; newNote = { title: '', content: '', color: 'yellow' }; }}
+                class="compose-x"
+                onclick={() => { composing = false; newNote = { title: '', content: '', color: 't0' }; }}
+                aria-label="Discard"
               >
                 <X size={16} />
               </button>
@@ -297,33 +422,30 @@
               bind:value={newNote.title}
             />
             <textarea
-              placeholder="Write something..."
+              placeholder="Write something for {$displayNames[otherUserId]}…"
               rows="4"
               class="sticky-input resize-none text-sm leading-relaxed"
               bind:value={newNote.content}
             ></textarea>
 
-            <!-- Color picker -->
+            <!-- Tone picker (author's palette) -->
             <div class="flex items-center gap-2 pt-1">
-              <span class="text-xs" style="color: rgba(0,0,0,0.5)">Color:</span>
+              <span class="compose-eyebrow">Tone</span>
               <div class="flex gap-1.5">
-                {#each NOTE_COLORS as color}
+                {#each NOTE_TONE_KEYS as key, i}
                   <button
                     type="button"
-                    class="touch-sm color-swatch note-{color} {newNote.color === color ? 'ring-2 ring-slate-600 ring-offset-1' : ''}"
-                    onclick={() => newNote.color = color}
-                    aria-label="Color {color}"
+                    class="touch-sm color-swatch {newNote.color === key ? 'is-selected' : ''}"
+                    style="background:{swatchBg(myPalette[i])}"
+                    onclick={() => newNote.color = key}
+                    aria-label="Tone {i + 1}"
                   ></button>
                 {/each}
               </div>
             </div>
 
             <div class="flex justify-end pt-1">
-              <button
-                type="button"
-                class="pin-btn"
-                onclick={addNote}
-              >
+              <button type="button" class="pin-btn" onclick={addNote}>
                 <Pin size={14} />
                 Pin it
               </button>
@@ -332,13 +454,12 @@
         </div>
       {/if}
 
-      <!-- Notes masonry grid -->
       {#if boardNotes.length === 0 && !composing}
         <div class="cork-empty">
           <EmptyState
             icon={StickyNote}
-            title="The board is empty"
-            description="Pin your first note for {$displayNames[otherUserId]}"
+            title={activeFilterCount > 0 ? 'No notes match' : 'The board is empty'}
+            description={activeFilterCount > 0 ? 'Try clearing the filters.' : `Pin your first note for ${$displayNames[otherUserId]}`}
           />
         </div>
       {:else}
@@ -346,26 +467,24 @@
           {#each boardNotes as note (note.id)}
             {@const isUnread = !note.read && note.createdBy !== $activeUser}
             {@const rot = getNoteRotation(note.id)}
+            {@const sig = signatureFor(note.createdBy)}
             <div
-              class="sticky-note note-{note.color ?? 'yellow'} {note.pinned ? 'is-pinned' : ''} {isUnread ? 'is-unread' : ''}"
-              style="--rot: {rot}deg"
+              class="sticky-note {note.pinned ? 'is-pinned' : ''} {isUnread ? 'is-unread' : ''}"
+              style="{noteVars(toneOf(note))}--rot:{rot}deg"
               onclick={() => openNoteDetail(note)}
               role="button"
               tabindex="0"
               onkeydown={(e) => e.key === 'Enter' && openNoteDetail(note)}
             >
-              <!-- Thumbtack -->
               <div class="thumbtack {note.pinned ? 'thumbtack-pinned' : ''}">
                 <div class="thumbtack-head"></div>
                 <div class="thumbtack-stem"></div>
               </div>
 
-              <!-- Unread dot -->
               {#if isUnread}
                 <div class="unread-dot"></div>
               {/if}
 
-              <!-- Note content -->
               <div class="sticky-body">
                 {#if note.title}
                   <h3 class="sticky-title">{note.title}</h3>
@@ -374,22 +493,23 @@
                   <p class="sticky-content">{note.content}</p>
                 {/if}
                 {#if note.photos?.length}
-                  <div class="flex items-center gap-1 mt-2 text-xs opacity-60">
+                  <div class="sticky-photos">
                     <ImageIcon size={12} />
                     <span>{note.photos.length} photo{note.photos.length === 1 ? '' : 's'}</span>
                   </div>
                 {/if}
+                {#if sig}
+                  <p class="sticky-sign">{sig}</p>
+                {/if}
               </div>
 
-              <!-- Footer: author + time -->
               <div class="sticky-footer">
-                <span class="sticky-author {note.createdBy === $activeUser ? 'opacity-50' : ''}">
+                <span class="sticky-author">
                   {note.createdBy === $activeUser ? 'You' : getDisplayNameForUser(note.createdBy)}
                 </span>
                 <span class="sticky-time">{getRelativeTime(note.createdAt)}</span>
               </div>
 
-              <!-- Hover action tray -->
               <div class="sticky-actions" role="none" onclick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
@@ -439,11 +559,6 @@
   {:else}
     <!-- Archive view -->
     <div class="archive-view">
-      <div class="flex items-center gap-2 mb-4 px-1">
-        <Archive size={16} class="text-slate-400" />
-        <span class="text-sm text-slate-500">{archivedNotes.length} archived note{archivedNotes.length === 1 ? '' : 's'}</span>
-      </div>
-
       {#if archivedNotes.length === 0}
         <EmptyState
           icon={Archive}
@@ -453,8 +568,9 @@
       {:else}
         <div class="flex flex-col gap-3">
           {#each archivedNotes as note (note.id)}
+            {@const tone = toneOf(note)}
             <div
-              class="card p-4 cursor-pointer hover:border-accent/50 transition-colors"
+              class="archive-card"
               onclick={() => openNoteDetail(note)}
               role="button"
               tabindex="0"
@@ -463,7 +579,7 @@
               <div class="flex items-start justify-between gap-3">
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 mb-1">
-                    <div class="w-2 h-2 rounded-full note-dot-{note.color ?? 'yellow'}"></div>
+                    <div class="w-2.5 h-2.5 rounded-full shrink-0" style="background:{tone.tack}"></div>
                     {#if note.title}
                       <h3 class="font-medium truncate">{note.title}</h3>
                     {:else}
@@ -507,11 +623,12 @@
 <Modal open={!!selectedNote} onclose={closeNoteDetail} title={selectedNote?.title || 'Note'}>
   {#snippet header()}
     {#if selectedNote}
-      {@const noteColor = selectedNote.color ?? 'yellow'}
-      <div class="relative modal-note-header note-header-{noteColor} p-6 shrink-0">
+      {@const tone = toneOf(selectedNote)}
+      <div class="relative modal-note-header p-6 shrink-0" style={noteVars(tone)}>
         <button
           class="absolute top-2 right-2 w-11 h-11 rounded-full bg-black/10 flex items-center justify-center hover:bg-black/20 transition-colors touch-manipulation"
           onclick={closeNoteDetail}
+          aria-label="Close"
         >
           <X size={20} />
         </button>
@@ -547,6 +664,10 @@
     <div class="space-y-5">
       {#if selectedNote.content}
         <p class="whitespace-pre-wrap text-slate-700 dark:text-slate-300 leading-relaxed">{selectedNote.content}</p>
+      {/if}
+
+      {#if signatureFor(selectedNote.createdBy)}
+        <p class="detail-sign">{signatureFor(selectedNote.createdBy)}</p>
       {/if}
 
       <!-- Photos -->
@@ -595,6 +716,7 @@
           type="button"
           class="btn-danger text-sm"
           onclick={() => { selectedNote?.id && removeNote(selectedNote.id); closeNoteDetail(); }}
+          aria-label="Delete note"
         >
           <Trash2 size={16} />
         </button>
@@ -627,16 +749,17 @@
         bind:value={editingNote.content}
       ></textarea>
 
-      <!-- Color picker -->
+      <!-- Tone picker -->
       <div class="flex items-center gap-3">
-        <span class="text-sm text-slate-500">Color:</span>
+        <span class="text-sm text-slate-500">Tone:</span>
         <div class="flex gap-2">
-          {#each NOTE_COLORS as color}
+          {#each NOTE_TONE_KEYS as key, i}
             <button
               type="button"
-              class="touch-sm color-swatch-lg note-{color} {editingNote.color === color ? 'ring-2 ring-slate-600 ring-offset-2' : ''}"
-              onclick={() => { if (editingNote) editingNote.color = color }}
-              aria-label="Color {color}"
+              class="touch-sm color-swatch-lg {editingNote.color === key ? 'is-selected' : ''}"
+              style="background:{swatchBg(myPalette[i])}"
+              onclick={() => { if (editingNote) editingNote.color = key }}
+              aria-label="Tone {i + 1}"
             ></button>
           {/each}
         </div>
@@ -664,31 +787,71 @@
 />
 
 <style>
-  /* ===== CORKBOARD PAGE ===== */
-  .corkboard-page {
-    min-height: calc(100vh - 5rem);
-    display: flex;
-    flex-direction: column;
+  /* ===== CORK BACKDROP (full-bleed page background) ===== */
+  .cork-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E"),
+      radial-gradient(120% 120% at 50% 0%, #d4b895 0%, #c8a882 55%, #b9986f 100%);
+    box-shadow: inset 0 8px 24px rgba(0,0,0,0.18);
   }
 
-  /* Header */
-  .corkboard-header {
+  :global(.dark) .cork-backdrop {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.13'/%3E%3C/svg%3E"),
+      radial-gradient(120% 120% at 50% 0%, #8a6a44 0%, #7a5c3a 55%, #654b30 100%);
+    box-shadow: inset 0 8px 30px rgba(0,0,0,0.4);
+  }
+
+  .corkboard-page {
+    position: relative;
+    z-index: 1;
+    min-height: calc(100vh - 6rem);
+  }
+
+  /* ===== WOODEN CONTROL RAIL ===== */
+  .cork-rail {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem 1rem 0.75rem;
-    background: transparent;
+    gap: 0.5rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: 0.9rem;
+    background: linear-gradient(180deg, #9a7b4f 0%, #86683f 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.18),
+      inset 0 -2px 4px rgba(0,0,0,0.25),
+      0 3px 8px rgba(0,0,0,0.25);
+    margin-bottom: 0.85rem;
   }
 
   .corkboard-pin-icon {
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 2rem;
+    height: 2rem;
     border-radius: 50%;
     background: var(--color-accent);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    flex-shrink: 0;
+  }
+
+  .cork-title {
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #fdf6e9;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.35);
+  }
+
+  .cork-subtitle {
+    font-size: 0.7rem;
+    color: rgba(253,246,233,0.75);
   }
 
   .unread-bubble {
@@ -701,25 +864,126 @@
     letter-spacing: 0.02em;
   }
 
-  /* Cork surface */
-  .cork-surface {
-    flex: 1;
-    padding: 1rem;
-    background:
-      /* Subtle noise texture via SVG data-uri */
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E"),
-      #c8a882;
-    border-radius: 1rem;
-    margin: 0 0.5rem 1rem;
-    min-height: 24rem;
-    box-shadow: inset 0 2px 8px rgba(0,0,0,0.18), 0 1px 0 rgba(255,255,255,0.3);
+  /* Rail buttons (brass tacks in the bin) */
+  .rail-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.2rem;
+    height: 2.2rem;
+    padding: 0 0.5rem;
+    border-radius: 0.6rem;
+    color: #fdf6e9;
+    background: rgba(255,255,255,0.1);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+    transition: background 120ms;
+  }
+  .rail-btn:hover { background: rgba(255,255,255,0.2); }
+  .rail-btn.is-active { background: var(--color-accent); }
+
+  .rail-badge {
+    margin-left: 0.3rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    background: rgba(0,0,0,0.25);
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
   }
 
-  :global(.dark) .cork-surface {
-    background:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E"),
-      #7a5c3a;
-    box-shadow: inset 0 2px 10px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.08);
+  .rail-pen {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 2.2rem;
+    padding: 0 0.75rem;
+    border-radius: 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: white;
+    background: var(--color-accent);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
+    transition: filter 120ms;
+  }
+  .rail-pen:hover { filter: brightness(1.08); }
+
+  /* ===== FILTER TRAY ===== */
+  .filter-tray {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.7rem;
+    margin-bottom: 0.85rem;
+    border-radius: 0.85rem;
+    background: rgba(255,255,255,0.82);
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  }
+  :global(.dark) .filter-tray {
+    background: rgba(30,26,22,0.8);
+  }
+
+  .tray-input {
+    width: 100%;
+    height: 2.25rem;
+    padding: 0 0.75rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.85rem;
+    outline: none;
+  }
+  .tray-input:focus { border-color: var(--color-accent); }
+
+  .tray-chips { display: inline-flex; gap: 0.25rem; }
+
+  .tray-chip {
+    height: 2.25rem;
+    padding: 0 0.7rem;
+    border-radius: 0.6rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-text-muted, #57534e);
+    background: var(--color-surface-2);
+    transition: background 120ms, color 120ms;
+  }
+  .tray-chip.is-on {
+    background: var(--color-accent);
+    color: white;
+  }
+
+  .tray-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 2.25rem;
+    padding: 0 0.6rem;
+    border-radius: 0.6rem;
+    background: var(--color-surface-2);
+  }
+  .tray-sort select {
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .tray-clear {
+    height: 2.25rem;
+    padding: 0 0.6rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-accent);
+  }
+
+  /* ===== BOARD ===== */
+  .notes-board {
+    padding: 0.25rem 0.15rem 1rem;
+    min-height: 20rem;
   }
 
   .cork-empty {
@@ -727,26 +991,19 @@
     align-items: center;
     justify-content: center;
     min-height: 20rem;
+    background: rgba(255,255,255,0.35);
+    border-radius: 1rem;
+  }
+  :global(.dark) .cork-empty {
+    background: rgba(0,0,0,0.2);
   }
 
-  /* Notes masonry */
   .notes-masonry {
     columns: 2;
     column-gap: 0.75rem;
-    /* On wider screens show 3 columns */
   }
-
-  @media (min-width: 640px) {
-    .notes-masonry {
-      columns: 3;
-    }
-  }
-
-  @media (min-width: 900px) {
-    .notes-masonry {
-      columns: 4;
-    }
-  }
+  @media (min-width: 640px) { .notes-masonry { columns: 3; } }
+  @media (min-width: 900px) { .notes-masonry { columns: 4; } }
 
   /* ===== STICKY NOTE ===== */
   .sticky-note {
@@ -756,6 +1013,8 @@
     border-radius: 2px;
     padding: 0.875rem 0.875rem 0.6rem;
     cursor: pointer;
+    background: var(--note-bg, #fef08a);
+    color: var(--note-ink, #1c1917);
     transform: rotate(var(--rot, 0deg));
     transition: transform 150ms ease, box-shadow 150ms ease;
     box-shadow: 2px 3px 10px rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.1);
@@ -784,21 +1043,6 @@
     box-shadow: 0 0 0 2px white;
   }
 
-  /* Sticky note color variants */
-  .note-yellow { background: #fef08a; }
-  .note-pink   { background: #fbcfe8; }
-  .note-blue   { background: #bae6fd; }
-  .note-green  { background: #bbf7d0; }
-  .note-purple { background: #e9d5ff; }
-  .note-orange { background: #fed7aa; }
-
-  :global(.dark) .note-yellow { background: #ca8a04; }
-  :global(.dark) .note-pink   { background: #be185d; }
-  :global(.dark) .note-blue   { background: #0369a1; }
-  :global(.dark) .note-green  { background: #15803d; }
-  :global(.dark) .note-purple { background: #7e22ce; }
-  :global(.dark) .note-orange { background: #c2410c; }
-
   /* Thumbtack */
   .thumbtack {
     position: absolute;
@@ -810,7 +1054,6 @@
     align-items: center;
     z-index: 2;
   }
-
   .thumbtack-head {
     width: 14px;
     height: 14px;
@@ -818,11 +1061,9 @@
     background: radial-gradient(circle at 35% 35%, #e5e7eb, #6b7280);
     box-shadow: 0 1px 3px rgba(0,0,0,0.4);
   }
-
   .thumbtack-pinned .thumbtack-head {
-    background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.7), var(--color-accent));
+    background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.75), var(--note-tack, #6366f1));
   }
-
   .thumbtack-stem {
     width: 2px;
     height: 5px;
@@ -830,17 +1071,14 @@
     border-radius: 0 0 1px 1px;
   }
 
-  /* Sticky note body */
-  .sticky-body {
-    margin-top: 0.5rem;
-    min-height: 2.5rem;
-  }
+  .sticky-body { margin-top: 0.5rem; min-height: 2.5rem; }
 
   .sticky-title {
     font-weight: 700;
     font-size: 0.875rem;
     line-height: 1.3;
-    color: rgba(0,0,0,0.75);
+    color: var(--note-ink);
+    opacity: 0.92;
     margin-bottom: 0.3rem;
     word-break: break-word;
   }
@@ -848,15 +1086,35 @@
   .sticky-content {
     font-size: 0.8rem;
     line-height: 1.45;
-    color: rgba(0,0,0,0.65);
+    color: var(--note-ink);
+    opacity: 0.78;
     white-space: pre-wrap;
     word-break: break-word;
-    /* Clamp to 6 lines on card */
     display: -webkit-box;
     -webkit-line-clamp: 6;
     line-clamp: 6;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  .sticky-photos {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+    font-size: 0.7rem;
+    color: var(--note-ink);
+    opacity: 0.6;
+  }
+
+  .sticky-sign {
+    margin-top: 0.5rem;
+    font-style: italic;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--note-tack);
+    opacity: 0.85;
+    word-break: break-word;
   }
 
   .sticky-footer {
@@ -865,20 +1123,22 @@
     align-items: center;
     margin-top: 0.6rem;
     padding-top: 0.4rem;
-    border-top: 1px solid rgba(0,0,0,0.08);
+    border-top: 1px solid rgba(120,110,90,0.22);
   }
 
   .sticky-author {
     font-size: 0.65rem;
-    font-weight: 600;
-    color: rgba(0,0,0,0.5);
+    font-weight: 700;
+    color: var(--note-ink);
+    opacity: 0.55;
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
 
   .sticky-time {
     font-size: 0.65rem;
-    color: rgba(0,0,0,0.4);
+    color: var(--note-ink);
+    opacity: 0.42;
   }
 
   /* Hover action tray */
@@ -889,44 +1149,38 @@
     transform: translateX(-50%);
     display: flex;
     gap: 0.25rem;
-    background: white;
+    background: var(--color-surface);
     border-radius: 999px;
     padding: 0.25rem 0.5rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     opacity: 0;
     pointer-events: none;
     transition: opacity 120ms;
     z-index: 20;
     white-space: nowrap;
   }
-
   .sticky-note:hover .sticky-actions,
   .sticky-note:focus-within .sticky-actions {
     opacity: 1;
     pointer-events: auto;
   }
-
   @media (hover: none) {
-    /* On touch, keep actions hidden - use detail modal for actions */
-    .sticky-actions {
-      display: none;
-    }
+    .sticky-actions { display: none; }
   }
 
   .sticky-action-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 1.9rem;
+    height: 1.9rem;
     border-radius: 50%;
-    color: #64748b;
+    color: var(--color-text-muted, #64748b);
     transition: color 100ms, background 100ms;
   }
-
   .sticky-action-btn:hover {
-    color: #1e293b;
-    background: #f1f5f9;
+    color: var(--color-text, #1e293b);
+    background: var(--color-surface-2);
   }
 
   /* ===== COMPOSE STICKY ===== */
@@ -934,7 +1188,9 @@
     position: relative;
     margin-bottom: 1rem;
     border-radius: 2px;
-    box-shadow: 3px 4px 14px rgba(0,0,0,0.2);
+    background: var(--note-bg);
+    color: var(--note-ink);
+    box-shadow: 3px 4px 14px rgba(0,0,0,0.24);
     max-width: 24rem;
     margin-left: auto;
     margin-right: auto;
@@ -952,17 +1208,33 @@
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   }
 
+  .compose-eyebrow {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--note-ink);
+    opacity: 0.55;
+  }
+
+  .compose-x {
+    color: var(--note-ink);
+    opacity: 0.5;
+    transition: opacity 120ms;
+  }
+  .compose-x:hover { opacity: 0.85; }
+
   .sticky-input {
     width: 100%;
     background: transparent;
     border: none;
     outline: none;
-    color: rgba(0,0,0,0.75);
+    color: var(--note-ink);
     font-family: inherit;
   }
-
   .sticky-input::placeholder {
-    color: rgba(0,0,0,0.35);
+    color: var(--note-ink);
+    opacity: 0.4;
   }
 
   .pin-btn {
@@ -970,68 +1242,75 @@
     align-items: center;
     gap: 0.35rem;
     font-size: 0.8rem;
-    font-weight: 600;
-    padding: 0.35rem 0.85rem;
+    font-weight: 700;
+    padding: 0.4rem 0.9rem;
     border-radius: 999px;
-    background: rgba(0,0,0,0.12);
-    color: rgba(0,0,0,0.65);
-    transition: background 150ms;
+    background: var(--note-tack);
+    color: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    transition: filter 150ms;
   }
+  .pin-btn:hover { filter: brightness(1.08); }
 
-  .pin-btn:hover {
-    background: rgba(0,0,0,0.2);
-  }
-
-  /* Color swatch (small, in compose form) */
   .color-swatch {
-    width: 1.1rem;
-    height: 1.1rem;
+    width: 1.2rem;
+    height: 1.2rem;
     border-radius: 50%;
-    border: 1.5px solid rgba(0,0,0,0.15);
+    border: 1.5px solid rgba(0,0,0,0.18);
     cursor: pointer;
     transition: transform 100ms;
   }
-
-  .color-swatch:hover {
-    transform: scale(1.2);
+  .color-swatch:hover { transform: scale(1.2); }
+  .color-swatch.is-selected {
+    outline: 2px solid var(--note-ink);
+    outline-offset: 1px;
   }
 
-  /* Color swatch (larger, in edit modal) */
   .color-swatch-lg {
-    width: 1.6rem;
-    height: 1.6rem;
+    width: 1.7rem;
+    height: 1.7rem;
     border-radius: 50%;
-    border: 1.5px solid rgba(0,0,0,0.12);
+    border: 1.5px solid rgba(0,0,0,0.14);
     cursor: pointer;
     transition: transform 100ms;
   }
-
-  .color-swatch-lg:hover {
-    transform: scale(1.15);
+  .color-swatch-lg:hover { transform: scale(1.15); }
+  .color-swatch-lg.is-selected {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
   }
 
-  /* Archive view color dot */
-  .note-dot-yellow { background: #ca8a04; }
-  .note-dot-pink   { background: #be185d; }
-  .note-dot-blue   { background: #0284c7; }
-  .note-dot-green  { background: #16a34a; }
-  .note-dot-purple { background: #7c3aed; }
-  .note-dot-orange { background: #ea580c; }
+  /* Modal note header */
+  .modal-note-header {
+    background: var(--note-bg);
+    color: var(--note-ink);
+  }
 
-  /* Modal note header color */
-  .modal-note-header { color: rgba(0,0,0,0.8); }
-  .note-header-yellow { background: #fef08a; }
-  .note-header-pink   { background: #fbcfe8; }
-  .note-header-blue   { background: #bae6fd; }
-  .note-header-green  { background: #bbf7d0; }
-  .note-header-purple { background: #e9d5ff; }
-  .note-header-orange { background: #fed7aa; }
+  .detail-sign {
+    font-style: italic;
+    font-weight: 600;
+    color: var(--color-accent);
+    opacity: 0.9;
+  }
 
   /* Archive view */
   .archive-view {
-    padding: 1rem;
+    padding: 0.25rem 0.15rem 1rem;
     max-width: 42rem;
     margin: 0 auto;
+  }
+
+  .archive-card {
+    padding: 1rem;
+    border-radius: 0.85rem;
+    background: rgba(255,255,255,0.9);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+    cursor: pointer;
+    transition: box-shadow 150ms;
+  }
+  .archive-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.18); }
+  :global(.dark) .archive-card {
+    background: rgba(30,26,22,0.85);
   }
 
   /* Unread dot */

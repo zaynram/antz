@@ -39,6 +39,9 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         locationMode: "off",
         searchRadius: 5000,
         videoSyncPlatform: "none",
+        fontScale: 1,
+        reduceMotion: false,
+        noteAutoToneShift: true,
         lastUpdated: Date.now(),
     },
     T: {
@@ -49,6 +52,9 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         locationMode: "off",
         searchRadius: 5000,
         videoSyncPlatform: "none",
+        fontScale: 1,
+        reduceMotion: false,
+        noteAutoToneShift: true,
         lastUpdated: Date.now(),
     },
 }
@@ -134,6 +140,10 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
         "youtubePlaylistId",
         "navMode",
         "fontPreset",
+        "fontScale",
+        "reduceMotion",
+        "noteSignature",
+        "noteAutoToneShift",
     ]
 
     for (const userId of ["Z", "T"] as const) {

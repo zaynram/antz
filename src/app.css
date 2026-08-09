@@ -79,9 +79,10 @@
            transition-colors touch-manipulation disabled:opacity-50;
   }
 
-  /* Card/panel base */
+  /* Card/panel base — softly rounded and gently lifted for a cozier,
+     less flat/"SaaS" feel. */
   .card {
-    @apply bg-surface border border-[var(--color-border)] rounded-xl;
+    @apply bg-surface border border-[var(--color-border)] rounded-2xl shadow-sm;
   }
 
   /* Form input base */
@@ -118,6 +119,13 @@
 }
 
 @layer base {
+  /* Global text/UI scale. Multiplies the viewer's own root size (respecting
+     their browser font preference) by the per-user --font-scale setting. */
+  html {
+    font-size: calc(100% * var(--font-scale, 1));
+    overscroll-behavior-y: contain;
+  }
+
   body {
     background-color: var(--color-bg);
     color: var(--color-text);
@@ -128,11 +136,29 @@
   * {
     -webkit-overflow-scrolling: touch;
   }
+}
 
-  /* Prevent pull-to-refresh in PWA */
-  html {
-    overscroll-behavior-y: contain;
-  }
+/* Reduce-motion: honor the explicit per-user toggle by neutralizing
+   non-essential transitions and animations app-wide. Loading spinners are
+   exempted (they carry meaning), and interactive tap-scale is flattened. */
+:root[data-reduce-motion] *,
+:root[data-reduce-motion] *::before,
+:root[data-reduce-motion] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+:root[data-reduce-motion] .animate-spin {
+  animation-duration: 0.8s !important;
+  animation-iteration-count: infinite !important;
+}
+
+:root[data-reduce-motion] button:active,
+:root[data-reduce-motion] [role="button"]:active,
+:root[data-reduce-motion] .touch-feedback:active {
+  transform: none !important;
 }
 
 /* Touch device enhancements */

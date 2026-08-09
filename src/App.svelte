@@ -67,11 +67,13 @@
   let prevTheme: string | undefined = undefined
   let prevAccentColor: string | undefined = undefined
   let prevFontPreset: string | undefined = undefined
+  let prevFontScale: number | undefined = undefined
+  let prevReduceMotion: boolean | undefined = undefined
 
   $effect(() => {
     if ($currentPreferences) {
       const root = document.documentElement
-      const { theme, accentColor, fontPreset } = $currentPreferences
+      const { theme, accentColor, fontPreset, fontScale, reduceMotion } = $currentPreferences
 
       if (prevTheme !== theme) {
         root.classList.toggle('dark', theme === 'dark')
@@ -86,6 +88,18 @@
       if (prevFontPreset !== fontPreset) {
         root.setAttribute('data-font', fontPreset ?? 'warm-rounded')
         prevFontPreset = fontPreset
+      }
+
+      const scale = fontScale ?? 1
+      if (prevFontScale !== scale) {
+        root.style.setProperty('--font-scale', String(scale))
+        prevFontScale = scale
+      }
+
+      const reduce = reduceMotion ?? false
+      if (prevReduceMotion !== reduce) {
+        root.toggleAttribute('data-reduce-motion', reduce)
+        prevReduceMotion = reduce
       }
     }
   })
