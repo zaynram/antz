@@ -40,7 +40,7 @@
 
 {#if $navMode === 'bottom-tabs'}
   <nav
-    class="fixed bottom-0 left-0 right-0 z-40 bg-surface border-t border-slate-200 dark:border-slate-700 safe-area-bottom"
+    class="fixed bottom-0 left-0 right-0 z-40 bg-surface border-t border-[var(--color-border)] safe-area-bottom"
     aria-label="Main navigation"
   >
     <div class="flex items-stretch h-14">
@@ -71,9 +71,6 @@
       </button>
     </div>
   </nav>
-
-  <!-- Extra bottom padding so content isn't hidden behind tab bar -->
-  <div class="h-14"></div>
 
   <BottomSheet open={moreOpen} onClose={() => { moreOpen = false }} title="More">
     {#snippet children()}

@@ -137,7 +137,7 @@
   <!-- Hamburger button - top left -->
   <button
     type="button"
-    class="flex items-center justify-center w-11 h-11 rounded-xl bg-surface border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all touch-manipulation"
+    class="flex items-center justify-center w-11 h-11 rounded-xl bg-surface border border-[var(--color-border)] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all touch-manipulation"
     onclick={toggleSidebar}
     aria-label={isOpen ? 'Close menu' : 'Open menu'}
     aria-expanded={isOpen}
@@ -152,7 +152,7 @@
   <!-- Home button - top right -->
   <button
     type="button"
-    class="flex items-center justify-center w-11 h-11 rounded-xl bg-surface border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all touch-manipulation {currentPath === '/' ? 'bg-accent text-white border-accent hover:bg-accent/90' : ''}"
+    class="flex items-center justify-center w-11 h-11 rounded-xl bg-surface border border-[var(--color-border)] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all touch-manipulation {currentPath === '/' ? 'bg-accent text-white border-accent hover:bg-accent/90' : ''}"
     onclick={() => handleNavigate('/')}
     aria-label="Go home"
   >
@@ -174,7 +174,7 @@
 <!-- Sidebar -->
 <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
 <aside
-  class="fixed top-0 left-0 z-50 h-full w-72 bg-surface border-r border-slate-200 dark:border-slate-700 shadow-2xl transform flex flex-col"
+  class="fixed top-0 left-0 z-50 h-full w-72 bg-surface border-r border-[var(--color-border)] shadow-2xl transform flex flex-col"
   class:-translate-x-full={!isOpen && !isSwiping}
   class:translate-x-0={isOpen && !isSwiping}
   class:transition-transform={!isSwiping}
@@ -189,7 +189,7 @@
   ontouchend={handleTouchEnd}
 >
   <!-- Header with user info -->
-  <header class="p-4 border-b border-slate-200 dark:border-slate-700 safe-area-top">
+  <header class="p-4 border-b border-[var(--color-border)] safe-area-top">
     <button
       type="button"
       class="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors touch-manipulation"
@@ -251,7 +251,7 @@
 
       <!-- Library sub-items -->
       {#if libraryExpanded}
-        <div class="ml-4 mt-1 space-y-1 border-l-2 border-slate-200 dark:border-slate-700 pl-4">
+        <div class="ml-4 mt-1 space-y-1 border-l-2 border-[var(--color-border)] pl-4">
           {#each libraryItems as item (item.path)}
             <button
               type="button"
@@ -270,7 +270,7 @@
   </nav>
 
   <!-- Footer with settings and logout -->
-  <footer class="p-3 border-t border-slate-200 dark:border-slate-700 space-y-1">
+  <footer class="p-3 border-t border-[var(--color-border)] space-y-1">
     <button
       type="button"
       class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors touch-manipulation {currentPath === '/settings'

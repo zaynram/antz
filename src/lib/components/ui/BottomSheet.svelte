@@ -81,7 +81,7 @@
     </div>
 
     {#if title}
-      <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] flex-shrink-0">
         <h2 id="bottomsheet-title" class="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
         <button
           type="button"

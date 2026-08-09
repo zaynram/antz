@@ -18,6 +18,7 @@
   import { Timestamp } from 'firebase/firestore'
   import { searchMovies, searchTV, type TMDBSearchResult } from '$lib/tmdb'
   import { searchGames, type WikiGameResult, fetchGameThumbnail } from '$lib/wikipedia'
+  import { consumeQueryParam } from '$lib/stores/nav'
 
   interface Props {
     navigate: (path: string) => void
@@ -69,6 +70,9 @@
   let unsubPlaces: (() => void) | undefined
 
   onMount(() => {
+    // Switch straight to Discover when arriving via a quick-add link.
+    if (consumeQueryParam('discover') !== null) searchMode = 'discover'
+
     // Load tips preference
     try {
       const stored = localStorage.getItem('search-tips-visible')
@@ -563,7 +567,7 @@
         bind:this={searchInput}
         bind:value={searchQuery}
         placeholder={searchMode === 'library' ? 'Search your library...' : 'Search movies, TV & games...'}
-        class="w-full px-5 py-4 pl-12 pr-12 bg-surface border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-slate-100 text-lg focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
+        class="w-full px-5 py-4 pl-12 pr-12 bg-surface border border-[var(--color-border)] rounded-2xl text-slate-900 dark:text-slate-100 text-lg focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
       />
       {#if isSearching}
         <Loader2 class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-accent animate-spin" />

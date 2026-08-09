@@ -120,7 +120,7 @@
 
 <div class="space-y-2">
   {#if value}
-    <div class="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600">
+    <div class="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-[var(--color-border)]">
       <span class="text-accent"><MapPin size={16} /></span>
       <span class="flex-1 text-sm truncate" title={value.address || `${value.lat.toFixed(4)}, ${value.lng.toFixed(4)}`}>
         {value.address || `${value.lat.toFixed(4)}, ${value.lng.toFixed(4)}`}
@@ -144,7 +144,7 @@
             oninput={handleSearchInput}
             onfocus={() => searchResults.length > 0 && (showDropdown = true)}
             onblur={handleBlur}
-            class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:border-accent"
+            class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg text-sm focus:outline-none focus:border-accent"
             {placeholder}
           />
           {#if searching}
@@ -156,7 +156,7 @@
         
         <button
           type="button"
-          class="px-3 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 flex items-center justify-center"
+          class="px-3 py-2 bg-slate-100 dark:bg-slate-700 border border-[var(--color-border)] rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 flex items-center justify-center"
           onclick={detectCurrentLocation}
           disabled={detectingLocation}
           title="Use current location"
@@ -170,7 +170,7 @@
       </div>
       
       {#if showDropdown && searchResults.length > 0}
-        <div class="absolute top-full left-0 right-0 mt-1 bg-surface border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+        <div class="absolute top-full left-0 right-0 mt-1 bg-surface border border-[var(--color-border)] rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
           {#each searchResults as result}
             <button
               type="button"

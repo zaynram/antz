@@ -6,6 +6,7 @@
   import { getIOSCompatibleImageUrl } from '$lib/ios-images'
   import { Sun, Moon, MapPin, Camera, X, Loader2 } from 'lucide-svelte'
   import { toast } from 'svelte-sonner'
+  import { ACCENT_PRESETS, DEFAULT_ACCENT_Z } from '$lib/accents'
 
   interface Props {
     open: boolean;
@@ -15,7 +16,7 @@
   let { open, onClose }: Props = $props();
 
   let localTheme = $state<Theme>('dark');
-  let localAccentColor = $state('#6366f1');
+  let localAccentColor = $state(DEFAULT_ACCENT_Z);
   let localName = $state('');
   let localProfilePicture = $state<string | undefined>(undefined);
   let uploadingPicture = $state(false);
@@ -30,16 +31,7 @@
   let previousOpen = false;
   let previousUser: 'Z' | 'T' | null = null;
 
-  const presetColors = [
-    '#6366f1', // Indigo
-    '#ec4899', // Pink
-    '#8b5cf6', // Violet
-    '#06b6d4', // Cyan
-    '#10b981', // Emerald
-    '#f59e0b', // Amber
-    '#ef4444', // Red
-    '#3b82f6', // Blue
-  ];
+  const presetColors = ACCENT_PRESETS;
 
   const radiusOptions = [
     { value: 1000, label: '1 km' },
@@ -162,7 +154,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="bg-surface rounded-xl max-w-md w-full shadow-2xl max-h-[90vh] flex flex-col" onclick={handleModalClick}>
-      <div class="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
+      <div class="flex items-center justify-between p-4 border-b border-[var(--color-border)] shrink-0">
         <h2 class="text-lg font-semibold">Preferences for {$activeUser}</h2>
         <button
           class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500"
@@ -237,7 +229,7 @@
             id="prefs-display-name"
             type="text"
             bind:value={localName}
-            class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent"
+            class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg focus:outline-none focus:border-accent"
             placeholder="Your name"
           />
         </div>
@@ -247,14 +239,14 @@
           <span class="block text-sm font-medium mb-2">Theme</span>
           <div class="flex gap-3">
             <button
-              class="flex-1 py-3 px-4 rounded-lg border-2 transition-all flex items-center justify-center gap-2 {localTheme === 'light' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+              class="flex-1 py-3 px-4 rounded-lg border-2 transition-all flex items-center justify-center gap-2 {localTheme === 'light' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
               onclick={() => localTheme = 'light'}
             >
               <Sun size={20} />
               <span>Light</span>
             </button>
             <button
-              class="flex-1 py-3 px-4 rounded-lg border-2 transition-all flex items-center justify-center gap-2 {localTheme === 'dark' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+              class="flex-1 py-3 px-4 rounded-lg border-2 transition-all flex items-center justify-center gap-2 {localTheme === 'dark' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
               onclick={() => localTheme = 'dark'}
             >
               <Moon size={20} />
@@ -269,7 +261,8 @@
           <div class="flex flex-wrap gap-2 mb-3">
             {#each presetColors as color}
               <button
-                class="w-10 h-10 rounded-full border-2 transition-transform hover:scale-110"
+                type="button"
+                class="touch-sm w-10 h-10 rounded-full border-2 transition-transform hover:scale-110"
                 style:background-color={color}
                 class:border-white={localAccentColor === color}
                 class:border-transparent={localAccentColor !== color}
@@ -292,7 +285,7 @@
             <input
               type="text"
               bind:value={localAccentColor}
-              class="flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg font-mono"
+              class="flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg font-mono"
               pattern="^#[0-9A-Fa-f]{6}$"
               aria-label="Custom color hex value"
             />
@@ -300,7 +293,7 @@
         </div>
         
         <!-- Location Settings -->
-        <div class="pt-2 border-t border-slate-200 dark:border-slate-700">
+        <div class="pt-2 border-t border-[var(--color-border)]">
           <span class="flex items-center gap-2 text-sm font-medium mb-3">
             <MapPin size={16} />
             Location Settings
@@ -311,19 +304,19 @@
             <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Location Mode</span>
             <div class="flex gap-2">
               <button
-                class="flex-1 py-2 px-3 rounded-lg border-2 text-sm transition-all {localLocationMode === 'off' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+                class="flex-1 py-2 px-3 rounded-lg border-2 text-sm transition-all {localLocationMode === 'off' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
                 onclick={() => localLocationMode = 'off'}
               >
                 Off
               </button>
               <button
-                class="flex-1 py-2 px-3 rounded-lg border-2 text-sm transition-all {localLocationMode === 'manual' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+                class="flex-1 py-2 px-3 rounded-lg border-2 text-sm transition-all {localLocationMode === 'manual' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
                 onclick={() => localLocationMode = 'manual'}
               >
                 Manual
               </button>
               <button
-                class="flex-1 py-2 px-3 rounded-lg border-2 text-sm transition-all {localLocationMode === 'auto' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+                class="flex-1 py-2 px-3 rounded-lg border-2 text-sm transition-all {localLocationMode === 'auto' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
                 onclick={() => localLocationMode = 'auto'}
               >
                 Auto
@@ -374,7 +367,7 @@
               <select
                 id="prefs-search-radius"
                 bind:value={localSearchRadius}
-                class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
+                class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg"
               >
                 {#each radiusOptions as opt}
                   <option value={opt.value}>{opt.label}</option>
@@ -385,7 +378,7 @@
         </div>
         
         <!-- Preview -->
-        <div class="p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+        <div class="p-3 rounded-lg border border-[var(--color-border)]">
           <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Preview</span>
           <div class="flex items-center gap-3">
             {#if localProfilePicture}
@@ -413,9 +406,9 @@
         </div>
       </div>
       
-      <div class="flex gap-3 p-4 border-t border-slate-200 dark:border-slate-700 shrink-0">
+      <div class="flex gap-3 p-4 border-t border-[var(--color-border)] shrink-0">
         <button
-          class="flex-1 py-2 px-4 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          class="flex-1 py-2 px-4 rounded-lg border border-[var(--color-border)] hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           onclick={onClose}
         >
           Cancel

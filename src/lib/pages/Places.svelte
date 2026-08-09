@@ -19,6 +19,7 @@
   import type { ComponentType } from 'svelte'
   import { hapticSuccess, hapticLight } from '$lib/haptics'
   import { forceRepaint } from '$lib/pwa-utils'
+  import { consumeQueryParam } from '$lib/stores/nav'
 
   const categoryIcons: Record<PlaceCategory, ComponentType> = {
     restaurant: UtensilsCrossed,
@@ -65,6 +66,9 @@
   ]
 
   onMount(() => {
+    // Open the add-place form directly when arriving via a quick-add link.
+    if (consumeQueryParam('add') !== null) showForm = true
+
     unsubscribe = subscribeToCollection<Place>('places', (items) => {
       places = items
       // Keep selected place in sync
@@ -537,7 +541,7 @@
               type="button"
               class="w-11 h-11 rounded-xl border-2 flex items-center justify-center transition-colors touch-manipulation {place.visited
                 ? 'bg-emerald-500 border-emerald-500 text-white'
-                : 'bg-transparent border-slate-200 dark:border-slate-600 text-slate-400 hover:border-emerald-500 hover:text-emerald-500'}"
+                : 'bg-transparent border-[var(--color-border)] text-slate-400 hover:border-emerald-500 hover:text-emerald-500'}"
               onclick={(e) => { e.stopPropagation(); toggleVisited(place); }}
               aria-label={place.visited ? 'Mark as not visited' : 'Mark as visited'}
             >
@@ -546,7 +550,7 @@
 
             <button
               type="button"
-              class="w-11 h-11 rounded-xl border border-slate-200 dark:border-slate-600 flex items-center justify-center text-slate-400 hover:text-red-500 hover:border-red-500 transition-colors opacity-0 group-hover:opacity-100 touch-manipulation"
+              class="w-11 h-11 rounded-xl border border-[var(--color-border)] flex items-center justify-center text-slate-400 hover:text-red-500 hover:border-red-500 transition-colors opacity-0 group-hover:opacity-100 touch-manipulation"
               onclick={(e) => { e.stopPropagation(); place.id && remove(place.id); }}
               aria-label="Remove place"
             >

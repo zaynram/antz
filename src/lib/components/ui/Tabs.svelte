@@ -14,7 +14,7 @@
   let { tabs, active, onchange }: Props = $props()
 </script>
 
-<div class="overflow-x-auto scrollbar-none mb-4 border-b border-slate-200 dark:border-slate-700">
+<div class="overflow-x-auto scrollbar-none mb-4 border-b border-[var(--color-border)]">
   <div class="flex gap-1 min-w-max">
     {#each tabs as tab (tab.key)}
       <button

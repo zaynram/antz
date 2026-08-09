@@ -190,7 +190,7 @@
         tabindex="0"
       >
         <!-- Header -->
-        <div class="flex items-start justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+        <div class="flex items-start justify-between p-6 border-b border-[var(--color-border)]">
           <div class="flex-1 pr-4">
             <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
               {video.title}
@@ -210,7 +210,7 @@
         </div>
 
         <!-- Video Embed -->
-        <div class="p-6 border-b border-slate-200 dark:border-slate-700">
+        <div class="p-6 border-b border-[var(--color-border)]">
           <div class="aspect-video bg-slate-900 rounded-lg overflow-hidden mb-4">
             <iframe
               src={getYouTubeEmbedUrl(video.videoId)}
@@ -232,7 +232,7 @@
         </div>
 
         <!-- Status & Watched Date -->
-        <div class="p-6 border-b border-slate-200 dark:border-slate-700 space-y-4">
+        <div class="p-6 border-b border-[var(--color-border)] space-y-4">
           <div>
             <span class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Status
@@ -266,7 +266,7 @@
         </div>
 
         <!-- Ratings -->
-        <div class="p-6 border-b border-slate-200 dark:border-slate-700">
+        <div class="p-6 border-b border-[var(--color-border)]">
           <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Ratings</h3>
           
           {#each ALL_USER_IDS as userId}
@@ -296,7 +296,7 @@
           {/each}
 
           {#if getVideoAverageRating(video)}
-            <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <div class="mt-4 pt-4 border-t border-[var(--color-border)]">
               <p class="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Average: {getVideoAverageRating(video)?.toFixed(1)} / 5.0
               </p>
@@ -305,7 +305,7 @@
         </div>
 
         <!-- Notes -->
-        <div class="p-6 border-b border-slate-200 dark:border-slate-700">
+        <div class="p-6 border-b border-[var(--color-border)]">
           <label for="notes" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             Notes
           </label>

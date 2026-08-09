@@ -704,7 +704,7 @@
       <div class="grid gap-4" style="grid-template-columns: repeat({columns}, minmax(0, 1fr));" role="grid">
         {#each filteredMedia as item, index (item.id)}
           <div
-            class="group relative bg-surface border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden hover:shadow-lg focus:ring-2 focus:ring-accent focus:outline-none transition-all"
+            class="group relative bg-surface border border-[var(--color-border)] rounded-xl overflow-hidden hover:shadow-lg focus:ring-2 focus:ring-accent focus:outline-none transition-all"
             tabindex="0"
             role="gridcell"
             data-grid-item

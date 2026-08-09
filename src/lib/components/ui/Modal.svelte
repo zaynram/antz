@@ -60,7 +60,7 @@
       {#if header}
         {@render header()}
       {:else}
-        <header class="shrink-0 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
+        <header class="shrink-0 border-b border-[var(--color-border)] p-4 flex items-center justify-between">
           <h2 id="modal-title" class="text-lg font-bold">{title}</h2>
           <IconButton icon={X} onclick={onclose} label="Close" variant="ghost" size="sm" />
         </header>
@@ -73,7 +73,7 @@
 
       <!-- Footer -->
       {#if footer}
-        <footer class="shrink-0 border-t border-slate-200 dark:border-slate-700 p-4">
+        <footer class="shrink-0 border-t border-[var(--color-border)] p-4">
           {@render footer()}
         </footer>
       {/if}

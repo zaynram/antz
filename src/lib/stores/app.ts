@@ -6,6 +6,7 @@ import {
     subscribeToPreferences,
 } from "../firebase"
 import type { UserId, UserPreferences, UserPreferencesMap } from "../types"
+import { DEFAULT_ACCENT_Z, DEFAULT_ACCENT_T } from "../accents"
 
 // Touch device detection store
 // Uses pointer: coarse media query which is more reliable than touch event detection
@@ -32,7 +33,7 @@ export const isTouchDevice = readable(false, set => {
 const DEFAULT_PREFERENCES: UserPreferencesMap = {
     Z: {
         theme: "dark",
-        accentColor: "#6366f1",
+        accentColor: DEFAULT_ACCENT_Z,
         name: "Z",
         unitSystem: "metric",
         locationMode: "off",
@@ -42,7 +43,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
     },
     T: {
         theme: "light",
-        accentColor: "#ec4899",
+        accentColor: DEFAULT_ACCENT_T,
         name: "T",
         unitSystem: "metric",
         locationMode: "off",

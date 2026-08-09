@@ -493,7 +493,7 @@
 
             <!-- Average Rating -->
             {#if getPlaceAverageRating(place) !== null}
-              <div class="pt-2 border-t border-slate-200 dark:border-slate-600">
+              <div class="pt-2 border-t border-[var(--color-border)]">
                 <div class="text-xs text-slate-400 mb-0.5">Average</div>
                 <div class="flex items-center gap-2">
                   <div class="flex gap-0.5">
@@ -593,7 +593,7 @@
         </div>
 
         <!-- Metadata info -->
-        <div class="text-xs text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
+        <div class="text-xs text-slate-400 pt-2 border-t border-[var(--color-border)]">
           Added by {getDisplayNameForUser(place.createdBy)} · {formatDate(place.createdAt)}
           {#if place.updatedBy}
             · Updated by {getDisplayNameForUser(place.updatedBy)}
