@@ -11,7 +11,8 @@ Based on `docs/ui/redesign-plan.md`.
 
 ## 1. Problem Statement
 
-The current app is functional but feels generic, navigation is high-friction on mobile, and core identity/personal context is underrepresented in the UI.
+The current app is functional but feels generic, navigation is high-friction on mobile, and core
+identity/personal context is underrepresented in the UI.
 
 ---
 
