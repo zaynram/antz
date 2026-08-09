@@ -50,7 +50,7 @@
         <li>
           <button
             type="button"
-            class="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-surface border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors touch-manipulation text-left"
+            class="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-surface border border-[var(--color-border)] hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors touch-manipulation text-left"
             onclick={() => onItemClick(item)}
           >
             {#if item.posterPath}

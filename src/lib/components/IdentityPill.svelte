@@ -1,16 +1,22 @@
 <script lang="ts">
   import { activeUser, displayAbbreviations, userPreferences } from '$lib/stores/app'
   import { hapticLight } from '$lib/haptics'
+  import { DEFAULT_ACCENT } from '$lib/accents'
   import type { UserId } from '$lib/types'
 
   let isExpanded = $state(false)
   let pillEl = $state<HTMLDivElement | null>(null)
 
-  function toggle(): void {
+  // stopPropagation keeps the window click handler from seeing this tap and
+  // immediately collapsing the pill (the toggle re-renders and detaches the
+  // trigger, so an outside-click check would otherwise wrongly fire).
+  function toggle(e: MouseEvent): void {
+    e.stopPropagation()
     isExpanded = !isExpanded
   }
 
-  function selectUser(userId: UserId): void {
+  function selectUser(e: MouseEvent, userId: UserId): void {
+    e.stopPropagation()
     hapticLight()
     activeUser.set(userId)
     isExpanded = false
@@ -37,7 +43,7 @@
   {#if isExpanded}
     <!-- Expanded picker -->
     <div
-      class="flex items-center gap-1 p-1 rounded-full bg-surface border border-slate-200 dark:border-slate-700 shadow-lg"
+      class="flex items-center gap-1 p-1 rounded-full bg-surface border border-[var(--color-border)] shadow-lg"
       role="listbox"
       aria-label="Switch user"
     >
@@ -47,10 +53,10 @@
           type="button"
           role="option"
           aria-selected={$activeUser === userId}
-          class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold transition-transform hover:scale-105 touch-manipulation
+          class="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold transition-transform hover:scale-105 touch-manipulation
             {$activeUser === userId ? 'ring-2 ring-offset-1 ring-accent' : ''}"
-          style:background-color={prefs?.accentColor ?? '#6366f1'}
-          onclick={() => selectUser(userId)}
+          style:background-color={prefs?.accentColor ?? DEFAULT_ACCENT}
+          onclick={(e) => selectUser(e, userId)}
         >
           {$displayAbbreviations[userId]}
         </button>
@@ -61,8 +67,8 @@
     <button
       type="button"
       aria-label="Switch user"
-      class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg transition-transform hover:scale-105 touch-manipulation"
-      style:background-color={$userPreferences[$activeUser]?.accentColor ?? '#6366f1'}
+      class="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg transition-transform hover:scale-105 touch-manipulation"
+      style:background-color={$userPreferences[$activeUser]?.accentColor ?? DEFAULT_ACCENT}
       onclick={toggle}
     >
       {$displayAbbreviations[$activeUser]}

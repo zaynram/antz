@@ -572,7 +572,7 @@
   </header>
 
   <!-- Data Stats -->
-  <section class="bg-surface border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+  <section class="bg-surface border border-[var(--color-border)] rounded-xl p-4">
     <div class="flex items-center gap-2 mb-4">
       <Database size={18} class="text-slate-400" />
       <h2 class="font-semibold">Data Statistics</h2>
@@ -611,7 +611,7 @@
   </section>
 
   <!-- System Info -->
-  <section class="bg-surface border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+  <section class="bg-surface border border-[var(--color-border)] rounded-xl p-4">
     <div class="flex items-center gap-2 mb-4">
       <Cpu size={18} class="text-slate-400" />
       <h2 class="font-semibold">System Info</h2>
@@ -636,7 +636,7 @@
   </section>
 
   <!-- Quick Actions -->
-  <section class="bg-surface border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+  <section class="bg-surface border border-[var(--color-border)] rounded-xl p-4">
     <h2 class="font-semibold mb-4">Quick Actions</h2>
 
     <div class="flex flex-wrap gap-2">
@@ -670,7 +670,7 @@
   </section>
 
   <!-- Migration Tool -->
-  <section class="bg-surface border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+  <section class="bg-surface border border-[var(--color-border)] rounded-xl p-4">
     <h2 class="font-semibold mb-2">Media Migration</h2>
     <p class="text-sm text-slate-500 mb-4">
       Backfill existing media with TMDB genres, collections, and production companies.
@@ -708,7 +708,7 @@
   </section>
 
   <!-- Image Migration Tool -->
-  <section class="bg-surface border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+  <section class="bg-surface border border-[var(--color-border)] rounded-xl p-4">
     <div class="flex items-center gap-2 mb-2">
       <Image size={18} class="text-slate-400" />
       <h2 class="font-semibold">Fix Missing Images</h2>
@@ -728,7 +728,7 @@
     <div class="flex flex-wrap items-center gap-3 mb-4">
       <select
         bind:value={imageMigrationType}
-        class="px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+        class="px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg text-sm"
         disabled={imageMigrating}
       >
         <option value="all">All Types ({dataStats.missingImages})</option>
@@ -769,7 +769,7 @@
   </section>
 
   <!-- Video Ratings Migration Tool -->
-  <section class="bg-surface border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+  <section class="bg-surface border border-[var(--color-border)] rounded-xl p-4">
     <h2 class="font-semibold mb-2">Video Ratings Migration</h2>
     <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">
       Ensures all videos have the proper ratings structure for per-user ratings.
@@ -806,7 +806,7 @@
   </section>
 
   <!-- GitHub Issues -->
-  <section class="bg-surface border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+  <section class="bg-surface border border-[var(--color-border)] rounded-xl p-4">
     <div class="flex items-center gap-2 mb-2">
       <GitBranch size={18} class="text-slate-400" />
       <h2 class="font-semibold">GitHub Issues</h2>
@@ -828,7 +828,7 @@
               id="issue-state-filter"
               bind:value={issuesState}
               onchange={loadIssues}
-              class="px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+              class="px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg text-sm"
             >
               <option value="all">All Issues</option>
               <option value="open">Open</option>
@@ -923,7 +923,7 @@
                 type="text"
                 bind:value={newIssueTitle}
                 placeholder="Issue title"
-                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent"
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg focus:outline-none focus:border-accent"
               />
             </div>
 
@@ -934,7 +934,7 @@
                 bind:value={newIssueBody}
                 placeholder="Describe the issue..."
                 rows="6"
-                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent resize-none"
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg focus:outline-none focus:border-accent resize-none"
               ></textarea>
             </div>
 
@@ -1027,7 +1027,7 @@
             </div>
 
             <!-- Comments Section -->
-            <div class="border-t border-slate-200 dark:border-slate-700 pt-4">
+            <div class="border-t border-[var(--color-border)] pt-4">
               <h4 class="font-semibold mb-3">
                 Comments ({issueComments.length})
               </h4>
@@ -1057,7 +1057,7 @@
                   bind:value={newCommentBody}
                   placeholder="Add a comment..."
                   rows="3"
-                  class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent resize-none text-sm"
+                  class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg focus:outline-none focus:border-accent resize-none text-sm"
                 ></textarea>
                 <button
                   type="button"
@@ -1101,7 +1101,7 @@
                 type="text"
                 bind:value={editIssueTitle}
                 placeholder="Issue title"
-                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent"
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg focus:outline-none focus:border-accent"
               />
             </div>
 
@@ -1112,7 +1112,7 @@
                 bind:value={editIssueBody}
                 placeholder="Describe the issue..."
                 rows="6"
-                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent resize-none"
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg focus:outline-none focus:border-accent resize-none"
               ></textarea>
             </div>
 
@@ -1146,7 +1146,7 @@
   </section>
 
   <!-- Current Preferences -->
-  <section class="bg-surface border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+  <section class="bg-surface border border-[var(--color-border)] rounded-xl p-4">
     <h2 class="font-semibold mb-2">Current Preferences</h2>
     <pre class="bg-slate-900 text-slate-300 p-3 rounded-lg font-mono text-xs overflow-x-auto">{JSON.stringify($currentPreferences, null, 2)}</pre>
   </section>

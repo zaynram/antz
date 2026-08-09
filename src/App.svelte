@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onAuthChange } from '$lib/firebase'
   import { authLoading, authUser, currentPreferences, initPreferencesSync, cleanupPreferencesSync } from '$lib/stores/app'
-  import { currentRoute, navigate, navMode } from '$lib/stores/nav'
+  import { currentRoute, currentPath, navigate, navMode } from '$lib/stores/nav'
   import { initHomeStore, cleanupHomeStore } from '$lib/stores/home'
   import { onMount } from 'svelte'
   import { Toaster } from 'svelte-sonner'
@@ -45,7 +45,7 @@
     })
 
     const handlePopState = () => {
-      currentRoute.set(window.location.pathname)
+      currentRoute.set(window.location.pathname + window.location.search)
     }
     window.addEventListener('popstate', handlePopState)
 
@@ -92,13 +92,14 @@
 
   // Determine library type from path
   let libraryType = $derived.by(() => {
-    if ($currentRoute === '/library/movies') return 'movie' as const
-    if ($currentRoute === '/library/tv') return 'tv' as const
-    if ($currentRoute === '/library/games') return 'game' as const
+    if ($currentPath === '/library/movies') return 'movie' as const
+    if ($currentPath === '/library/tv') return 'tv' as const
+    if ($currentPath === '/library/games') return 'game' as const
     return null
   })
 
   let showSidebar = $derived($navMode === 'sidebar')
+  let showBottomTabs = $derived($navMode === 'bottom-tabs')
 </script>
 
 <Toaster richColors position="bottom-center" />
@@ -121,34 +122,36 @@
   <Login />
 {:else}
   {#if showSidebar}
-    <Sidebar currentPath={$currentRoute} navigate={handleNavigate} />
+    <Sidebar currentPath={$currentPath} navigate={handleNavigate} />
   {/if}
 
   <main
-    class="min-h-screen pb-8 px-4 sm:px-6 transition-all"
+    class="min-h-screen px-4 sm:px-6 transition-all"
+    class:pb-8={!showBottomTabs}
+    class:pb-24={showBottomTabs}
     class:pt-16={showSidebar}
     class:pt-6={!showSidebar}
     class:pt-24={isOffline && showSidebar}
     class:pt-14={isOffline && !showSidebar}
   >
     <div class="max-w-5xl mx-auto">
-      {#if $currentRoute === '/'}
+      {#if $currentPath === '/'}
         <Home navigate={handleNavigate} />
-      {:else if $currentRoute === '/search'}
+      {:else if $currentPath === '/search'}
         <Search navigate={handleNavigate} />
-      {:else if $currentRoute === '/notes'}
+      {:else if $currentPath === '/notes'}
         <Notes />
-      {:else if $currentRoute === '/videos'}
+      {:else if $currentPath === '/videos'}
         <Videos />
-      {:else if $currentRoute === '/profiles'}
+      {:else if $currentPath === '/profiles'}
         <Profiles />
       {:else if libraryType}
         <Library type={libraryType} navigate={handleNavigate} />
-      {:else if $currentRoute === '/places'}
+      {:else if $currentPath === '/places'}
         <Places />
-      {:else if $currentRoute === '/debug'}
+      {:else if $currentPath === '/debug'}
         <Debug />
-      {:else if $currentRoute === '/settings'}
+      {:else if $currentPath === '/settings'}
         <Settings navigate={handleNavigate} />
       {:else}
         <!-- 404 Not Found -->
@@ -171,5 +174,5 @@
 
   <BackToTop />
   <IdentityPill />
-  <BottomTabBar activeRoute={$currentRoute} onNavigate={handleNavigate} />
+  <BottomTabBar activeRoute={$currentPath} onNavigate={handleNavigate} />
 {/if}

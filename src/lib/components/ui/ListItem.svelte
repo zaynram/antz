@@ -30,7 +30,7 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
-  class="group flex items-start gap-4 p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl transition-all"
+  class="group flex items-start gap-4 p-4 bg-surface border border-[var(--color-border)] rounded-xl transition-all"
   class:opacity-70={dimmed}
   class:cursor-pointer={onclick}
   class:hover:border-accent={onclick}

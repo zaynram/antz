@@ -91,7 +91,7 @@
 
 <div class="mb-6">
   <button
-    class="w-full flex items-center justify-between p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl hover:border-accent transition-colors"
+    class="w-full flex items-center justify-between p-4 bg-surface border border-[var(--color-border)] rounded-xl hover:border-accent transition-colors"
     onclick={() => expanded = !expanded}
   >
     <div class="flex items-center gap-2">
@@ -107,7 +107,7 @@
   </button>
   
   {#if expanded}
-    <div class="mt-2 p-4 bg-surface border border-slate-200 dark:border-slate-700 rounded-xl">
+    <div class="mt-2 p-4 bg-surface border border-[var(--color-border)] rounded-xl">
       {#if !hasLocation}
         <p class="text-sm text-slate-500 dark:text-slate-400 text-center py-4">
           Enable location in <span class="font-medium">Preferences</span> to discover nearby places

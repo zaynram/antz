@@ -8,6 +8,7 @@
   import { Camera, Info, Loader2, LogOut, MapPin, Moon, Palette, RefreshCw, Settings, Sun, User, Video, X, Download, ExternalLink as ExternalLinkIcon, Layout, Type } from 'lucide-svelte'
   import { toast } from 'svelte-sonner'
   import { isYouTubeAPIConfigured, requestAccessToken } from '$lib/services/youtube-sync'
+  import { ACCENT_PRESETS, DEFAULT_ACCENT_Z, DEFAULT_ACCENT_T } from '$lib/accents'
 
   interface Props {
     navigate: (path: string) => void
@@ -17,7 +18,7 @@
 
   // Local state for form
   let localTheme = $state<Theme>('dark')
-  let localAccentColor = $state('#6366f1')
+  let localAccentColor = $state(DEFAULT_ACCENT_Z)
   let localName = $state('')
   let localProfilePicture = $state<string | undefined>(undefined)
   let uploadingPicture = $state(false)
@@ -55,10 +56,7 @@
     }
   })
 
-  const presetColors = [
-    '#6366f1', '#ec4899', '#8b5cf6', '#06b6d4',
-    '#10b981', '#f59e0b', '#ef4444', '#3b82f6',
-  ]
+  const presetColors = ACCENT_PRESETS
 
   // Dynamic radius options based on unit system
   const radiusOptions = $derived(localUnitSystem === 'imperial' ? [
@@ -396,13 +394,13 @@
       <div class="flex gap-2">
         <button
           type="button"
-          class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-3 touch-manipulation {$activeUser === 'Z' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+          class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-3 touch-manipulation {$activeUser === 'Z' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
           onclick={() => handleUserSwitch('Z')}
         >
           {#if $userPreferences.Z?.profilePicture}
             <img src={$userPreferences.Z.profilePicture} alt={$displayAbbreviations.Z} class="w-8 h-8 rounded-full object-cover" />
           {:else}
-            <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold" style:background-color={$userPreferences.Z?.accentColor || '#6366f1'}>
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold" style:background-color={$userPreferences.Z?.accentColor || DEFAULT_ACCENT_Z}>
               {$displayAbbreviations.Z}
             </div>
           {/if}
@@ -410,13 +408,13 @@
         </button>
         <button
           type="button"
-          class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-3 touch-manipulation {$activeUser === 'T' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+          class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-3 touch-manipulation {$activeUser === 'T' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
           onclick={() => handleUserSwitch('T')}
         >
           {#if $userPreferences.T?.profilePicture}
             <img src={$userPreferences.T.profilePicture} alt={$displayAbbreviations.T} class="w-8 h-8 rounded-full object-cover" />
           {:else}
-            <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold" style:background-color={$userPreferences.T?.accentColor || '#ec4899'}>
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold" style:background-color={$userPreferences.T?.accentColor || DEFAULT_ACCENT_T}>
               {$displayAbbreviations.T}
             </div>
           {/if}
@@ -502,7 +500,7 @@
         <div class="flex gap-3">
           <button
             type="button"
-            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 touch-manipulation {localTheme === 'light' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 touch-manipulation {localTheme === 'light' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleThemeChange('light')}
           >
             <Sun size={20} />
@@ -510,7 +508,7 @@
           </button>
           <button
             type="button"
-            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 touch-manipulation {localTheme === 'dark' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 touch-manipulation {localTheme === 'dark' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleThemeChange('dark')}
           >
             <Moon size={20} />
@@ -526,7 +524,7 @@
           {#each presetColors as color}
             <button
               type="button"
-              class="w-10 h-10 rounded-full border-2 transition-transform hover:scale-110 touch-manipulation"
+              class="touch-sm w-10 h-10 rounded-full border-2 transition-transform hover:scale-110 touch-manipulation"
               style:background-color={color}
               class:border-white={localAccentColor === color}
               class:border-transparent={localAccentColor !== color}
@@ -545,7 +543,7 @@
             type="color"
             bind:value={localAccentColor}
             onchange={() => handleColorChange(localAccentColor)}
-            class="w-10 h-10 rounded cursor-pointer border-0"
+            class="w-11 h-11 rounded cursor-pointer border-0"
           />
           <input
             type="text"
@@ -571,14 +569,14 @@
         <div class="flex gap-3">
           <button
             type="button"
-            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 touch-manipulation {localUnitSystem === 'metric' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 touch-manipulation {localUnitSystem === 'metric' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleUnitSystemChange('metric')}
           >
             <span>Metric (km)</span>
           </button>
           <button
             type="button"
-            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 touch-manipulation {localUnitSystem === 'imperial' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 touch-manipulation {localUnitSystem === 'imperial' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleUnitSystemChange('imperial')}
           >
             <span>Imperial (mi)</span>
@@ -599,21 +597,21 @@
         <div class="flex gap-2">
           <button
             type="button"
-            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localLocationMode === 'off' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localLocationMode === 'off' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleLocationModeChange('off')}
           >
             Off
           </button>
           <button
             type="button"
-            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localLocationMode === 'manual' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localLocationMode === 'manual' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleLocationModeChange('manual')}
           >
             Manual
           </button>
           <button
             type="button"
-            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localLocationMode === 'auto' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localLocationMode === 'auto' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleLocationModeChange('auto')}
           >
             Auto
@@ -661,21 +659,21 @@
         <div class="flex gap-2">
           <button
             type="button"
-            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localVideoSyncPlatform === 'none' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localVideoSyncPlatform === 'none' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleVideoSyncPlatformChange('none')}
           >
             None
           </button>
           <button
             type="button"
-            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localVideoSyncPlatform === 'youtube' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localVideoSyncPlatform === 'youtube' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleVideoSyncPlatformChange('youtube')}
           >
             YouTube
           </button>
           <button
             type="button"
-            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localVideoSyncPlatform === 'grayjay' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localVideoSyncPlatform === 'grayjay' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleVideoSyncPlatformChange('grayjay')}
           >
             Grayjay
@@ -771,21 +769,21 @@
         <div class="flex gap-2">
           <button
             type="button"
-            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localNavMode === 'bottom-tabs' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localNavMode === 'bottom-tabs' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleNavModeChange('bottom-tabs')}
           >
             Bottom tabs
           </button>
           <button
             type="button"
-            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localNavMode === 'sidebar' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localNavMode === 'sidebar' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleNavModeChange('sidebar')}
           >
             Sidebar
           </button>
           <button
             type="button"
-            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localNavMode === 'none' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localNavMode === 'none' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleNavModeChange('none')}
           >
             None
@@ -806,7 +804,7 @@
         <div class="flex gap-3">
           <button
             type="button"
-            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex flex-col items-center gap-1 touch-manipulation {localFontPreset === 'warm-rounded' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex flex-col items-center gap-1 touch-manipulation {localFontPreset === 'warm-rounded' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleFontPresetChange('warm-rounded')}
           >
             <span class="font-medium text-base" style="font-family: Nunito, system-ui">Aa</span>
@@ -814,7 +812,7 @@
           </button>
           <button
             type="button"
-            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex flex-col items-center gap-1 touch-manipulation {localFontPreset === 'refined-system' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex flex-col items-center gap-1 touch-manipulation {localFontPreset === 'refined-system' ? 'border-accent bg-accent/10' : 'border-[var(--color-border)]'}"
             onclick={() => handleFontPresetChange('refined-system')}
           >
             <span class="font-medium text-base" style="font-family: system-ui">Aa</span>

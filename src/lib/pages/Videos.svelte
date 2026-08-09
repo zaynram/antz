@@ -275,7 +275,7 @@
 
 <div class="min-h-screen bg-slate-50 dark:bg-slate-900">
   <!-- Header -->
-  <div class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
+  <div class="bg-white dark:bg-slate-800 border-b border-[var(--color-border)] sticky top-0 z-10">
     <div class="max-w-7xl mx-auto px-4 py-4">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
@@ -308,7 +308,7 @@
               </button>
               
               {#if showExportMenu}
-                <div class="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden z-10">
+                <div class="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-[var(--color-border)] overflow-hidden z-10">
                   <button
                     onclick={handleExportJSON}
                     class="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
@@ -395,7 +395,7 @@
     {:else}
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {#each filteredVideos as video (video.id)}
-          <div class="bg-white dark:bg-slate-800 rounded-lg overflow-hidden shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow">
+          <div class="bg-white dark:bg-slate-800 rounded-lg overflow-hidden shadow-sm border border-[var(--color-border)] hover:shadow-md transition-shadow">
             <!-- Thumbnail -->
             <button
               onclick={() => openVideoDetail(video)}

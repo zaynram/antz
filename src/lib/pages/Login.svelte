@@ -18,7 +18,7 @@
 </script>
 
 <div class="flex items-center justify-center min-h-screen">
-  <div class="bg-surface p-12 rounded-2xl text-center border border-slate-200 dark:border-slate-700">
+  <div class="bg-surface p-12 rounded-2xl text-center border border-[var(--color-border)]">
     <h1 class="text-4xl font-bold mb-2 text-accent">Us</h1>
     <p class="text-slate-500 dark:text-slate-400 mb-8">Sign in to continue</p>
 

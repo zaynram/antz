@@ -199,7 +199,7 @@
               id="media-status"
               value={media.status}
               onchange={(e) => updateStatus(e.currentTarget.value as MediaStatus)}
-              class="w-full p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
+              class="w-full p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg"
             >
               {#each statusOptions as status}
                 <option value={status}>{status}</option>
@@ -254,7 +254,7 @@
             
             <!-- Average Rating -->
             {#if getAverageRating(media) !== null}
-              <div class="pt-2 border-t border-slate-200 dark:border-slate-600">
+              <div class="pt-2 border-t border-[var(--color-border)]">
                 <div class="text-xs text-slate-400 mb-0.5">Average</div>
                 <div class="flex items-center gap-2">
                   <div class="flex gap-0.5">
@@ -282,7 +282,7 @@
                 type="date"
                 bind:value={watchDateInput}
                 onchange={updateWatchDate}
-                class="flex-1 p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg"
+                class="flex-1 p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg"
               />
               {#if watchDateInput}
                 <button
@@ -335,7 +335,7 @@
             onblur={updateNotes}
             placeholder="Add your thoughts..."
             rows="2"
-            class="w-full p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg resize-y focus:outline-none focus:border-accent"
+            class="w-full p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg resize-y focus:outline-none focus:border-accent"
           ></textarea>
         </div>
         
@@ -369,7 +369,7 @@
               type="text"
               bind:value={newComment}
               placeholder="Add a comment..."
-              class="flex-1 px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-accent"
+              class="flex-1 px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg focus:outline-none focus:border-accent"
             />
             <button
               type="submit"
@@ -382,7 +382,7 @@
         </div>
         
         <!-- Metadata info -->
-        <div class="text-xs text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
+        <div class="text-xs text-slate-400 pt-2 border-t border-[var(--color-border)]">
           Added by {getDisplayNameForUser(media.createdBy)} · {formatDate(media.createdAt)}
           {#if media.updatedBy}
             · Updated by {getDisplayNameForUser(media.updatedBy)}

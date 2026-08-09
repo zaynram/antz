@@ -6,6 +6,7 @@
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
   import { hapticLight, hapticMedium, hapticSuccess } from '$lib/haptics'
   import { activeUser, displayNames } from '$lib/stores/app'
+  import { consumeQueryParam } from '$lib/stores/nav'
   import type { Note, NoteColor, UserId } from '$lib/types'
   import { Timestamp, type Timestamp as TimestampType } from 'firebase/firestore'
   import { Archive, ArchiveRestore, Check, Image as ImageIcon, Pencil, Pin, StickyNote, Trash2, X } from 'lucide-svelte'
@@ -45,6 +46,9 @@
   }
 
   onMount(() => {
+    // Open the compose form directly when arriving via a quick-add link.
+    if (consumeQueryParam('add') !== null) composing = true
+
     unsubscribe = subscribeToCollection<Note>('notes', (items) => {
       notes = items
     })
@@ -272,14 +276,15 @@
 
       <!-- Compose sticky inline -->
       {#if composing}
-        <div class="compose-sticky note-yellow">
+        <div class="compose-sticky note-{newNote.color}">
           <div class="sticky-top-tape"></div>
           <div class="p-4 pt-5 space-y-2">
             <div class="flex items-center justify-between mb-1">
-              <span class="text-xs font-semibold text-amber-800/70 uppercase tracking-wider">New note</span>
+              <span class="text-xs font-semibold uppercase tracking-wider" style="color: rgba(0,0,0,0.55)">New note</span>
               <button
                 type="button"
-                class="text-amber-700/60 hover:text-amber-900 transition-colors"
+                class="transition-colors"
+                style="color: rgba(0,0,0,0.5)"
                 onclick={() => { composing = false; newNote = { title: '', content: '', color: 'yellow' }; }}
               >
                 <X size={16} />
@@ -300,12 +305,12 @@
 
             <!-- Color picker -->
             <div class="flex items-center gap-2 pt-1">
-              <span class="text-xs text-amber-700/60">Color:</span>
+              <span class="text-xs" style="color: rgba(0,0,0,0.5)">Color:</span>
               <div class="flex gap-1.5">
                 {#each NOTE_COLORS as color}
                   <button
                     type="button"
-                    class="color-swatch note-{color} {newNote.color === color ? 'ring-2 ring-slate-600 ring-offset-1' : ''}"
+                    class="touch-sm color-swatch note-{color} {newNote.color === color ? 'ring-2 ring-slate-600 ring-offset-1' : ''}"
                     onclick={() => newNote.color = color}
                     aria-label="Color {color}"
                   ></button>
@@ -562,7 +567,7 @@
       {/if}
 
       <!-- Actions row -->
-      <div class="flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+      <div class="flex items-center gap-2 pt-2 border-t border-[var(--color-border)]">
         <button
           type="button"
           class="btn-secondary text-sm flex-1"
@@ -629,7 +634,7 @@
           {#each NOTE_COLORS as color}
             <button
               type="button"
-              class="color-swatch-lg note-{color} {editingNote.color === color ? 'ring-2 ring-slate-600 ring-offset-2' : ''}"
+              class="touch-sm color-swatch-lg note-{color} {editingNote.color === color ? 'ring-2 ring-slate-600 ring-offset-2' : ''}"
               onclick={() => { if (editingNote) editingNote.color = color }}
               aria-label="Color {color}"
             ></button>
@@ -775,7 +780,7 @@
     width: 0.5rem;
     height: 0.5rem;
     border-radius: 50%;
-    background: #6366f1;
+    background: var(--color-accent);
     box-shadow: 0 0 0 2px white;
   }
 
@@ -815,7 +820,7 @@
   }
 
   .thumbtack-pinned .thumbtack-head {
-    background: radial-gradient(circle at 35% 35%, #a5b4fc, #6366f1);
+    background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.7), var(--color-accent));
   }
 
   .thumbtack-stem {
@@ -1037,7 +1042,7 @@
     width: 0.5rem;
     height: 0.5rem;
     border-radius: 50%;
-    background: #6366f1;
+    background: var(--color-accent);
     box-shadow: 0 0 0 1.5px white;
   }
 </style>
