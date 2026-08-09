@@ -1,12 +1,17 @@
 <script lang="ts">
   import { onAuthChange } from '$lib/firebase'
   import { authLoading, authUser, currentPreferences, initPreferencesSync, cleanupPreferencesSync } from '$lib/stores/app'
+  import { currentRoute, navigate, navMode } from '$lib/stores/nav'
+  import { initHomeStore, cleanupHomeStore } from '$lib/stores/home'
   import { onMount } from 'svelte'
   import { Toaster } from 'svelte-sonner'
   import { SearchX, WifiOff } from 'lucide-svelte'
 
   import Sidebar from '$lib/components/Sidebar.svelte'
+  import BottomTabBar from '$lib/components/BottomTabBar.svelte'
+  import IdentityPill from '$lib/components/IdentityPill.svelte'
   import BackToTop from '$lib/components/ui/BackToTop.svelte'
+  import Home from '$lib/pages/Home.svelte'
   import Search from '$lib/pages/Search.svelte'
   import Login from '$lib/pages/Login.svelte'
   import Library from '$lib/pages/Library.svelte'
@@ -17,9 +22,9 @@
   import Videos from '$lib/pages/Videos.svelte'
   import Profiles from '$lib/pages/Profiles.svelte'
 
-  let currentPath = $state(window.location.pathname)
   let isOffline = $state(!navigator.onLine)
 
+  // Keep nav store in sync with browser popstate
   onMount(() => {
     const handleOnline = () => { isOffline = false }
     const handleOffline = () => { isOffline = true }
@@ -32,38 +37,41 @@
 
       if (user) {
         initPreferencesSync()
+        initHomeStore()
       } else {
         cleanupPreferencesSync()
+        cleanupHomeStore()
       }
     })
 
     const handlePopState = () => {
-      currentPath = window.location.pathname
+      currentRoute.set(window.location.pathname)
     }
     window.addEventListener('popstate', handlePopState)
 
     return () => {
       unsubscribe()
       cleanupPreferencesSync()
+      cleanupHomeStore()
       window.removeEventListener('popstate', handlePopState)
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
   })
 
-  function navigate(path: string) {
-    window.history.pushState({}, '', path)
-    currentPath = path
+  function handleNavigate(path: string) {
+    navigate(path)
   }
 
   // Non-reactive tracking to prevent effect double-runs
   let prevTheme: string | undefined = undefined
   let prevAccentColor: string | undefined = undefined
+  let prevFontPreset: string | undefined = undefined
 
   $effect(() => {
     if ($currentPreferences) {
       const root = document.documentElement
-      const { theme, accentColor } = $currentPreferences
+      const { theme, accentColor, fontPreset } = $currentPreferences
 
       if (prevTheme !== theme) {
         root.classList.toggle('dark', theme === 'dark')
@@ -74,16 +82,23 @@
         root.style.setProperty('--color-accent', accentColor)
         prevAccentColor = accentColor
       }
+
+      if (prevFontPreset !== fontPreset) {
+        root.setAttribute('data-font', fontPreset ?? 'warm-rounded')
+        prevFontPreset = fontPreset
+      }
     }
   })
 
   // Determine library type from path
   let libraryType = $derived.by(() => {
-    if (currentPath === '/library/movies') return 'movie' as const
-    if (currentPath === '/library/tv') return 'tv' as const
-    if (currentPath === '/library/games') return 'game' as const
+    if ($currentRoute === '/library/movies') return 'movie' as const
+    if ($currentRoute === '/library/tv') return 'tv' as const
+    if ($currentRoute === '/library/games') return 'game' as const
     return null
   })
+
+  let showSidebar = $derived($navMode === 'sidebar')
 </script>
 
 <Toaster richColors position="bottom-center" />
@@ -105,29 +120,36 @@
 {:else if !$authUser}
   <Login />
 {:else}
-  <Sidebar {currentPath} {navigate} />
+  {#if showSidebar}
+    <Sidebar currentPath={$currentRoute} navigate={handleNavigate} />
+  {/if}
 
   <main
-    class="min-h-screen pt-16 pb-8 px-4 sm:px-6 transition-all"
-    class:pt-24={isOffline}
+    class="min-h-screen pb-8 px-4 sm:px-6 transition-all"
+    class:pt-16={showSidebar}
+    class:pt-6={!showSidebar}
+    class:pt-24={isOffline && showSidebar}
+    class:pt-14={isOffline && !showSidebar}
   >
     <div class="max-w-5xl mx-auto">
-      {#if currentPath === '/'}
-        <Search {navigate} />
-      {:else if currentPath === '/notes'}
+      {#if $currentRoute === '/'}
+        <Home navigate={handleNavigate} />
+      {:else if $currentRoute === '/search'}
+        <Search navigate={handleNavigate} />
+      {:else if $currentRoute === '/notes'}
         <Notes />
-      {:else if currentPath === '/videos'}
+      {:else if $currentRoute === '/videos'}
         <Videos />
-      {:else if currentPath === '/profiles'}
+      {:else if $currentRoute === '/profiles'}
         <Profiles />
       {:else if libraryType}
-        <Library type={libraryType} {navigate} />
-      {:else if currentPath === '/places'}
+        <Library type={libraryType} navigate={handleNavigate} />
+      {:else if $currentRoute === '/places'}
         <Places />
-      {:else if currentPath === '/debug'}
+      {:else if $currentRoute === '/debug'}
         <Debug />
-      {:else if currentPath === '/settings'}
-        <Settings {navigate} />
+      {:else if $currentRoute === '/settings'}
+        <Settings navigate={handleNavigate} />
       {:else}
         <!-- 404 Not Found -->
         <div class="text-center py-16">
@@ -137,10 +159,10 @@
           <h1 class="text-2xl font-bold mb-2">Page not found</h1>
           <p class="text-slate-500 dark:text-slate-400 mb-6">The page you're looking for doesn't exist.</p>
           <button
-            onclick={() => navigate('/')}
+            onclick={() => handleNavigate('/')}
             class="px-6 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90"
           >
-            Go to Search
+            Go Home
           </button>
         </div>
       {/if}
@@ -148,4 +170,6 @@
   </main>
 
   <BackToTop />
+  <IdentityPill />
+  <BottomTabBar activeRoute={$currentRoute} onNavigate={handleNavigate} />
 {/if}

@@ -4,8 +4,8 @@
   import { deleteProfilePicture, logOut, uploadProfilePicture } from '$lib/firebase'
   import { hapticLight } from '$lib/haptics'
   import { activeUser, currentPreferences, displayAbbreviations, immediateSavePreferences, userPreferences } from '$lib/stores/app'
-  import type { GeoLocation, LocationMode, Theme, VideoSyncPlatform } from '$lib/types'
-  import { Camera, Info, Loader2, LogOut, MapPin, Moon, Palette, RefreshCw, Settings, Sun, User, Video, X, Download, ExternalLink as ExternalLinkIcon } from 'lucide-svelte'
+  import type { GeoLocation, LocationMode, NavMode, FontPreset, Theme, VideoSyncPlatform } from '$lib/types'
+  import { Camera, Info, Loader2, LogOut, MapPin, Moon, Palette, RefreshCw, Settings, Sun, User, Video, X, Download, ExternalLink as ExternalLinkIcon, Layout, Type } from 'lucide-svelte'
   import { toast } from 'svelte-sonner'
   import { isYouTubeAPIConfigured, requestAccessToken } from '$lib/services/youtube-sync'
 
@@ -28,6 +28,8 @@
   let localReferenceLocation = $state<GeoLocation | undefined>(undefined)
   let localSearchRadius = $state(5000)
   let localVideoSyncPlatform = $state<VideoSyncPlatform>('none')
+  let localNavMode = $state<NavMode>('bottom-tabs')
+  let localFontPreset = $state<FontPreset>('warm-rounded')
 
   // App state
   let isReloading = $state(false)
@@ -88,6 +90,8 @@
       localReferenceLocation = $currentPreferences.referenceLocation
       localSearchRadius = $currentPreferences.searchRadius
       localVideoSyncPlatform = $currentPreferences.videoSyncPlatform || 'none'
+      localNavMode = $currentPreferences.navMode ?? 'bottom-tabs'
+      localFontPreset = $currentPreferences.fontPreset ?? 'warm-rounded'
       previousUser = $activeUser
     }
   })
@@ -180,6 +184,8 @@
         youtubeAuth: prefs[$activeUser]?.youtubeAuth,
         youtubePlaylistId: prefs[$activeUser]?.youtubePlaylistId,
         grayjayConfig: prefs[$activeUser]?.grayjayConfig,
+        navMode: localNavMode,
+        fontPreset: localFontPreset,
         lastUpdated: Date.now()
       }
     }))
@@ -242,6 +248,18 @@
   function handleVideoSyncPlatformChange(platform: VideoSyncPlatform): void {
     hapticLight()
     localVideoSyncPlatform = platform
+    savePreferences()
+  }
+
+  function handleNavModeChange(mode: NavMode): void {
+    hapticLight()
+    localNavMode = mode
+    savePreferences()
+  }
+
+  function handleFontPresetChange(preset: FontPreset): void {
+    hapticLight()
+    localFontPreset = preset
     savePreferences()
   }
 
@@ -739,6 +757,71 @@
           </p>
         </div>
       {/if}
+    </section>
+
+    <!-- Navigation Settings -->
+    <section class="card p-4 space-y-4">
+      <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-2">
+        <Layout size={16} />
+        Navigation
+      </h2>
+
+      <div>
+        <span class="block text-sm font-medium mb-2">Nav Mode</span>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localNavMode === 'bottom-tabs' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            onclick={() => handleNavModeChange('bottom-tabs')}
+          >
+            Bottom tabs
+          </button>
+          <button
+            type="button"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localNavMode === 'sidebar' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            onclick={() => handleNavModeChange('sidebar')}
+          >
+            Sidebar
+          </button>
+          <button
+            type="button"
+            class="flex-1 py-2.5 px-3 rounded-xl border-2 text-sm transition-all touch-manipulation {localNavMode === 'none' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            onclick={() => handleNavModeChange('none')}
+          >
+            None
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Typography Settings -->
+    <section class="card p-4 space-y-4">
+      <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-2">
+        <Type size={16} />
+        Typography
+      </h2>
+
+      <div>
+        <span class="block text-sm font-medium mb-2">Font Preset</span>
+        <div class="flex gap-3">
+          <button
+            type="button"
+            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex flex-col items-center gap-1 touch-manipulation {localFontPreset === 'warm-rounded' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            onclick={() => handleFontPresetChange('warm-rounded')}
+          >
+            <span class="font-medium text-base" style="font-family: Nunito, system-ui">Aa</span>
+            <span class="text-xs">Warm Rounded</span>
+          </button>
+          <button
+            type="button"
+            class="flex-1 py-3 px-4 rounded-xl border-2 transition-all flex flex-col items-center gap-1 touch-manipulation {localFontPreset === 'refined-system' ? 'border-accent bg-accent/10' : 'border-slate-200 dark:border-slate-700'}"
+            onclick={() => handleFontPresetChange('refined-system')}
+          >
+            <span class="font-medium text-base" style="font-family: system-ui">Aa</span>
+            <span class="text-xs">System</span>
+          </button>
+        </div>
+      </div>
     </section>
 
     <!-- App Settings -->

@@ -1,16 +1,38 @@
 @import 'tailwindcss';
+@import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400..900;1,400..900&display=swap');
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --color-accent: #6366f1;
-  --color-surface: #f8fafc;
-  --color-surface-2: #e2e8f0;
+  --color-surface: #ffffff;
+  --color-surface-2: #f5f5f4;
+  --color-bg: #fafaf9;
+  --color-border: #e7e5e0;
+  --color-text: #1c1917;
+  --color-text-muted: #57534e;
+  --color-text-hint: #78716c;
 }
 
 .dark {
-  --color-surface: #1e293b;
-  --color-surface-2: #334155;
+  --color-surface: #27272a;
+  --color-surface-2: #3f3f46;
+  --color-bg: #18181b;
+  --color-border: #52525b;
+  --color-text: #fafafa;
+  --color-text-muted: #a1a1aa;
+  --color-text-hint: #71717a;
+}
+
+/* Font preset tokens */
+:root[data-font="warm-rounded"] {
+  --font-display: "Nunito", system-ui, sans-serif;
+  --font-body: "Nunito", system-ui, sans-serif;
+}
+
+:root[data-font="refined-system"] {
+  --font-display: system-ui, sans-serif;
+  --font-body: system-ui, sans-serif;
 }
 
 /* ===== DESIGN SYSTEM UTILITIES ===== */
@@ -98,6 +120,7 @@
 @layer base {
   body {
     @apply bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
+    font-family: var(--font-body, system-ui, sans-serif);
   }
 
   /* Ensure smooth scrolling on all scroll containers */

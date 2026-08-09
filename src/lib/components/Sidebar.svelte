@@ -17,7 +17,8 @@
     X,
     LogOut,
     ChevronRight,
-    Heart
+    Heart,
+    Home
   } from 'lucide-svelte'
 
   interface Props {
@@ -114,7 +115,8 @@
   })
 
   const navItems = [
-    { path: '/', label: 'Search', icon: Search },
+    { path: '/', label: 'Home', icon: Home },
+    { path: '/search', label: 'Search', icon: Search },
     { path: '/videos', label: 'Videos', icon: Video },
     { path: '/notes', label: 'Notes', icon: StickyNote },
     { path: '/places', label: 'Places', icon: MapPin },
@@ -147,14 +149,14 @@
     {/if}
   </button>
 
-  <!-- Home/Search button - top right -->
+  <!-- Home button - top right -->
   <button
     type="button"
     class="flex items-center justify-center w-11 h-11 rounded-xl bg-surface border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all touch-manipulation {currentPath === '/' ? 'bg-accent text-white border-accent hover:bg-accent/90' : ''}"
     onclick={() => handleNavigate('/')}
-    aria-label="Go to search"
+    aria-label="Go home"
   >
-    <Search size={20} />
+    <Home size={20} />
   </button>
 </nav>
 

@@ -15,6 +15,9 @@ export function createEmptyRatings(): Record<UserId, null> {
 
 export type Theme = "light" | "dark"
 
+export type NavMode = "sidebar" | "bottom-tabs" | "none"
+export type FontPreset = "warm-rounded" | "refined-system"
+
 export type LocationMode = "auto" | "manual" | "off"
 
 export type UnitSystem = "metric" | "imperial"
@@ -57,6 +60,8 @@ export interface UserPreferences {
     youtubePlaylistId?: string // ID of the YouTube playlist to sync with
     grayjayConfig?: GrayjayConfig // Grayjay configuration
     lastUpdated?: number // Timestamp for conflict resolution
+    navMode?: NavMode    // Default: "bottom-tabs" on mobile, "sidebar" on desktop
+    fontPreset?: FontPreset // Default: "warm-rounded"
 }
 
 export type UserPreferencesMap = Record<UserId, UserPreferences>
@@ -348,4 +353,18 @@ export interface ProfileItem extends BaseDocument {
     photos?: string[] // URLs to photos in Google Drive
     isFavorite?: boolean
     rating?: number // 1-5 scale for how much they like it
+}
+
+// Home dashboard types
+export type HomeActivityType = "note" | "media" | "place"
+
+export interface HomeActivity {
+    type: HomeActivityType
+    id: string
+    title: string
+    subtitle?: string       // e.g. status label or category
+    createdBy: UserId
+    updatedAt: Timestamp
+    posterPath?: string | null // Media poster, if available
+    mediaType?: MediaType      // Only set when type === "media"
 }
