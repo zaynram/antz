@@ -3,9 +3,9 @@
   import PageHeader from '$lib/components/ui/PageHeader.svelte'
   import { deleteProfilePicture, logOut, uploadProfilePicture } from '$lib/firebase'
   import { hapticLight } from '$lib/haptics'
-  import { activeUser, currentPreferences, displayAbbreviations, immediateSavePreferences, userPreferences } from '$lib/stores/app'
+  import { activeUser, currentPreferences, displayAbbreviations, immediateSavePreferences, saveActiveUserPreferences, userPreferences } from '$lib/stores/app'
   import type { GeoLocation, LocationMode, NavMode, FontPreset, Theme, VideoSyncPlatform } from '$lib/types'
-  import { Camera, Info, Loader2, LogOut, MapPin, Moon, Palette, RefreshCw, Settings, Sun, User, Video, X, Download, ExternalLink as ExternalLinkIcon, Layout, Type, Sparkles } from 'lucide-svelte'
+  import { Camera, Info, Loader2, LogOut, MapPin, Moon, Palette, RefreshCw, Settings, Sun, User, Video, X, Download, ExternalLink as ExternalLinkIcon, Layout, Type, Sparkles, Save, Check as CheckIcon } from 'lucide-svelte'
   import { toast } from 'svelte-sonner'
   import { isYouTubeAPIConfigured, requestAccessToken } from '$lib/services/youtube-sync'
   import { ACCENT_PRESETS, DEFAULT_ACCENT_Z, DEFAULT_ACCENT_T } from '$lib/accents'
@@ -60,6 +60,10 @@
       if (tapTimer) {
         clearTimeout(tapTimer)
         tapTimer = null
+      }
+      if (savedTimer) {
+        clearTimeout(savedTimer)
+        savedTimer = null
       }
     }
   })
@@ -352,6 +356,27 @@
 
   function handleSignatureChange(): void {
     savePreferences()
+  }
+
+  // Manual force-save of ONLY the active user's settings.
+  let isSavingSettings = $state(false)
+  let justSaved = $state(false)
+  let savedTimer: ReturnType<typeof setTimeout> | null = null
+  async function handleManualSave(): Promise<void> {
+    isSavingSettings = true
+    hapticLight()
+    try {
+      await saveActiveUserPreferences()
+      justSaved = true
+      if (savedTimer) clearTimeout(savedTimer)
+      savedTimer = setTimeout(() => { justSaved = false }, 2000)
+      toast.success(`Saved ${localName || $activeUser}'s settings`)
+    } catch (err) {
+      console.error('Manual save failed:', err)
+      toast.error('Failed to save settings')
+    } finally {
+      isSavingSettings = false
+    }
   }
 
   async function handleConnectYouTube(): Promise<void> {
@@ -1096,6 +1121,26 @@
         <Info size={16} />
         App
       </h2>
+
+      <!-- Manual save (active user's settings only) -->
+      <button
+        type="button"
+        class="btn-primary w-full"
+        onclick={handleManualSave}
+        disabled={isSavingSettings}
+      >
+        {#if isSavingSettings}
+          <Loader2 size={18} class="animate-spin" />
+          <span>Saving…</span>
+        {:else if justSaved}
+          <CheckIcon size={18} />
+          <span>Saved</span>
+        {:else}
+          <Save size={18} />
+          <span>Save {localName || $activeUser}'s settings</span>
+        {/if}
+      </button>
+      <p class="text-xs text-slate-400 -mt-2">Forces a sync of only the active profile's settings.</p>
 
       <!-- Update/Reload Button -->
       <button

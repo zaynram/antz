@@ -45,7 +45,9 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         noteAutoToneShift: true,
         showIdentityPill: true,
         bottomTabs: [...DEFAULT_BOTTOM_TABS],
-        lastUpdated: Date.now(),
+        // 0 so an untouched default never wins the last-write-wins merge and
+        // clobbers real synced settings from another device.
+        lastUpdated: 0,
     },
     T: {
         theme: "light",
@@ -60,7 +62,9 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         noteAutoToneShift: true,
         showIdentityPill: true,
         bottomTabs: [...DEFAULT_BOTTOM_TABS],
-        lastUpdated: Date.now(),
+        // 0 so an untouched default never wins the last-write-wins merge and
+        // clobbers real synced settings from another device.
+        lastUpdated: 0,
     },
 }
 
@@ -202,11 +206,11 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
     return true
 }
 
-// Save with exponential backoff retry
-async function saveWithRetry(prefs: UserPreferencesMap, retries = 3): Promise<void> {
+// Save with exponential backoff retry. Only the given user's entry is written.
+async function saveWithRetry(prefs: UserPreferencesMap, userId: UserId, retries = 3): Promise<void> {
     for (let i = 0; i < retries; i++) {
         try {
-            await savePreferencesToFirestore(prefs)
+            await savePreferencesToFirestore(prefs, userId)
             return
         } catch (err) {
             if (i === retries - 1) {
@@ -220,17 +224,19 @@ async function saveWithRetry(prefs: UserPreferencesMap, retries = 3): Promise<vo
     }
 }
 
-// Debounced save to Firestore with retry
+// Debounced save to Firestore with retry — persists only the active user's
+// settings so we never overwrite the other identity's data on sync.
 function debouncedSaveToFirestore(prefs: UserPreferencesMap): void {
     if (isRemoteUpdate) return // Don't save if this was a remote update
 
+    const activeUserId = get(activeUser)
     if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
     syncDebounceTimer = setTimeout(() => {
-        saveWithRetry(prefs)
+        saveWithRetry(prefs, activeUserId)
     }, 1000) // 1 second debounce
 }
 
-// Immediate save (no debounce) for critical updates like profile pictures
+// Immediate save (no debounce) for critical updates like profile pictures.
 export async function immediateSavePreferences(): Promise<void> {
     if (isRemoteUpdate) return
 
@@ -239,7 +245,18 @@ export async function immediateSavePreferences(): Promise<void> {
     const activeUserId = get(activeUser)
     prefs[activeUserId].lastUpdated = Date.now()
 
-    await saveWithRetry(prefs)
+    await saveWithRetry(prefs, activeUserId)
+}
+
+// Force-persist ONLY the active user's settings right now (manual save button).
+export async function saveActiveUserPreferences(): Promise<void> {
+    const activeUserId = get(activeUser)
+    userPreferences.update(p => {
+        if (p[activeUserId]) p[activeUserId].lastUpdated = Date.now()
+        return p
+    })
+    if (syncDebounceTimer) clearTimeout(syncDebounceTimer) // cancel any pending debounce
+    await saveWithRetry(get(userPreferences), activeUserId)
 }
 
 // Initialize Firestore sync (call after auth)
@@ -276,9 +293,10 @@ export async function initPreferencesSync(): Promise<void> {
             userPreferences.set(merged)
             isRemoteUpdate = false
         } else {
-            // No remote prefs yet, push local to Firestore
+            // No remote prefs yet — seed only the active user's entry so we
+            // don't stamp the other identity with this device's defaults.
             const localPrefs = get(userPreferences)
-            await savePreferencesToFirestore(localPrefs)
+            await savePreferencesToFirestore(localPrefs, get(activeUser))
         }
     } catch (err) {
         console.warn("Failed to load preferences from Firestore:", err)
