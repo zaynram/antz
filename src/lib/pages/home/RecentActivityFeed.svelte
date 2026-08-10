@@ -73,7 +73,7 @@
             </div>
 
             <div class="flex flex-col items-end gap-1 flex-shrink-0">
-              <span class="text-xs font-medium text-accent">{item.createdBy}</span>
+              <span class="text-xs font-medium text-accent">{item.actor}</span>
               <span class="text-xs text-slate-400">{relativeTime(item)}</span>
             </div>
           </button>

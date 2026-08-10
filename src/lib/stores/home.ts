@@ -34,6 +34,7 @@ function rebuildActivity(): void {
         title: m.title,
         subtitle: m.status,
         createdBy: m.createdBy,
+        actor: m.updatedBy ?? m.createdBy,
         updatedAt: m.updatedAt,
         posterPath: m.posterPath,
         mediaType: m.type,
@@ -45,6 +46,7 @@ function rebuildActivity(): void {
         title: n.title || "(untitled)",
         subtitle: n.tags?.[0],
         createdBy: n.createdBy,
+        actor: n.updatedBy ?? n.createdBy,
         updatedAt: n.updatedAt,
     }))
 
@@ -54,6 +56,7 @@ function rebuildActivity(): void {
         title: p.name,
         subtitle: p.category,
         createdBy: p.createdBy,
+        actor: p.updatedBy ?? p.createdBy,
         updatedAt: p.updatedAt,
     }))
 

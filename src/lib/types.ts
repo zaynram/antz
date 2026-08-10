@@ -62,6 +62,11 @@ export interface UserPreferences {
     lastUpdated?: number // Timestamp for conflict resolution
     navMode?: NavMode    // Default: "bottom-tabs" on mobile, "sidebar" on desktop
     fontPreset?: FontPreset // Default: "warm-rounded"
+    fontScale?: number   // Global text-scale multiplier (0.85..1.4), default 1
+    reduceMotion?: boolean // Disable non-essential animations/transitions
+    noteSignature?: string // Short handwritten-style sign-off shown on this identity's notes
+    noteAutoToneShift?: boolean // Auto hue-shift note palette when both accents collide (default true)
+    showIdentityPill?: boolean // Show the floating identity switcher (default true)
 }
 
 export type UserPreferencesMap = Record<UserId, UserPreferences>
@@ -74,7 +79,12 @@ export interface BaseDocument {
     updatedBy?: UserId
 }
 
-export type NoteColor = "yellow" | "pink" | "blue" | "green" | "purple" | "orange"
+// Tonal slot (t0..t5) resolved to a concrete color from the author's accent at
+// render time. Legacy named colors are still accepted for notes stored before
+// the per-identity palette migration.
+export type NoteTone = "t0" | "t1" | "t2" | "t3" | "t4" | "t5"
+export type LegacyNoteColor = "yellow" | "pink" | "blue" | "green" | "purple" | "orange"
+export type NoteColor = NoteTone | LegacyNoteColor
 
 export interface Note extends BaseDocument {
     type: "note"
@@ -364,6 +374,7 @@ export interface HomeActivity {
     title: string
     subtitle?: string       // e.g. status label or category
     createdBy: UserId
+    actor: UserId           // Who performed the most recent activity (updatedBy ?? createdBy)
     updatedAt: Timestamp
     posterPath?: string | null // Media poster, if available
     mediaType?: MediaType      // Only set when type === "media"

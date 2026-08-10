@@ -5,7 +5,7 @@
   import { hapticLight } from '$lib/haptics'
   import { activeUser, currentPreferences, displayAbbreviations, immediateSavePreferences, userPreferences } from '$lib/stores/app'
   import type { GeoLocation, LocationMode, NavMode, FontPreset, Theme, VideoSyncPlatform } from '$lib/types'
-  import { Camera, Info, Loader2, LogOut, MapPin, Moon, Palette, RefreshCw, Settings, Sun, User, Video, X, Download, ExternalLink as ExternalLinkIcon, Layout, Type } from 'lucide-svelte'
+  import { Camera, Info, Loader2, LogOut, MapPin, Moon, Palette, RefreshCw, Settings, Sun, User, Video, X, Download, ExternalLink as ExternalLinkIcon, Layout, Type, Sparkles } from 'lucide-svelte'
   import { toast } from 'svelte-sonner'
   import { isYouTubeAPIConfigured, requestAccessToken } from '$lib/services/youtube-sync'
   import { ACCENT_PRESETS, DEFAULT_ACCENT_Z, DEFAULT_ACCENT_T } from '$lib/accents'
@@ -31,6 +31,11 @@
   let localVideoSyncPlatform = $state<VideoSyncPlatform>('none')
   let localNavMode = $state<NavMode>('bottom-tabs')
   let localFontPreset = $state<FontPreset>('warm-rounded')
+  let localFontScale = $state(1)
+  let localReduceMotion = $state(false)
+  let localNoteSignature = $state('')
+  let localNoteAutoToneShift = $state(true)
+  let localShowIdentityPill = $state(true)
 
   // App state
   let isReloading = $state(false)
@@ -90,6 +95,11 @@
       localVideoSyncPlatform = $currentPreferences.videoSyncPlatform || 'none'
       localNavMode = $currentPreferences.navMode ?? 'bottom-tabs'
       localFontPreset = $currentPreferences.fontPreset ?? 'warm-rounded'
+      localFontScale = $currentPreferences.fontScale ?? 1
+      localReduceMotion = $currentPreferences.reduceMotion ?? false
+      localNoteSignature = $currentPreferences.noteSignature ?? ''
+      localNoteAutoToneShift = $currentPreferences.noteAutoToneShift ?? true
+      localShowIdentityPill = $currentPreferences.showIdentityPill ?? true
       previousUser = $activeUser
     }
   })
@@ -184,6 +194,11 @@
         grayjayConfig: prefs[$activeUser]?.grayjayConfig,
         navMode: localNavMode,
         fontPreset: localFontPreset,
+        fontScale: localFontScale,
+        reduceMotion: localReduceMotion,
+        noteSignature: localNoteSignature.trim() || undefined,
+        noteAutoToneShift: localNoteAutoToneShift,
+        showIdentityPill: localShowIdentityPill,
         lastUpdated: Date.now()
       }
     }))
@@ -258,6 +273,46 @@
   function handleFontPresetChange(preset: FontPreset): void {
     hapticLight()
     localFontPreset = preset
+    savePreferences()
+  }
+
+  const FONT_SCALE_MIN = 0.85
+  const FONT_SCALE_MAX = 1.4
+  function handleFontScaleChange(): void {
+    // Clamp to the supported range so layout stays sane.
+    localFontScale = Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, Number(localFontScale) || 1))
+    savePreferences()
+  }
+  function nudgeFontScale(delta: number): void {
+    hapticLight()
+    localFontScale = Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, Math.round((localFontScale + delta) * 100) / 100))
+    savePreferences()
+  }
+  function resetFontScale(): void {
+    hapticLight()
+    localFontScale = 1
+    savePreferences()
+  }
+
+  function handleReduceMotionToggle(): void {
+    hapticLight()
+    localReduceMotion = !localReduceMotion
+    savePreferences()
+  }
+
+  function handleToneShiftToggle(): void {
+    hapticLight()
+    localNoteAutoToneShift = !localNoteAutoToneShift
+    savePreferences()
+  }
+
+  function handleIdentityPillToggle(): void {
+    hapticLight()
+    localShowIdentityPill = !localShowIdentityPill
+    savePreferences()
+  }
+
+  function handleSignatureChange(): void {
     savePreferences()
   }
 
@@ -492,6 +547,21 @@
           class="input"
           placeholder="Your name"
         />
+      </div>
+
+      <!-- Sticky-note signature -->
+      <div>
+        <label for="settings-note-signature" class="block text-sm font-medium mb-2">Sticky-note signature</label>
+        <input
+          id="settings-note-signature"
+          type="text"
+          bind:value={localNoteSignature}
+          onblur={handleSignatureChange}
+          class="input"
+          maxlength="40"
+          placeholder="e.g. — love, {localName || $activeUser} 💌"
+        />
+        <p class="text-xs text-slate-400 mt-1">A little sign-off shown on notes you pin. Leave blank for none.</p>
       </div>
 
       <!-- Theme -->
@@ -790,6 +860,22 @@
           </button>
         </div>
       </div>
+
+      <!-- Identity switcher visibility -->
+      <button
+        type="button"
+        class="w-full flex items-center justify-between gap-3 touch-manipulation"
+        onclick={handleIdentityPillToggle}
+        aria-pressed={localShowIdentityPill}
+      >
+        <span class="text-left">
+          <span class="block text-sm font-medium">Floating identity switcher</span>
+          <span class="block text-xs text-slate-400">Tap to switch, hold and drag to reposition</span>
+        </span>
+        <span class="relative shrink-0 w-11 h-6 rounded-full transition-colors {localShowIdentityPill ? 'bg-accent' : 'bg-slate-300 dark:bg-slate-600'}" aria-hidden="true">
+          <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {localShowIdentityPill ? 'translate-x-5' : ''}"></span>
+        </span>
+      </button>
     </section>
 
     <!-- Typography Settings -->
@@ -820,6 +906,75 @@
           </button>
         </div>
       </div>
+
+      <!-- Text size -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-medium">Text size</span>
+          <span class="text-xs text-slate-400 tabular-nums">{Math.round(localFontScale * 100)}%</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="button" class="btn-icon touch-sm" aria-label="Smaller text" onclick={() => nudgeFontScale(-0.05)}>
+            <span class="text-xs font-bold">A</span>
+          </button>
+          <input
+            type="range"
+            min="0.85"
+            max="1.4"
+            step="0.05"
+            bind:value={localFontScale}
+            oninput={handleFontScaleChange}
+            class="flex-1 accent-[var(--color-accent)]"
+            aria-label="Text size"
+          />
+          <button type="button" class="btn-icon touch-sm" aria-label="Larger text" onclick={() => nudgeFontScale(0.05)}>
+            <span class="text-lg font-bold">A</span>
+          </button>
+        </div>
+        {#if Math.abs(localFontScale - 1) > 0.001}
+          <button type="button" class="text-xs text-accent mt-2" onclick={resetFontScale}>Reset to 100%</button>
+        {/if}
+      </div>
+    </section>
+
+    <!-- Accessibility & Notes -->
+    <section class="card p-4 space-y-4">
+      <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-2">
+        <Sparkles size={16} />
+        Accessibility &amp; Notes
+      </h2>
+
+      <!-- Reduce motion -->
+      <button
+        type="button"
+        class="w-full flex items-center justify-between gap-3 touch-manipulation"
+        onclick={handleReduceMotionToggle}
+        aria-pressed={localReduceMotion}
+      >
+        <span class="text-left">
+          <span class="block text-sm font-medium">Reduce motion</span>
+          <span class="block text-xs text-slate-400">Turn off animations and tap bounce</span>
+        </span>
+        <span class="relative shrink-0 w-11 h-6 rounded-full transition-colors {localReduceMotion ? 'bg-accent' : 'bg-slate-300 dark:bg-slate-600'}" aria-hidden="true">
+          <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {localReduceMotion ? 'translate-x-5' : ''}"></span>
+        </span>
+      </button>
+
+      <!-- Note tone-shift on collision -->
+      <button
+        type="button"
+        class="w-full flex items-center justify-between gap-3 touch-manipulation"
+        onclick={handleToneShiftToggle}
+        aria-pressed={localNoteAutoToneShift}
+      >
+        <span class="text-left">
+          <span class="block text-sm font-medium">Distinct note colors</span>
+          <span class="block text-xs text-slate-400">Shift note hues apart when both accents match</span>
+        </span>
+        <span class="relative shrink-0 w-11 h-6 rounded-full transition-colors {localNoteAutoToneShift ? 'bg-accent' : 'bg-slate-300 dark:bg-slate-600'}" aria-hidden="true">
+          <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {localNoteAutoToneShift ? 'translate-x-5' : ''}"></span>
+        </span>
+      </button>
     </section>
 
     <!-- App Settings -->
