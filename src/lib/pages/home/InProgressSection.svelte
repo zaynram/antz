@@ -38,9 +38,9 @@
             class="flex-shrink-0 w-24 touch-manipulation"
             onclick={() => onItemClick(item)}
           >
-            {#if item.posterPath}
+            {#if item.imageOverride || item.posterPath}
               <img
-                src="https://image.tmdb.org/t/p/w154{item.posterPath}"
+                src={item.imageOverride || `https://image.tmdb.org/t/p/w154${item.posterPath}`}
                 alt={item.title}
                 class="w-24 h-36 object-cover rounded-xl shadow-md"
               />

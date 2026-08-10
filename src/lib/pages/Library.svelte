@@ -733,9 +733,9 @@
               onclick={() => selectedMedia = item}
             >
               <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 relative">
-                {#if item.posterPath}
+                {#if item.imageOverride || item.posterPath}
                   <img
-                    src={posterUrl(item.posterPath, 'md')}
+                    src={item.imageOverride || posterUrl(item.posterPath, 'md')}
                     alt={item.title}
                     loading="lazy"
                     class="w-full h-full object-cover"

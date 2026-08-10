@@ -20,6 +20,7 @@
   let editedNotes = $state('');
   let newComment = $state('');
   let watchDateInput = $state('');
+  let editedImageOverride = $state('');
   
   // Non-reactive tracking - prevents effect from creating dependencies on local form state
   let previousMediaId: string | undefined = undefined;
@@ -32,7 +33,8 @@
       // Only sync when viewing a different media item
       if (media.id !== previousMediaId) {
         editedNotes = media.notes || '';
-        
+        editedImageOverride = media.imageOverride || '';
+
         if (media.watchDate) {
           const d = new Date(media.watchDate.toDate());
           const year = d.getFullYear();
@@ -75,6 +77,15 @@
   async function updateNotes(): Promise<void> {
     if (!media?.id) return;
     await updateDocument<Media>('media', media.id, { notes: editedNotes }, $activeUser);
+  }
+
+  async function updateImageOverride(): Promise<void> {
+    if (!media?.id) return;
+    await updateDocument<Media>('media', media.id, { imageOverride: editedImageOverride.trim() }, $activeUser);
+  }
+  function clearImageOverride(): void {
+    editedImageOverride = '';
+    updateImageOverride();
   }
 
   async function updateStatus(status: MediaStatus): Promise<void> {
@@ -146,9 +157,9 @@
     {#snippet header()}
       <!-- Header with poster -->
       <div class="relative shrink-0">
-        {#if media.posterPath}
+        {#if media.imageOverride || media.posterPath}
           <img
-            src={posterUrl(media.posterPath)}
+            src={posterUrl(media.imageOverride || media.posterPath)}
             alt={media.title}
             loading="lazy"
             class="w-full h-48 object-cover rounded-t-xl"
@@ -326,6 +337,25 @@
           </div>
         {/if}
         
+        <!-- Custom image override -->
+        <div>
+          <label for="media-image-override" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Custom image URL</label>
+          <div class="flex gap-2">
+            <input
+              id="media-image-override"
+              type="url"
+              bind:value={editedImageOverride}
+              onblur={updateImageOverride}
+              placeholder="https://…  (overrides the poster)"
+              class="flex-1 p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg focus:outline-none focus:border-accent"
+            />
+            {#if editedImageOverride}
+              <button type="button" class="btn-icon-sm touch-sm" onclick={clearImageOverride} aria-label="Clear custom image">✕</button>
+            {/if}
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Use when the poster exists but won't load.</p>
+        </div>
+
         <!-- Notes -->
         <div>
           <label for="media-notes" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Personal Notes</label>

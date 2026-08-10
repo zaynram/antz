@@ -401,9 +401,9 @@
               onclick={() => openVideoDetail(video)}
               class="relative w-full aspect-video bg-slate-100 dark:bg-slate-900 overflow-hidden group"
             >
-              {#if video.thumbnailUrl}
+              {#if video.imageOverride || video.thumbnailUrl}
                 <img
-                  src={video.thumbnailUrl}
+                  src={video.imageOverride || video.thumbnailUrl}
                   alt={video.title}
                   class="w-full h-full object-cover group-hover:scale-105 transition-transform"
                 />

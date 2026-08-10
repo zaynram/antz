@@ -37,6 +37,7 @@ function rebuildActivity(): void {
         actor: m.updatedBy ?? m.createdBy,
         updatedAt: m.updatedAt,
         posterPath: m.posterPath,
+        imageOverride: m.imageOverride,
         mediaType: m.type,
     }))
 
