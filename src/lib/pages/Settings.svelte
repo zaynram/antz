@@ -35,6 +35,7 @@
   let localReduceMotion = $state(false)
   let localNoteSignature = $state('')
   let localNoteAutoToneShift = $state(true)
+  let localShowIdentityPill = $state(true)
 
   // App state
   let isReloading = $state(false)
@@ -98,6 +99,7 @@
       localReduceMotion = $currentPreferences.reduceMotion ?? false
       localNoteSignature = $currentPreferences.noteSignature ?? ''
       localNoteAutoToneShift = $currentPreferences.noteAutoToneShift ?? true
+      localShowIdentityPill = $currentPreferences.showIdentityPill ?? true
       previousUser = $activeUser
     }
   })
@@ -196,6 +198,7 @@
         reduceMotion: localReduceMotion,
         noteSignature: localNoteSignature.trim() || undefined,
         noteAutoToneShift: localNoteAutoToneShift,
+        showIdentityPill: localShowIdentityPill,
         lastUpdated: Date.now()
       }
     }))
@@ -300,6 +303,12 @@
   function handleToneShiftToggle(): void {
     hapticLight()
     localNoteAutoToneShift = !localNoteAutoToneShift
+    savePreferences()
+  }
+
+  function handleIdentityPillToggle(): void {
+    hapticLight()
+    localShowIdentityPill = !localShowIdentityPill
     savePreferences()
   }
 
@@ -851,6 +860,22 @@
           </button>
         </div>
       </div>
+
+      <!-- Identity switcher visibility -->
+      <button
+        type="button"
+        class="w-full flex items-center justify-between gap-3 touch-manipulation"
+        onclick={handleIdentityPillToggle}
+        aria-pressed={localShowIdentityPill}
+      >
+        <span class="text-left">
+          <span class="block text-sm font-medium">Floating identity switcher</span>
+          <span class="block text-xs text-slate-400">Tap to switch, hold and drag to reposition</span>
+        </span>
+        <span class="relative shrink-0 w-11 h-6 rounded-full transition-colors {localShowIdentityPill ? 'bg-accent' : 'bg-slate-300 dark:bg-slate-600'}" aria-hidden="true">
+          <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {localShowIdentityPill ? 'translate-x-5' : ''}"></span>
+        </span>
+      </button>
     </section>
 
     <!-- Typography Settings -->

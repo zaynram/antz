@@ -42,6 +42,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         fontScale: 1,
         reduceMotion: false,
         noteAutoToneShift: true,
+        showIdentityPill: true,
         lastUpdated: Date.now(),
     },
     T: {
@@ -55,6 +56,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         fontScale: 1,
         reduceMotion: false,
         noteAutoToneShift: true,
+        showIdentityPill: true,
         lastUpdated: Date.now(),
     },
 }
@@ -144,6 +146,7 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
         "reduceMotion",
         "noteSignature",
         "noteAutoToneShift",
+        "showIdentityPill",
     ]
 
     for (const userId of ["Z", "T"] as const) {

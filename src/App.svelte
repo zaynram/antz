@@ -187,6 +187,8 @@
   </main>
 
   <BackToTop />
-  <IdentityPill />
+  {#if $currentPreferences?.showIdentityPill ?? true}
+    <IdentityPill />
+  {/if}
   <BottomTabBar activeRoute={$currentPath} onNavigate={handleNavigate} />
 {/if}

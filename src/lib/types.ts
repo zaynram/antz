@@ -66,6 +66,7 @@ export interface UserPreferences {
     reduceMotion?: boolean // Disable non-essential animations/transitions
     noteSignature?: string // Short handwritten-style sign-off shown on this identity's notes
     noteAutoToneShift?: boolean // Auto hue-shift note palette when both accents collide (default true)
+    showIdentityPill?: boolean // Show the floating identity switcher (default true)
 }
 
 export type UserPreferencesMap = Record<UserId, UserPreferences>
@@ -373,6 +374,7 @@ export interface HomeActivity {
     title: string
     subtitle?: string       // e.g. status label or category
     createdBy: UserId
+    actor: UserId           // Who performed the most recent activity (updatedBy ?? createdBy)
     updatedAt: Timestamp
     posterPath?: string | null // Media poster, if available
     mediaType?: MediaType      // Only set when type === "media"
