@@ -1,12 +1,12 @@
 <script lang="ts">
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
-  import PageHeader from '$lib/components/ui/PageHeader.svelte'
   import Tabs from '$lib/components/ui/Tabs.svelte'
   import Modal from '$lib/components/ui/Modal.svelte'
   import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte'
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
   import { hapticLight, hapticSuccess } from '$lib/haptics'
-  import { activeUser, displayNames } from '$lib/stores/app'
+  import { activeUser, displayNames, userPreferences } from '$lib/stores/app'
+  import { DEFAULT_ACCENT } from '$lib/accents'
   import type { ProfileItem, ProfileCategory, UserId } from '$lib/types'
   import { Heart, Pencil, Plus, Star, Trash2, Gift, Coffee, Music, Film, BookOpen, Zap, Sparkles, Palette, Users, MapPin, Utensils } from 'lucide-svelte'
   import { onMount } from 'svelte'
@@ -190,39 +190,37 @@
   function getUserDisplayName(userId: UserId): string {
     return $displayNames[userId] || userId
   }
+
+  // Tint each keepsake by its author's accent, echoing the notes system.
+  function accentFor(userId: UserId): string {
+    return $userPreferences[userId]?.accentColor ?? DEFAULT_ACCENT
+  }
 </script>
 
 <div class="max-w-2xl mx-auto">
 
-<PageHeader
-  title="Partner Profiles"
-  subtitle="Keep track of things we like"
-  icon={Heart}
->
-  {#snippet children()}
-    <!-- View mode toggle -->
-    <div class="flex gap-2 justify-center">
-      <button
-        class="{viewMode === 'both' ? 'btn-primary' : 'btn-secondary'} touch-manipulation"
-        onclick={() => { viewMode = 'both'; hapticLight() }}
-      >
-        Both
-      </button>
-      <button
-        class="{viewMode === 'mine' ? 'btn-primary' : 'btn-secondary'} touch-manipulation"
-        onclick={() => { viewMode = 'mine'; hapticLight() }}
-      >
-        Mine
-      </button>
-      <button
-        class="{viewMode === 'theirs' ? 'btn-primary' : 'btn-secondary'} touch-manipulation"
-        onclick={() => { viewMode = 'theirs'; hapticLight() }}
-      >
-        Theirs
-      </button>
+<!-- Keepsake-box header -->
+<div class="keepbox mb-5">
+  <div class="keepbox-inner">
+    <div class="min-w-0 mb-3">
+      <p class="keepbox-eyebrow">Little things</p>
+      <h1 class="keepbox-title">Our Keepsakes</h1>
+      <p class="keepbox-sub">The things we love, kept</p>
     </div>
-  {/snippet}
-</PageHeader>
+    <!-- View mode toggle -->
+    <div class="flex gap-1.5">
+      {#each [{ k: 'both', l: 'Both' }, { k: 'mine', l: 'Mine' }, { k: 'theirs', l: 'Theirs' }] as m}
+        <button
+          type="button"
+          class="keepbox-chip {viewMode === m.k ? 'is-on' : ''}"
+          onclick={() => { viewMode = m.k as typeof viewMode; hapticLight() }}
+        >
+          {m.l}
+        </button>
+      {/each}
+    </div>
+  </div>
+</div>
 
 <!-- Category tabs + Add button -->
 <div class="flex items-center gap-2">
@@ -271,7 +269,7 @@
         </h3>
         <div class="grid gap-3 md:grid-cols-2">
           {#each userItems as item (item.id)}
-            <div class="card p-4">
+            <div class="keepsake" style="--keepsake-accent: {accentFor(item.createdBy)}">
               <div class="flex items-start justify-between mb-2">
                 <div class="flex items-center gap-2 flex-1">
                   <span class="text-2xl">{categoryInfo[item.category].emoji}</span>
@@ -314,8 +312,8 @@
               {#if item.notes}
                 <p class="text-sm text-slate-500 dark:text-slate-400 italic mt-2">{item.notes}</p>
               {/if}
-              <div class="mt-2 text-xs text-slate-400 dark:text-slate-500">
-                {categoryInfo[item.category].label}
+              <div class="mt-2">
+                <span class="keepsake-tag">{categoryInfo[item.category].label}</span>
               </div>
             </div>
           {/each}
@@ -327,7 +325,7 @@
   <!-- Regular list view -->
   <div class="grid gap-3 md:grid-cols-2">
     {#each filteredItems as item (item.id)}
-      <div class="card p-4">
+      <div class="keepsake" style="--keepsake-accent: {accentFor(item.createdBy)}">
         <div class="flex items-start justify-between mb-2">
           <div class="flex items-center gap-2 flex-1">
             <span class="text-2xl">{categoryInfo[item.category].emoji}</span>
@@ -370,8 +368,8 @@
         {#if item.notes}
           <p class="text-sm text-slate-500 dark:text-slate-400 italic mt-2">{item.notes}</p>
         {/if}
-        <div class="mt-2 text-xs text-slate-400 dark:text-slate-500">
-          {categoryInfo[item.category].label}
+        <div class="mt-2">
+          <span class="keepsake-tag">{categoryInfo[item.category].label}</span>
         </div>
       </div>
     {/each}
@@ -509,3 +507,80 @@
 />
 
 </div>
+
+<style>
+  /* ===== Keepsake-box header ===== */
+  .keepbox {
+    position: relative;
+    border-radius: 1.1rem;
+    background:
+      radial-gradient(120% 140% at 50% -20%, color-mix(in srgb, var(--color-accent) 34%, #3a2540) 0%, #33203a 55%, #241729 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 10px 26px rgba(0,0,0,0.28);
+    overflow: hidden;
+  }
+  .keepbox-inner { padding: 1.1rem 1.3rem; }
+  .keepbox-eyebrow {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #f3c6e6;
+    text-shadow: 0 0 8px rgba(230,150,210,0.4);
+    margin-bottom: 0.1rem;
+  }
+  .keepbox-title {
+    font-size: 1.7rem;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    color: #fbeef7;
+  }
+  .keepbox-sub {
+    font-size: 0.8rem;
+    color: rgba(251,238,247,0.68);
+    margin-top: 0.15rem;
+  }
+  .keepbox-chip {
+    height: 2.25rem;
+    padding: 0 0.9rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #f3e7ef;
+    background: rgba(255,255,255,0.1);
+    transition: background 120ms, color 120ms;
+  }
+  .keepbox-chip.is-on { background: #f3c6e6; color: #3a1f33; }
+
+  /* ===== Keepsake item cards ===== */
+  .keepsake {
+    position: relative;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--keepsake-accent, var(--color-accent));
+    border-radius: 0.85rem;
+    padding: 1rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 6px 14px rgba(0,0,0,0.05);
+    transition: transform 140ms ease, box-shadow 140ms ease;
+  }
+  .keepsake:hover {
+    transform: rotate(-0.4deg) translateY(-2px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.1), 0 12px 24px rgba(0,0,0,0.1);
+  }
+
+  .keepsake-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--color-text-muted, #57534e);
+    background: var(--color-surface-2);
+    padding: 0.12rem 0.55rem;
+    border-radius: 999px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .keepsake:hover { transform: none; }
+  }
+</style>
