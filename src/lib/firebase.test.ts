@@ -73,10 +73,12 @@ import {
     deleteDocument,
     logOut,
     onAuthChange,
+    savePreferencesToFirestore,
     signInWithGoogle,
     subscribeToCollection,
     updateDocument,
 } from "./firebase"
+import type { UserPreferencesMap } from "./types"
 
 describe("Firebase utilities", () => {
     beforeEach(() => {
@@ -260,6 +262,36 @@ describe("Firebase utilities", () => {
             await deleteDocument("places", "place-789")
 
             expect(firestore.doc).toHaveBeenCalledWith(expect.anything(), "places", "place-789")
+        })
+    })
+
+    describe("savePreferencesToFirestore", () => {
+        const prefs = {
+            Z: { name: "Zed", accentColor: "#e11d48" },
+            T: { name: "Tee", accentColor: "#7c3aed" },
+        } as unknown as UserPreferencesMap
+
+        it("writes ONLY the active user's entry (merge) when a userId is given", async () => {
+            await savePreferencesToFirestore(prefs, "Z")
+
+            const call = vi.mocked(firestore.setDoc).mock.calls[0]
+            const data = call[1] as Record<string, unknown>
+            const options = call[2]
+
+            expect(data).toHaveProperty("Z", prefs.Z)
+            expect(data).not.toHaveProperty("T") // never touches the other identity
+            expect(options).toEqual({ merge: true })
+        })
+
+        it("writes the full map (merge) when no userId is given (first-time seed)", async () => {
+            await savePreferencesToFirestore(prefs)
+
+            const call = vi.mocked(firestore.setDoc).mock.calls[0]
+            const data = call[1] as Record<string, unknown>
+
+            expect(data).toHaveProperty("Z")
+            expect(data).toHaveProperty("T")
+            expect(call[2]).toEqual({ merge: true })
         })
     })
 })

@@ -107,12 +107,26 @@ export { deleteProfilePicture, uploadProfilePicture } from "./drive"
 // Preferences sync functions
 const PREFERENCES_DOC = "preferences/shared"
 
-export async function savePreferencesToFirestore(prefs: UserPreferencesMap): Promise<void> {
+/**
+ * Persist preferences to Firestore. When `userId` is given, only that user's
+ * entry is written (merge), so a device signed in as one identity can never
+ * overwrite the other identity's settings. Without `userId`, the full map is
+ * written (used only for first-time seeding).
+ */
+export async function savePreferencesToFirestore(
+    prefs: UserPreferencesMap,
+    userId?: UserId
+): Promise<void> {
     const docRef = doc(db, PREFERENCES_DOC)
-    await setDoc(docRef, {
-        ...prefs,
-        updatedAt: serverTimestamp(),
-    })
+    if (userId) {
+        await setDoc(
+            docRef,
+            { [userId]: prefs[userId], updatedAt: serverTimestamp() },
+            { merge: true }
+        )
+    } else {
+        await setDoc(docRef, { ...prefs, updatedAt: serverTimestamp() }, { merge: true })
+    }
 }
 
 export async function loadPreferencesFromFirestore(): Promise<UserPreferencesMap | null> {
