@@ -131,6 +131,7 @@ export interface Media extends BaseDocument {
     steamId?: number
     title: string
     posterPath: string | null
+    imageOverride?: string // Manual full-URL image override when the source poster won't display
     releaseDate?: string
     overview?: string
     status: MediaStatus
@@ -306,6 +307,7 @@ export interface Video extends BaseDocument {
     url: string
     videoId: string // YouTube video ID
     thumbnailUrl?: string
+    imageOverride?: string // Manual full-URL image override when the source thumbnail won't display
     duration?: string // e.g., "10:23"
     channelName?: string
     status: VideoStatus
@@ -378,5 +380,6 @@ export interface HomeActivity {
     actor: UserId           // Who performed the most recent activity (updatedBy ?? createdBy)
     updatedAt: Timestamp
     posterPath?: string | null // Media poster, if available
+    imageOverride?: string     // Manual image override, if set
     mediaType?: MediaType      // Only set when type === "media"
 }

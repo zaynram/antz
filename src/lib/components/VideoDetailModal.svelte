@@ -18,6 +18,7 @@
   let editedNotes = $state('');
   let newComment = $state('');
   let watchedDateInput = $state('');
+  let editedImageOverride = $state('');
   
   // Non-reactive tracking
   let previousVideoId: string | undefined = undefined;
@@ -29,7 +30,8 @@
     if (video) {
       if (video.id !== previousVideoId) {
         editedNotes = video.notes || '';
-        
+        editedImageOverride = video.imageOverride || '';
+
         if (video.watchedDate) {
           watchedDateInput = new Date(video.watchedDate.toDate()).toISOString().split('T')[0];
         } else {
@@ -57,6 +59,15 @@
   async function updateNotes(): Promise<void> {
     if (!video?.id) return;
     await updateDocument<Video>('videos', video.id, { notes: editedNotes }, $activeUser);
+  }
+
+  async function updateImageOverride(): Promise<void> {
+    if (!video?.id) return;
+    await updateDocument<Video>('videos', video.id, { imageOverride: editedImageOverride.trim() }, $activeUser);
+  }
+  function clearImageOverride(): void {
+    editedImageOverride = '';
+    updateImageOverride();
   }
 
   async function updateStatus(status: VideoStatus): Promise<void> {
@@ -302,6 +313,26 @@
               </p>
             </div>
           {/if}
+        </div>
+
+        <!-- Custom image override -->
+        <div class="p-6 border-b border-[var(--color-border)]">
+          <label for="video-image-override" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            Custom thumbnail URL
+          </label>
+          <div class="flex gap-2">
+            <input
+              id="video-image-override"
+              type="url"
+              bind:value={editedImageOverride}
+              onblur={updateImageOverride}
+              placeholder="https://…  (overrides the thumbnail)"
+              class="flex-1 p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg focus:outline-none focus:border-accent"
+            />
+            {#if editedImageOverride}
+              <button type="button" class="btn-icon-sm touch-sm" onclick={clearImageOverride} aria-label="Clear custom thumbnail">✕</button>
+            {/if}
+          </div>
         </div>
 
         <!-- Notes -->
