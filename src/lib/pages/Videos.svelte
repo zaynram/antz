@@ -273,14 +273,15 @@
 
 </script>
 
-<div class="min-h-screen bg-slate-50 dark:bg-slate-900">
-  <!-- Header -->
-  <div class="bg-white dark:bg-slate-800 border-b border-[var(--color-border)] sticky top-0 z-10">
-    <div class="max-w-7xl mx-auto px-4 py-4">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-3">
-          <VideoIcon size={28} class="text-accent" />
-          <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Video Queue</h1>
+<div class="videos-page pb-6">
+  <!-- Marquee header -->
+  <div class="marquee">
+    <div class="marquee-lights" aria-hidden="true"></div>
+    <div class="marquee-inner">
+      <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <div class="min-w-0">
+          <p class="marquee-eyebrow">Now showing</p>
+          <h1 class="marquee-title">Video Queue</h1>
         </div>
         <div class="flex items-center gap-2">
           <!-- Sync button -->
@@ -288,7 +289,7 @@
             <button
               onclick={handleSync}
               disabled={syncing || !isSyncAvailable($currentPreferences)}
-              class="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:opacity-90 transition-opacity touch-feedback disabled:opacity-50"
+              class="marquee-btn touch-feedback disabled:opacity-50"
               title={getSyncStatusMessage($currentPreferences)}
             >
               <RefreshCw size={18} class={syncing ? 'animate-spin' : ''} />
@@ -301,7 +302,7 @@
             <div class="relative" data-export-menu>
               <button
                 onclick={() => showExportMenu = !showExportMenu}
-                class="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:opacity-90 transition-opacity touch-feedback"
+                class="marquee-btn touch-feedback"
               >
                 <Download size={18} />
                 <span class="hidden sm:inline">Export</span>
@@ -337,9 +338,9 @@
           
           <button
             onclick={openAddModal}
-            class="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:opacity-90 transition-opacity touch-feedback"
+            class="marquee-btn marquee-btn-accent touch-feedback"
           >
-            <Plus size={20} />
+            <Plus size={18} />
             <span>Add Video</span>
           </button>
         </div>
@@ -355,23 +356,23 @@
         </div>
       {/if}
 
-      <!-- Filter tabs -->
-      <div class="flex gap-2 overflow-x-auto">
+      <!-- Ticket-stub filter tabs -->
+      <div class="flex gap-2 overflow-x-auto scrollbar-none pt-1">
         <button
           onclick={() => { filterStatus = 'all'; hapticLight() }}
-          class="px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap {filterStatus === 'all' ? 'bg-accent text-white' : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}"
+          class="ticket {filterStatus === 'all' ? 'is-on' : ''}"
         >
           All ({videos.length})
         </button>
         <button
           onclick={() => { filterStatus = 'queued'; hapticLight() }}
-          class="px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap {filterStatus === 'queued' ? 'bg-accent text-white' : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}"
+          class="ticket {filterStatus === 'queued' ? 'is-on' : ''}"
         >
           Queued ({videos.filter(v => v.status === 'queued').length})
         </button>
         <button
           onclick={() => { filterStatus = 'watched'; hapticLight() }}
-          class="px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap {filterStatus === 'watched' ? 'bg-accent text-white' : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}"
+          class="ticket {filterStatus === 'watched' ? 'is-on' : ''}"
         >
           Watched ({videos.filter(v => v.status === 'watched').length})
         </button>
@@ -395,11 +396,12 @@
     {:else}
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {#each filteredVideos as video (video.id)}
-          <div class="bg-white dark:bg-slate-800 rounded-lg overflow-hidden shadow-sm border border-[var(--color-border)] hover:shadow-md transition-shadow">
+          <div class="film-card">
+            <div class="film-strip" aria-hidden="true"></div>
             <!-- Thumbnail -->
             <button
               onclick={() => openVideoDetail(video)}
-              class="relative w-full aspect-video bg-slate-100 dark:bg-slate-900 overflow-hidden group"
+              class="relative w-full aspect-video bg-black/90 overflow-hidden group block"
             >
               {#if video.thumbnailUrl}
                 <img
@@ -558,3 +560,138 @@
   onConfirm={() => pendingConfirm?.onConfirm()}
   onCancel={() => pendingConfirm = null}
 />
+
+<style>
+  /* ===== Cinema marquee header ===== */
+  .marquee {
+    position: relative;
+    border-radius: 1.1rem;
+    margin-bottom: 1.25rem;
+    padding-top: 0.5rem;
+    background:
+      radial-gradient(120% 140% at 50% -20%, color-mix(in srgb, var(--color-accent) 55%, #1a1420) 0%, #1a1420 60%, #120e16 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      0 10px 26px rgba(0,0,0,0.28);
+    overflow: hidden;
+  }
+  /* Row of marquee bulbs along the top edge */
+  .marquee-lights {
+    height: 0.5rem;
+    background-image: radial-gradient(circle, #ffe9a8 0 40%, transparent 45%);
+    background-size: 1.05rem 0.5rem;
+    background-position: center;
+    background-repeat: repeat-x;
+    filter: drop-shadow(0 0 3px rgba(255,214,120,0.8));
+    opacity: 0.9;
+  }
+  .marquee-inner { padding: 0.9rem 1.1rem 1rem; }
+
+  .marquee-eyebrow {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #ffcf6a;
+    text-shadow: 0 0 8px rgba(255,180,80,0.5);
+    margin-bottom: 0.1rem;
+  }
+  .marquee-title {
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    color: #fdf6e9;
+  }
+
+  .marquee-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 2.5rem;
+    padding: 0 0.85rem;
+    border-radius: 0.65rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #f4ede0;
+    background: rgba(255,255,255,0.1);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+    transition: background 120ms;
+    white-space: nowrap;
+  }
+  .marquee-btn:hover { background: rgba(255,255,255,0.18); }
+  .marquee-btn-accent {
+    background: var(--color-accent);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
+  }
+  .marquee-btn-accent:hover { filter: brightness(1.08); background: var(--color-accent); }
+
+  /* Ticket-stub filter tabs */
+  .ticket {
+    position: relative;
+    height: 2.25rem;
+    padding: 0 0.9rem;
+    border-radius: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+    color: #efe6d6;
+    background: rgba(255,255,255,0.08);
+    /* notched ticket edges */
+    -webkit-mask:
+      radial-gradient(circle 5px at 0 50%, transparent 98%, #000) left,
+      radial-gradient(circle 5px at 100% 50%, transparent 98%, #000) right;
+    -webkit-mask-size: 51% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask:
+      radial-gradient(circle 5px at 0 50%, transparent 98%, #000) left,
+      radial-gradient(circle 5px at 100% 50%, transparent 98%, #000) right;
+    mask-size: 51% 100%;
+    mask-repeat: no-repeat;
+    transition: background 120ms, color 120ms;
+  }
+  .ticket.is-on {
+    background: #ffcf6a;
+    color: #2a1e10;
+  }
+
+  /* ===== Film-strip video cards ===== */
+  .film-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 0.9rem;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 6px 16px rgba(0,0,0,0.06);
+    transition: box-shadow 150ms, transform 150ms;
+  }
+  .film-card:hover {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 12px 26px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
+  }
+  /* Sprocket-hole strip above the thumbnail */
+  .film-strip {
+    height: 0.85rem;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 0.35rem, #e9e2d4 0.35rem 0.75rem),
+      #1a1420;
+    background-blend-mode: normal;
+    position: relative;
+  }
+  .film-strip::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, #1a1420 0 42%, transparent 46%);
+    background-size: 0.75rem 0.85rem;
+    background-position: 0.05rem center;
+    background-repeat: repeat-x;
+  }
+  :global(.dark) .film-strip {
+    background: repeating-linear-gradient(90deg, transparent 0 0.35rem, #3a332a 0.35rem 0.75rem), #0d0a11;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .film-card:hover { transform: none; }
+  }
+</style>
