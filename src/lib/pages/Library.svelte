@@ -20,7 +20,6 @@
   } from '$lib/filters'
   import { onMount } from 'svelte'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
-  import PageHeader from '$lib/components/ui/PageHeader.svelte'
   import IconButton from '$lib/components/ui/IconButton.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
   import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte'
@@ -457,29 +456,32 @@
 />
 
 <div class="max-w-6xl mx-auto">
-  <!-- Header with type navigation -->
-  <PageHeader
-    title={typeInfo[type].plural}
-    icon={typeInfo[type].icon}
-    subtitle="{typeMedia.length} item{typeMedia.length === 1 ? '' : 's'}"
-  >
-    {#snippet children()}
-      <!-- Type pills -->
-      <div class="flex justify-center gap-2">
+  <!-- Marquee header with type navigation -->
+  <div class="marquee mb-5">
+    <div class="marquee-lights" aria-hidden="true"></div>
+    <div class="marquee-inner">
+      <div class="flex items-end justify-between gap-3 flex-wrap">
+        <div class="min-w-0">
+          <p class="marquee-eyebrow">Now showing</p>
+          <h1 class="marquee-title">{typeInfo[type].plural}</h1>
+        </div>
+        <span class="marquee-count">{typeMedia.length} item{typeMedia.length === 1 ? '' : 's'}</span>
+      </div>
+
+      <!-- Type tickets -->
+      <div class="flex gap-2 overflow-x-auto scrollbar-none mt-3">
         {#each libraryTypes as t (t)}
           <button
             type="button"
-            class="px-4 py-2.5 rounded-full text-sm font-medium transition-colors touch-manipulation {t === type
-              ? 'bg-accent text-white'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}"
+            class="ticket {t === type ? 'is-on' : ''}"
             onclick={() => navigate(`/library/${t === 'tv' ? 'tv' : t + 's'}`)}
           >
             {typeInfo[t].plural}
           </button>
         {/each}
       </div>
-    {/snippet}
-  </PageHeader>
+    </div>
+  </div>
 
   <!-- Action bar -->
   <div class="flex items-center justify-between gap-2 mb-4">
@@ -821,4 +823,72 @@
       opacity: 1;
     }
   }
+
+  /* ===== Cinema marquee header ===== */
+  .marquee {
+    position: relative;
+    border-radius: 1.1rem;
+    padding-top: 0.5rem;
+    background:
+      radial-gradient(120% 140% at 50% -20%, color-mix(in srgb, var(--color-accent) 55%, #1a1420) 0%, #1a1420 60%, #120e16 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 10px 26px rgba(0,0,0,0.28);
+    overflow: hidden;
+  }
+  .marquee-lights {
+    height: 0.5rem;
+    background-image: radial-gradient(circle, #ffe9a8 0 40%, transparent 45%);
+    background-size: 1.05rem 0.5rem;
+    background-position: center;
+    background-repeat: repeat-x;
+    filter: drop-shadow(0 0 3px rgba(255,214,120,0.8));
+    opacity: 0.9;
+  }
+  .marquee-inner { padding: 0.9rem 1.1rem 1rem; }
+  .marquee-eyebrow {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #ffcf6a;
+    text-shadow: 0 0 8px rgba(255,180,80,0.5);
+    margin-bottom: 0.1rem;
+  }
+  .marquee-title {
+    font-size: 1.7rem;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    color: #fdf6e9;
+  }
+  .marquee-count {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: rgba(253,246,233,0.7);
+    padding-bottom: 0.2rem;
+  }
+
+  /* Ticket-stub type tabs */
+  .ticket {
+    position: relative;
+    height: 2.25rem;
+    padding: 0 0.95rem;
+    border-radius: 0.5rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    white-space: nowrap;
+    color: #efe6d6;
+    background: rgba(255,255,255,0.08);
+    -webkit-mask:
+      radial-gradient(circle 5px at 0 50%, transparent 98%, #000) left,
+      radial-gradient(circle 5px at 100% 50%, transparent 98%, #000) right;
+    -webkit-mask-size: 51% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask:
+      radial-gradient(circle 5px at 0 50%, transparent 98%, #000) left,
+      radial-gradient(circle 5px at 100% 50%, transparent 98%, #000) right;
+    mask-size: 51% 100%;
+    mask-repeat: no-repeat;
+    transition: background 120ms, color 120ms;
+  }
+  .ticket.is-on { background: #ffcf6a; color: #2a1e10; }
 </style>

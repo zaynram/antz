@@ -9,6 +9,8 @@
   import { toast } from 'svelte-sonner'
   import { isYouTubeAPIConfigured, requestAccessToken } from '$lib/services/youtube-sync'
   import { ACCENT_PRESETS, DEFAULT_ACCENT_Z, DEFAULT_ACCENT_T } from '$lib/accents'
+  import { TAB_DEFS, DEFAULT_BOTTOM_TABS, MAX_BOTTOM_TABS, tabDef } from '$lib/tabs'
+  import { ArrowUp, ArrowDown, Minus, Plus as PlusIcon } from 'lucide-svelte'
 
   interface Props {
     navigate: (path: string) => void
@@ -36,6 +38,7 @@
   let localNoteSignature = $state('')
   let localNoteAutoToneShift = $state(true)
   let localShowIdentityPill = $state(true)
+  let localBottomTabs = $state<string[]>([])
 
   // App state
   let isReloading = $state(false)
@@ -100,6 +103,7 @@
       localNoteSignature = $currentPreferences.noteSignature ?? ''
       localNoteAutoToneShift = $currentPreferences.noteAutoToneShift ?? true
       localShowIdentityPill = $currentPreferences.showIdentityPill ?? true
+      localBottomTabs = [...($currentPreferences.bottomTabs ?? DEFAULT_BOTTOM_TABS)]
       previousUser = $activeUser
     }
   })
@@ -199,6 +203,7 @@
         noteSignature: localNoteSignature.trim() || undefined,
         noteAutoToneShift: localNoteAutoToneShift,
         showIdentityPill: localShowIdentityPill,
+        bottomTabs: [...localBottomTabs],
         lastUpdated: Date.now()
       }
     }))
@@ -309,6 +314,39 @@
   function handleIdentityPillToggle(): void {
     hapticLight()
     localShowIdentityPill = !localShowIdentityPill
+    savePreferences()
+  }
+
+  // --- Bottom tab bar configuration ---
+  let availableTabs = $derived(TAB_DEFS.filter(t => !localBottomTabs.includes(t.key)))
+
+  function addBottomTab(key: string): void {
+    if (localBottomTabs.length >= MAX_BOTTOM_TABS || localBottomTabs.includes(key)) return
+    hapticLight()
+    localBottomTabs = [...localBottomTabs, key]
+    savePreferences()
+  }
+
+  function removeBottomTab(key: string): void {
+    if (localBottomTabs.length <= 1) return // keep at least one tab
+    hapticLight()
+    localBottomTabs = localBottomTabs.filter(k => k !== key)
+    savePreferences()
+  }
+
+  function moveBottomTab(index: number, dir: -1 | 1): void {
+    const target = index + dir
+    if (target < 0 || target >= localBottomTabs.length) return
+    hapticLight()
+    const next = [...localBottomTabs]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    localBottomTabs = next
+    savePreferences()
+  }
+
+  function resetBottomTabs(): void {
+    hapticLight()
+    localBottomTabs = [...DEFAULT_BOTTOM_TABS]
     savePreferences()
   }
 
@@ -876,6 +914,81 @@
           <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {localShowIdentityPill ? 'translate-x-5' : ''}"></span>
         </span>
       </button>
+
+      <!-- Bottom tab bar configuration -->
+      {#if localNavMode === 'bottom-tabs'}
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium">Bottom bar tabs</span>
+            <button type="button" class="text-xs text-accent" onclick={resetBottomTabs}>Reset</button>
+          </div>
+          <p class="text-xs text-slate-400 mb-3">Choose up to {MAX_BOTTOM_TABS} tabs and drag their order with the arrows. The rest live under "More".</p>
+
+          <!-- On the bar (ordered) -->
+          <ul class="space-y-2 mb-3">
+            {#each localBottomTabs as key, i (key)}
+              {@const def = tabDef(key)}
+              {#if def}
+                {@const TabIcon = def.icon}
+                <li class="flex items-center gap-2 p-2 rounded-xl border border-[var(--color-border)] bg-surface-2">
+                  <TabIcon size={18} class="text-accent shrink-0" />
+                  <span class="flex-1 text-sm font-medium truncate">{def.label}</span>
+                  <button
+                    type="button"
+                    class="btn-icon-sm touch-sm disabled:opacity-30"
+                    disabled={i === 0}
+                    onclick={() => moveBottomTab(i, -1)}
+                    aria-label="Move {def.label} up"
+                  >
+                    <ArrowUp size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-icon-sm touch-sm disabled:opacity-30"
+                    disabled={i === localBottomTabs.length - 1}
+                    onclick={() => moveBottomTab(i, 1)}
+                    aria-label="Move {def.label} down"
+                  >
+                    <ArrowDown size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-icon-sm touch-sm hover:text-red-500 disabled:opacity-30"
+                    disabled={localBottomTabs.length <= 1}
+                    onclick={() => removeBottomTab(key)}
+                    aria-label="Remove {def.label}"
+                  >
+                    <Minus size={16} />
+                  </button>
+                </li>
+              {/if}
+            {/each}
+          </ul>
+
+          <!-- Available to add -->
+          {#if availableTabs.length > 0}
+            <span class="block text-xs text-slate-400 mb-2">Available</span>
+            <div class="flex flex-wrap gap-2">
+              {#each availableTabs as def (def.key)}
+                {@const TabIcon = def.icon}
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full border border-[var(--color-border)] text-sm font-medium disabled:opacity-40 hover:border-accent transition-colors touch-manipulation"
+                  disabled={localBottomTabs.length >= MAX_BOTTOM_TABS}
+                  onclick={() => addBottomTab(def.key)}
+                >
+                  <TabIcon size={15} />
+                  <span>{def.label}</span>
+                  <PlusIcon size={14} class="text-accent" />
+                </button>
+              {/each}
+            </div>
+            {#if localBottomTabs.length >= MAX_BOTTOM_TABS}
+              <p class="text-xs text-slate-400 mt-2">Remove a tab to add another (max {MAX_BOTTOM_TABS}).</p>
+            {/if}
+          {/if}
+        </div>
+      {/if}
     </section>
 
     <!-- Typography Settings -->
