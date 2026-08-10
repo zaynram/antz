@@ -7,6 +7,7 @@ import {
 } from "../firebase"
 import type { UserId, UserPreferences, UserPreferencesMap } from "../types"
 import { DEFAULT_ACCENT_Z, DEFAULT_ACCENT_T } from "../accents"
+import { DEFAULT_BOTTOM_TABS } from "../tabsConfig"
 
 // Touch device detection store
 // Uses pointer: coarse media query which is more reliable than touch event detection
@@ -43,6 +44,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         reduceMotion: false,
         noteAutoToneShift: true,
         showIdentityPill: true,
+        bottomTabs: [...DEFAULT_BOTTOM_TABS],
         lastUpdated: Date.now(),
     },
     T: {
@@ -57,6 +59,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         reduceMotion: false,
         noteAutoToneShift: true,
         showIdentityPill: true,
+        bottomTabs: [...DEFAULT_BOTTOM_TABS],
         lastUpdated: Date.now(),
     },
 }
@@ -147,6 +150,7 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
         "noteSignature",
         "noteAutoToneShift",
         "showIdentityPill",
+        "bottomTabs",
     ]
 
     for (const userId of ["Z", "T"] as const) {
@@ -166,6 +170,12 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
                 if (!aLoc && !bLoc) continue
                 if (!aLoc || !bLoc) return false
                 if (aLoc.lat !== bLoc.lat || aLoc.lng !== bLoc.lng) return false
+            } else if (key === "bottomTabs") {
+                const aArr = aVal as string[] | undefined
+                const bArr = bVal as string[] | undefined
+                if (!aArr && !bArr) continue
+                if (!aArr || !bArr || aArr.length !== bArr.length) return false
+                if (aArr.some((v, i) => v !== bArr[i])) return false
             } else if (aVal !== bVal) {
                 return false
             }

@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { Home, Library, StickyNote, MapPin, MoreHorizontal } from 'lucide-svelte'
+  import { MoreHorizontal } from 'lucide-svelte'
   import { navMode } from '$lib/stores/nav'
+  import { currentPreferences } from '$lib/stores/app'
+  import { TAB_DEFS, resolveTabs, type TabDef } from '$lib/tabs'
   import BottomSheet from './ui/BottomSheet.svelte'
-  import { Search, Video, Heart, Settings } from 'lucide-svelte'
 
   interface Props {
     activeRoute: string
@@ -13,21 +14,15 @@
 
   let moreOpen = $state(false)
 
-  const tabs = [
-    { path: '/', label: 'Home', icon: Home },
-    { path: '/library/movies', label: 'Library', icon: Library, matchPrefix: '/library' },
-    { path: '/notes', label: 'Notes', icon: StickyNote },
-    { path: '/places', label: 'Places', icon: MapPin },
-  ]
+  // Primary tabs come from the user's configuration; everything else falls
+  // into the "More" sheet.
+  let primaryTabs = $derived(resolveTabs($currentPreferences?.bottomTabs))
+  let moreItems = $derived.by(() => {
+    const shown = new Set(primaryTabs.map(t => t.key))
+    return TAB_DEFS.filter(t => !shown.has(t.key))
+  })
 
-  const moreItems = [
-    { path: '/search', label: 'Search', icon: Search },
-    { path: '/videos', label: 'Videos', icon: Video },
-    { path: '/profiles', label: 'Profiles', icon: Heart },
-    { path: '/settings', label: 'Settings', icon: Settings },
-  ]
-
-  function isActive(tab: { path: string; matchPrefix?: string }): boolean {
+  function isActive(tab: TabDef): boolean {
     if (tab.matchPrefix) return activeRoute.startsWith(tab.matchPrefix)
     return activeRoute === tab.path
   }
@@ -44,7 +39,7 @@
     aria-label="Main navigation"
   >
     <div class="flex items-stretch h-14">
-      {#each tabs as tab (tab.path)}
+      {#each primaryTabs as tab (tab.key)}
         {@const active = isActive(tab)}
         <button
           type="button"
@@ -59,27 +54,29 @@
         </button>
       {/each}
 
-      <!-- More button -->
-      <button
-        type="button"
-        aria-label="More"
-        class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors touch-manipulation text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-        onclick={() => { moreOpen = true }}
-      >
-        <MoreHorizontal size={22} />
-        <span class="text-[10px] font-medium">More</span>
-      </button>
+      {#if moreItems.length > 0}
+        <!-- More button -->
+        <button
+          type="button"
+          aria-label="More"
+          class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors touch-manipulation text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          onclick={() => { moreOpen = true }}
+        >
+          <MoreHorizontal size={22} />
+          <span class="text-[10px] font-medium">More</span>
+        </button>
+      {/if}
     </div>
   </nav>
 
   <BottomSheet open={moreOpen} onClose={() => { moreOpen = false }} title="More">
     {#snippet children()}
       <nav class="space-y-1 py-2">
-        {#each moreItems as item (item.path)}
+        {#each moreItems as item (item.key)}
           <button
             type="button"
             class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors touch-manipulation
-              {activeRoute === item.path ? 'bg-accent/10 text-accent' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}"
+              {isActive(item) ? 'bg-accent/10 text-accent' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}"
             onclick={() => handleMoreItem(item.path)}
           >
             <item.icon size={20} />

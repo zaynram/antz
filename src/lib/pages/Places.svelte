@@ -9,7 +9,6 @@
   import PlaceSuggestions from '$lib/components/PlaceSuggestions.svelte'
   import LocationPicker from '$lib/components/LocationPicker.svelte'
   import PlaceDetailModal from '$lib/components/PlaceDetailModal.svelte'
-  import PageHeader from '$lib/components/ui/PageHeader.svelte'
   import IconButton from '$lib/components/ui/IconButton.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
   import Tabs from '$lib/components/ui/Tabs.svelte'
@@ -309,11 +308,24 @@
 />
 
 <div class="max-w-4xl mx-auto">
-  <PageHeader
-    title="Places"
-    icon={MapPin}
-    subtitle="{places.length} place{places.length === 1 ? '' : 's'}"
-  />
+  <!-- Travel-journal header -->
+  <div class="journal mb-5">
+    <div class="journal-inner">
+      <div class="flex items-end justify-between gap-3 flex-wrap">
+        <div class="min-w-0">
+          <p class="journal-eyebrow">Our map</p>
+          <h1 class="journal-title">Places</h1>
+        </div>
+        <span class="journal-count">
+          {#if places.length > 0}
+            {places.filter(p => p.visited).length}/{places.length} visited
+          {:else}
+            0 places
+          {/if}
+        </span>
+      </div>
+    </div>
+  </div>
 
   <!-- Action Bar -->
   <div class="flex items-center justify-between gap-2 mb-4">
@@ -482,13 +494,15 @@
       {@const Icon = categoryIcons[place.category]}
       {@const rating = getPlaceDisplayRating(place)}
       <div
-        class="group card p-4 transition-all cursor-pointer hover:border-accent"
-        class:opacity-70={place.visited}
+        class="group card p-4 transition-all cursor-pointer hover:border-accent relative overflow-hidden"
         onclick={() => selectedPlace = place}
         role="button"
         tabindex="0"
         onkeydown={(e) => e.key === 'Enter' && (selectedPlace = place)}
       >
+        {#if place.visited}
+          <span class="visited-stamp" aria-hidden="true">Visited</span>
+        {/if}
         <div class="flex items-start gap-4">
           <!-- Icon -->
           <div class="shrink-0 w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
@@ -498,7 +512,7 @@
           <!-- Content -->
           <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between gap-2">
-              <h3 class="font-medium" class:line-through={place.visited}>{place.name}</h3>
+              <h3 class="font-medium">{place.name}</h3>
               {#if rating}
                 <div class="shrink-0 flex items-center gap-0.5 text-amber-400">
                   <span>★</span>
@@ -576,5 +590,71 @@
     .group:active .opacity-0 {
       opacity: 1;
     }
+  }
+
+  /* ===== Travel-journal / passport header ===== */
+  .journal {
+    position: relative;
+    border-radius: 1.1rem;
+    background:
+      radial-gradient(120% 140% at 50% -20%, color-mix(in srgb, var(--color-accent) 30%, #4a3524) 0%, #3d2b1c 55%, #2c1e14 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 10px 26px rgba(0,0,0,0.28);
+    overflow: hidden;
+  }
+  /* stitched dashed border, like a passport page */
+  .journal::before {
+    content: "";
+    position: absolute;
+    inset: 0.5rem;
+    border: 1.5px dashed rgba(255,236,200,0.35);
+    border-radius: 0.7rem;
+    pointer-events: none;
+  }
+  .journal-inner { position: relative; padding: 1.1rem 1.3rem; }
+  .journal-eyebrow {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #e9c893;
+    text-shadow: 0 0 8px rgba(220,170,90,0.35);
+    margin-bottom: 0.1rem;
+  }
+  .journal-title {
+    font-size: 1.7rem;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    color: #fbf1df;
+  }
+  .journal-count {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: rgba(251,241,223,0.72);
+    padding-bottom: 0.2rem;
+  }
+
+  /* ===== "Visited" rubber stamp on place cards ===== */
+  .visited-stamp {
+    position: absolute;
+    bottom: 0.45rem;
+    right: 0.6rem;
+    transform: rotate(-11deg);
+    padding: 0.12rem 0.5rem;
+    border: 2px solid rgba(5,150,105,0.55);
+    border-radius: 0.3rem;
+    color: rgba(5,150,105,0.7);
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    pointer-events: none;
+    opacity: 0.85;
+    mix-blend-mode: multiply;
+  }
+  :global(.dark) .visited-stamp {
+    border-color: rgba(52,211,153,0.5);
+    color: rgba(52,211,153,0.75);
+    mix-blend-mode: screen;
   }
 </style>
