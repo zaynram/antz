@@ -68,6 +68,7 @@ export interface UserPreferences {
     noteAutoToneShift?: boolean // Auto hue-shift note palette when both accents collide (default true)
     showIdentityPill?: boolean // Show the floating identity switcher (default true)
     bottomTabs?: string[] // Ordered tab keys shown in the bottom bar (rest go under "More")
+    maxTabsShown?: number // How many chosen tabs render before overflowing to "More"
 }
 
 export type UserPreferencesMap = Record<UserId, UserPreferences>

@@ -4,7 +4,6 @@
   import { hapticLight } from '$lib/haptics'
   import { getIOSCompatibleImageUrl } from '$lib/ios-images'
   import {
-    Search,
     Library,
     Film,
     Tv,
@@ -17,7 +16,6 @@
     X,
     LogOut,
     ChevronRight,
-    Heart,
     Home
   } from 'lucide-svelte'
 
@@ -116,11 +114,9 @@
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
-    { path: '/search', label: 'Search', icon: Search },
     { path: '/videos', label: 'Videos', icon: Video },
     { path: '/notes', label: 'Notes', icon: StickyNote },
     { path: '/places', label: 'Places', icon: MapPin },
-    { path: '/profiles', label: 'Profiles', icon: Heart },
   ]
 
   const libraryItems = [

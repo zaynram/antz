@@ -7,6 +7,7 @@
   import { hapticLight, hapticSuccess } from '$lib/haptics'
   import { activeUser, displayNames, userPreferences } from '$lib/stores/app'
   import { DEFAULT_ACCENT } from '$lib/accents'
+  import { consumeQueryParam } from '$lib/stores/nav'
   import type { ProfileItem, ProfileCategory, UserId } from '$lib/types'
   import { Heart, Pencil, Plus, Star, Trash2, Gift, Coffee, Music, Film, BookOpen, Zap, Sparkles, Palette, Users, MapPin, Utensils } from 'lucide-svelte'
   import { onMount } from 'svelte'
@@ -51,6 +52,10 @@
   let viewMode = $state<ViewMode>('both')
 
   onMount(() => {
+    // Arriving from the identity pill: /profiles?view=mine|theirs
+    const view = consumeQueryParam('view')
+    if (view === 'mine' || view === 'theirs' || view === 'both') viewMode = view
+
     unsubscribe = subscribeToCollection<ProfileItem>('profiles', (items) => {
       profileItems = items
     })

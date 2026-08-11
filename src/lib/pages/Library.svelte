@@ -19,6 +19,7 @@
     type SortField,
   } from '$lib/filters'
   import { onMount } from 'svelte'
+  import { consumeQueryParam } from '$lib/stores/nav'
   import MediaDetailModal from '$lib/components/MediaDetailModal.svelte'
   import IconButton from '$lib/components/ui/IconButton.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
@@ -86,6 +87,9 @@
   const libraryTypes: MediaType[] = ['movie', 'tv', 'game']
 
   onMount(() => {
+    // Open the add/discover panel directly when arriving via a quick-add link.
+    if (consumeQueryParam('add') !== null) showAddPanel = true
+
     unsubscribe = subscribeToCollection<Media>('media', (items) => {
       media = items
       if (selectedMedia) {
@@ -500,12 +504,6 @@
     </button>
 
     <div class="flex items-center gap-1">
-      <IconButton
-        icon={Search}
-        label="Search"
-        onclick={() => navigate('/')}
-      />
-
       <IconButton label="Change grid size" onclick={cycleGridSize}>
         {#snippet children()}
           <span class="text-xs font-mono">{gridSizeIcons[$mediaGridSize]}</span>
