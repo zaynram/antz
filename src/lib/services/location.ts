@@ -36,6 +36,15 @@ export interface PlaceSuggestion {
   address?: string;
   tags?: Record<string, string>;
   priceLevel?: number; // 0-4 scale for budget (not available from free OSM API)
+  osmClass?: string; // Raw Nominatim class (for richer caller-side mapping)
+  osmType?: string; // Raw Nominatim type
+}
+
+export interface MapBounds {
+  west: number;
+  south: number;
+  east: number;
+  north: number;
 }
 
 // Nominatim endpoint (OSM geocoding)
@@ -227,8 +236,14 @@ const CATEGORY_TO_OSM: Record<PlaceCategory, string[]> = {
   restaurant: ['amenity=restaurant', 'amenity=fast_food'],
   cafe: ['amenity=cafe'],
   bar: ['amenity=bar', 'amenity=pub'],
-  attraction: ['tourism=attraction', 'tourism=museum', 'tourism=theme_park', 'tourism=zoo'],
+  attraction: ['tourism=attraction', 'tourism=theme_park', 'tourism=zoo'],
   park: ['leisure=park', 'leisure=garden', 'leisure=nature_reserve'],
+  hotel: ['tourism=hotel', 'tourism=motel', 'tourism=guest_house', 'tourism=hostel'],
+  shop: ['shop=mall', 'shop=supermarket', 'amenity=marketplace'],
+  museum: ['tourism=museum', 'tourism=gallery'],
+  beach: ['natural=beach', 'leisure=beach_resort'],
+  viewpoint: ['tourism=viewpoint', 'natural=peak'],
+  entertainment: ['amenity=cinema', 'amenity=theatre', 'leisure=amusement_arcade'],
   other: ['tourism=viewpoint', 'amenity=cinema', 'amenity=theatre']
 };
 
@@ -355,6 +370,47 @@ export async function searchPlacesByName(
       coordinates: coords,
       distance: nearCoords ? calculateDistance(nearCoords, coords) : 0,
       address: r.display_name
+    };
+  });
+}
+
+/**
+ * Discover places of a free-text category within a map viewport (bounded).
+ * Used by the Places map's "reroll" discovery. Returns raw candidates with
+ * their OSM class/type so the caller can map to a richer category.
+ */
+export async function discoverInBounds(
+  query: string,
+  bounds: MapBounds,
+  limit: number = 10
+): Promise<PlaceSuggestion[]> {
+  const params: Record<string, string> = {
+    q: query,
+    format: 'json',
+    addressdetails: '1',
+    limit: limit.toString(),
+    // Nominatim viewbox order: left(lng),top(lat),right(lng),bottom(lat)
+    viewbox: [bounds.west, bounds.north, bounds.east, bounds.south].join(','),
+    bounded: '1',
+  };
+  const url = `${NOMINATIM_BASE}/search?` + new URLSearchParams(params);
+  const response = await rateLimitedNominatimFetch(url);
+  if (response.ok === false) {
+    throw new Error(`Discovery failed: ${response.status}`);
+  }
+  const results = await response.json();
+  const center: Coordinates = { lat: (bounds.north + bounds.south) / 2, lng: (bounds.east + bounds.west) / 2 };
+  return (results as Array<{ place_id: number; display_name: string; lat: string; lon: string; class: string; type: string }>).map(r => {
+    const coordinates: Coordinates = { lat: parseFloat(r.lat), lng: parseFloat(r.lon) };
+    return {
+      id: `nominatim-${r.place_id}`,
+      name: r.display_name.split(',')[0],
+      category: mapOsmTypeToCategory(r.class, r.type),
+      coordinates,
+      distance: calculateDistance(center, coordinates),
+      address: r.display_name,
+      osmClass: r.class,
+      osmType: r.type,
     };
   });
 }

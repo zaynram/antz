@@ -156,9 +156,19 @@ interface Place extends BaseDocument {
 
   // User tags
   tags?: string[]
+
+  // Budget / price level (0=Free … 4=Very Expensive)
+  budget?: number | null
+
+  // Visited semantics override. When set, wins over the category default
+  // (CATEGORY_DEFS[].revisitDefault): true = track repeat visits (visit count),
+  // false = one-and-done (single "visited" state).
+  revisitable?: boolean
 }
 
-type PlaceCategory = "restaurant" | "cafe" | "bar" | "attraction" | "park" | "other"
+type PlaceCategory =
+  | "restaurant" | "cafe" | "bar" | "park" | "shop" | "entertainment"
+  | "beach" | "attraction" | "museum" | "hotel" | "viewpoint" | "other"
 
 interface PlaceComment {
   id: string

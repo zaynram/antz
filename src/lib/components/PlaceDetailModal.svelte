@@ -7,9 +7,9 @@
   import { activeUser, displayNames } from '$lib/stores/app'
   import type { Place, PlaceCategory, PlaceComment, UserId } from '$lib/types'
   import { getPlaceAverageRating, getPlaceUserRating } from '$lib/types'
+  import { CATEGORY_DEFS, categoryDef, isRevisitable } from '$lib/places'
   import { Timestamp } from 'firebase/firestore'
-  import { Calendar, Check, Coffee, ExternalLink, MapPin, Sparkles, Trees, UtensilsCrossed, Wine, X } from 'lucide-svelte'
-  import type { ComponentType } from 'svelte'
+  import { Calendar, Check, ExternalLink, MapPin, Repeat, X } from 'lucide-svelte'
   import { cycleRating, getStarFill } from '$lib/utils'
 
   interface Props {
@@ -25,26 +25,6 @@
   let editedBudget = $state<number | null>(null)
 
   let previousPlaceId: string | undefined = undefined
-
-  const categoryIcons: Record<PlaceCategory, ComponentType> = {
-    restaurant: UtensilsCrossed,
-    cafe: Coffee,
-    bar: Wine,
-    attraction: Sparkles,
-    park: Trees,
-    other: MapPin
-  }
-
-  const categoryLabels: Record<PlaceCategory, string> = {
-    restaurant: 'Restaurant',
-    cafe: 'Cafe',
-    bar: 'Bar',
-    attraction: 'Attraction',
-    park: 'Park',
-    other: 'Other'
-  }
-
-  const categories: PlaceCategory[] = ['restaurant', 'cafe', 'bar', 'attraction', 'park', 'other']
 
   $effect(() => {
     if (place && place.id !== previousPlaceId) {
@@ -72,6 +52,12 @@
   async function updateBudget(): Promise<void> {
     if (!place?.id) return
     await updateDocument<Place>('places', place.id, { budget: editedBudget }, $activeUser)
+  }
+
+  async function toggleRevisitable(): Promise<void> {
+    if (!place?.id) return
+    hapticLight()
+    await updateDocument<Place>('places', place.id, { revisitable: !isRevisitable(place) }, $activeUser)
   }
 
   async function updateLocation(location: { lat: number; lng: number; address?: string } | undefined): Promise<void> {
@@ -227,7 +213,8 @@
 </script>
 
 {#if place}
-  {@const CategoryIcon = categoryIcons[place.category]}
+  {@const CategoryIcon = categoryDef(place.category).icon}
+  {@const revisit = isRevisitable(place)}
   <Modal open={true} onclose={onClose} title={place.name}>
     {#snippet header()}
       <!-- Header -->
@@ -246,8 +233,8 @@
           <div class="flex-1 min-w-0">
             <h2 class="text-xl font-bold truncate">{place.name}</h2>
             <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              <span class="capitalize">{categoryLabels[place.category]}</span>
-              {#if place.visitDates?.length}
+              <span>{categoryDef(place.category).label}</span>
+              {#if revisit && place.visitDates?.length}
                 <span>·</span>
                 <span>{place.visitDates.length} visit{place.visitDates.length === 1 ? '' : 's'}</span>
               {/if}
@@ -287,10 +274,23 @@
             <Check size={20} />
             <span>{place.visited ? 'Visited' : 'Mark as Visited'}</span>
           </button>
+
+          <button
+            type="button"
+            class="flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-medium transition-colors touch-manipulation {revisit
+              ? 'bg-accent/10 text-accent'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}"
+            onclick={toggleRevisitable}
+            title={revisit ? 'Tracking repeat visits' : 'One-and-done'}
+            aria-pressed={revisit}
+          >
+            <Repeat size={18} />
+            <span class="text-sm">{revisit ? 'Repeat' : 'One-time'}</span>
+          </button>
         </div>
 
         <!-- Visit history -->
-        {#if place.visitDates?.length}
+        {#if revisit && place.visitDates?.length}
           <div>
             <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Visit History</span>
             <div class="flex flex-wrap gap-2">
@@ -311,8 +311,8 @@
           </div>
         {/if}
 
-        <!-- Add visit with date options -->
-        {#if place.visited}
+        <!-- Add visit with date options (only when tracking repeat visits) -->
+        {#if place.visited && revisit}
           <div>
             {#if showMode === 'single'}
               <div class="flex flex-wrap gap-2 items-end">
@@ -421,8 +421,8 @@
               onchange={updateCategory}
               class="input-sm"
             >
-              {#each categories as cat}
-                <option value={cat}>{categoryLabels[cat]}</option>
+              {#each CATEGORY_DEFS as def}
+                <option value={def.key}>{def.label}</option>
               {/each}
             </select>
           </div>
