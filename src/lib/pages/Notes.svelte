@@ -12,7 +12,7 @@
   import { DEFAULT_ACCENT } from '$lib/accents'
   import type { Note, NoteColor, UserId } from '$lib/types'
   import { Timestamp, type Timestamp as TimestampType } from 'firebase/firestore'
-  import { Archive, ArchiveRestore, Check, CheckCheck, Image as ImageIcon, Pencil, Pin, Reply, Search, SlidersHorizontal, ArrowUpDown, StickyNote, Trash2, X } from 'lucide-svelte'
+  import { Archive, ArchiveRestore, Check, CheckCheck, Image as ImageIcon, Pencil, Pin, Reply, Search, SlidersHorizontal, ArrowUpDown, StickyNote, Trash2, X, Link2, Unlink } from 'lucide-svelte'
   import { onMount } from 'svelte'
   import { toast } from 'svelte-sonner'
 
@@ -300,6 +300,45 @@
     }
   }
 
+  // ===== Linking / unlinking notes into threads =====
+  // Link the selected notes (and every note already sharing their threads) into
+  // one thread rooted at the earliest note.
+  async function bulkLink(): Promise<void> {
+    const faceIds = [...selectedIds]
+    if (faceIds.length < 2) return
+    const keys = new Set<string>()
+    for (const id of faceIds) {
+      const n = notes.find(x => x.id === id)
+      if (n) keys.add(threadKeyOf(n))
+    }
+    if (keys.size < 2) { toast('Those notes are already linked'); return }
+    const members = notes.filter(n => !n.archived && keys.has(threadKeyOf(n)))
+    const root = [...members].sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))[0]
+    const rootKey = root.threadId ?? root.id ?? ''
+    if (!rootKey) return
+    hapticSuccess()
+    for (const m of members) {
+      if (m.id === rootKey) continue
+      await updateDocument<Note>('notes', m.id!, { threadId: rootKey, replyTo: root.id! }, $activeUser)
+    }
+    toast.success(`Linked ${members.length} notes into a thread`)
+    selectedIds = new Set(); selectMode = false
+  }
+
+  // Detach a single note from its thread; it becomes its own standalone note.
+  async function unlinkNote(note: Note): Promise<void> {
+    if (!note.id) return
+    hapticMedium()
+    await updateDocument<Note>('notes', note.id, { threadId: note.id, replyTo: '' }, $activeUser)
+    toast.success('Note unlinked')
+  }
+
+  // Whether a note can be detached from the currently-open thread (not the root).
+  function canUnlink(note: Note): boolean {
+    const root = threadNotes[0]
+    return !!root && note.id !== root.id && threadNotes.length > 1
+  }
+
   // ===== Board view (new/all) persisted per session =====
   $effect(() => {
     try { sessionStorage.setItem('notes-board-view', boardView) } catch { /* private mode */ }
@@ -463,17 +502,28 @@
     { value: 'T', label: 'T' },
   ]
 
-  // Optional manual override of the board background colour.
+  // Optional manual override of the board background colour. When set, it tints
+  // the backdrop AND the control surfaces (rail + filter tray) so the whole
+  // board reads as one coloured object.
   let corkStyle = $derived.by(() => {
     const c = $currentPreferences?.corkboardColor?.trim()
-    return c ? `--cork-a:${c};--cork-b:${c};--cork-c:${c}` : ''
+    if (!c) return ''
+    return [
+      `--cork-a:${c}`,
+      `--cork-b:color-mix(in srgb, ${c} 88%, #000)`,
+      `--cork-c:color-mix(in srgb, ${c} 74%, #000)`,
+      // Darker framed wood-substitute for the control rail.
+      `--cork-rail:linear-gradient(180deg, color-mix(in srgb, ${c} 68%, #241a0e) 0%, color-mix(in srgb, ${c} 52%, #1c140a) 100%)`,
+      // Softly tinted tray that still keeps inputs legible.
+      `--cork-tray:color-mix(in srgb, ${c} 30%, var(--color-surface))`,
+    ].join(';')
   })
 </script>
 
 <!-- Full-bleed cork backdrop (fixed behind the page content) -->
 <div class="cork-backdrop" style={corkStyle} aria-hidden="true"></div>
 
-<div class="corkboard-page">
+<div class="corkboard-page" style={corkStyle}>
   <!-- Wooden control rail — the board's "tack & pen bin" -->
   <div class="cork-rail">
     <div class="flex items-center gap-2.5 min-w-0">
@@ -1038,6 +1088,7 @@
   <div class="bulk-bar">
     <span class="bulk-count">{selectedIds.size} selected</span>
     <div class="flex items-center gap-1.5">
+      <button type="button" class="bulk-btn" onclick={bulkLink} disabled={selectedIds.size < 2} title="Link into a thread"><Link2 size={16} /><span class="hidden sm:inline">Link</span></button>
       <button type="button" class="bulk-btn" onclick={bulkMarkRead}><Check size={16} /><span class="hidden sm:inline">Read</span></button>
       <button type="button" class="bulk-btn" onclick={bulkArchive}><Archive size={16} /><span class="hidden sm:inline">Archive</span></button>
       <button type="button" class="bulk-btn bulk-danger" onclick={bulkDelete}><Trash2 size={16} /><span class="hidden sm:inline">Delete</span></button>
@@ -1054,7 +1105,14 @@
         <div class="thread-note" style={noteVars(tone, n.customColor)}>
           <div class="flex items-center justify-between mb-1">
             <span class="thread-author">{n.createdBy === $activeUser ? 'You' : getDisplayNameForUser(n.createdBy)}</span>
-            <span class="thread-time">{getRelativeTime(n.createdAt)}</span>
+            <div class="flex items-center gap-1.5">
+              <span class="thread-time">{getRelativeTime(n.createdAt)}</span>
+              {#if canUnlink(n)}
+                <button type="button" class="thread-unlink" onclick={() => unlinkNote(n)} aria-label="Unlink from thread" title="Unlink from thread">
+                  <Unlink size={13} />
+                </button>
+              {/if}
+            </div>
           </div>
           {#if n.title}<h4 class="font-bold text-sm mb-0.5" style="color:var(--note-ink)">{n.title}</h4>{/if}
           {#if n.content}<p class="text-sm whitespace-pre-wrap" style="color:var(--note-ink);opacity:0.85">{n.content}</p>{/if}
@@ -1112,16 +1170,22 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 0.5rem;
+    row-gap: 0.5rem;
     padding: 0.6rem 0.85rem;
     border-radius: 0.9rem;
-    background: linear-gradient(180deg, #9a7b4f 0%, #86683f 100%);
+    background: var(--cork-rail, linear-gradient(180deg, #9a7b4f 0%, #86683f 100%));
     box-shadow:
       inset 0 1px 0 rgba(255,255,255,0.18),
       inset 0 -2px 4px rgba(0,0,0,0.25),
       0 3px 8px rgba(0,0,0,0.25);
     margin-bottom: 0.85rem;
   }
+  /* Title keeps a minimum footprint so the controls wrap to their own row on
+     narrow screens instead of overlapping "Our Board". */
+  .cork-rail > :first-child { flex: 1 1 auto; min-width: 8rem; }
+  .cork-rail > :last-child { flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
 
   .corkboard-pin-icon {
     width: 2rem;
@@ -1201,12 +1265,12 @@
     padding: 0.6rem 0.7rem;
     margin-bottom: 0.85rem;
     border-radius: 0.85rem;
-    background: rgba(255,255,255,0.82);
+    background: var(--cork-tray, rgba(255,255,255,0.82));
     backdrop-filter: blur(4px);
     box-shadow: 0 2px 8px rgba(0,0,0,0.12);
   }
   :global(.dark) .filter-tray {
-    background: rgba(30,26,22,0.8);
+    background: var(--cork-tray, rgba(30,26,22,0.8));
   }
 
   .tray-input {
@@ -1777,6 +1841,7 @@
     font-weight: 700;
     background: var(--color-surface-2);
   }
+  .bulk-btn:disabled { opacity: 0.4; pointer-events: none; }
   .bulk-danger { color: #ef4444; }
 
   /* ===== Thread modal notes ===== */
@@ -1788,4 +1853,11 @@
   }
   .thread-author { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--note-ink); opacity: 0.6; }
   .thread-time { font-size: 0.65rem; color: var(--note-ink); opacity: 0.5; }
+  .thread-unlink {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.5rem; height: 1.5rem; border-radius: 50%;
+    color: var(--note-ink); opacity: 0.5;
+    transition: opacity 120ms, background 120ms;
+  }
+  .thread-unlink:hover { opacity: 0.9; background: rgba(0,0,0,0.08); }
 </style>

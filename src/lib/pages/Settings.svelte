@@ -321,6 +321,24 @@
     savePreferences()
   }
 
+  // Warm, palette-compatible board colours that read well with the sticky-note
+  // tones (default cork tan first).
+  const CORKBOARD_PRESETS: Array<{ hex: string; label: string }> = [
+    { hex: '#c8a882', label: 'Cork tan' },
+    { hex: '#b08968', label: 'Chestnut' },
+    { hex: '#a3b18a', label: 'Sage' },
+    { hex: '#8fadc4', label: 'Dusty blue' },
+    { hex: '#c9a0b4', label: 'Mauve' },
+    { hex: '#d0a15c', label: 'Honey' },
+    { hex: '#9aa3ad', label: 'Slate' },
+    { hex: '#c58a6b', label: 'Terracotta' },
+  ]
+
+  function selectCorkboardPreset(hex: string): void {
+    hapticLight()
+    localCorkboardColor = hex
+    savePreferences()
+  }
   function handleCorkboardColorChange(): void {
     savePreferences()
   }
@@ -1146,23 +1164,42 @@
       </button>
 
       <!-- Notes board background override -->
-      <div class="flex items-center justify-between gap-3">
-        <span class="text-left">
-          <span class="block text-sm font-medium">Notes board background</span>
-          <span class="block text-xs text-slate-400">Override the corkboard color</span>
-        </span>
-        <div class="flex items-center gap-2 shrink-0">
-          <input
-            type="color"
-            class="w-9 h-9 rounded cursor-pointer border-0"
-            value={localCorkboardColor || '#c8a882'}
-            oninput={(e) => localCorkboardColor = (e.currentTarget as HTMLInputElement).value}
-            onchange={handleCorkboardColorChange}
-            aria-label="Board background color"
-          />
-          {#if localCorkboardColor}
-            <button type="button" class="btn-icon-sm touch-sm" onclick={clearCorkboardColor} aria-label="Reset board background">✕</button>
-          {/if}
+      <div>
+        <div class="flex items-center justify-between gap-3 mb-2">
+          <span class="text-left">
+            <span class="block text-sm font-medium">Notes board background</span>
+            <span class="block text-xs text-slate-400">Tints the board and its controls</span>
+          </span>
+          <div class="flex items-center gap-2 shrink-0">
+            <label class="relative w-9 h-9 rounded-lg cursor-pointer border border-[var(--color-border)] overflow-hidden" title="Custom color" aria-label="Custom board color">
+              <span class="absolute inset-0" style="background:{localCorkboardColor || '#c8a882'}"></span>
+              <input
+                type="color"
+                class="sr-only"
+                value={localCorkboardColor || '#c8a882'}
+                oninput={(e) => localCorkboardColor = (e.currentTarget as HTMLInputElement).value}
+                onchange={handleCorkboardColorChange}
+                aria-label="Board background color"
+              />
+            </label>
+            {#if localCorkboardColor}
+              <button type="button" class="btn-icon-sm touch-sm" onclick={clearCorkboardColor} aria-label="Reset board background">✕</button>
+            {/if}
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          {#each CORKBOARD_PRESETS as preset}
+            <button
+              type="button"
+              class="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm touch-sm transition-transform hover:scale-105 {localCorkboardColor.toLowerCase() === preset.hex ? 'ring-2 ring-accent ring-offset-1 ring-offset-[var(--color-surface)]' : ''}"
+              style="background:{preset.hex}"
+              onclick={() => selectCorkboardPreset(preset.hex)}
+              aria-label={preset.label}
+              title={preset.label}
+            >
+              {#if localCorkboardColor.toLowerCase() === preset.hex}<CheckIcon size={14} />{/if}
+            </button>
+          {/each}
         </div>
       </div>
     </section>

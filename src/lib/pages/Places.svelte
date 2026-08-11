@@ -665,6 +665,10 @@
   /* ===== Map frame + hand-drawn skin ===== */
   .map-frame {
     position: relative;
+    /* Contain Leaflet's internal z-indexes (panes 400, controls 1000) so they
+       can't paint over app modals/overlays that sit above the page. */
+    isolation: isolate;
+    z-index: 0;
     height: 46vh;
     min-height: 300px;
     max-height: 460px;
