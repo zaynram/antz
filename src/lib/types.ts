@@ -197,7 +197,19 @@ export function getDisplayRating(media: Media): number | null {
     return getAverageRating(media)
 }
 
-export type PlaceCategory = "restaurant" | "cafe" | "bar" | "attraction" | "park" | "other"
+export type PlaceCategory =
+    | "restaurant"
+    | "cafe"
+    | "bar"
+    | "attraction"
+    | "park"
+    | "hotel"
+    | "shop"
+    | "museum"
+    | "beach"
+    | "viewpoint"
+    | "entertainment"
+    | "other"
 
 export interface PlaceComment {
     id: string
@@ -220,6 +232,7 @@ export interface Place extends BaseDocument {
     tags?: string[] // User-defined tags
     photos?: string[] // URLs to photos in Google Drive
     budget?: number | null // Price level: 0-4 (0=Free, 1=Inexpensive, 2=Moderate, 3=Expensive, 4=Very Expensive)
+    revisitable?: boolean // Override for visited semantics (true = revisit-likely, false = one-and-done). Defaults by category.
 }
 
 // Place rating helpers (mirror Media rating helpers)
