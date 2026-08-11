@@ -2,6 +2,16 @@ import { derived, writable } from "svelte/store"
 import { subscribeToCollection } from "../firebase"
 import type { HomeActivity, Media, Note, Place } from "../types"
 
+// Label for a note in activity lists: prefer the title, else backfill from the
+// start of the body (truncated), else a neutral placeholder.
+function noteLabel(n: Note): string {
+    const title = n.title?.trim()
+    if (title) return title
+    const body = n.content?.trim().replace(/\s+/g, " ")
+    if (body) return body.length > 48 ? body.slice(0, 47).trimEnd() + "…" : body
+    return "Untitled note"
+}
+
 interface DashboardState {
     recentActivity: HomeActivity[]
     inProgress: Media[]
@@ -44,7 +54,7 @@ function rebuildActivity(): void {
     const noteItems: HomeActivity[] = latestNotes.map(n => ({
         type: "note" as const,
         id: n.id ?? "",
-        title: n.title || "(untitled)",
+        title: noteLabel(n),
         subtitle: n.tags?.[0],
         createdBy: n.createdBy,
         actor: n.updatedBy ?? n.createdBy,

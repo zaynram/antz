@@ -8,12 +8,16 @@
   import { activeUser, currentPreferences, displayNames, userPreferences } from '$lib/stores/app'
   import { consumeQueryParam } from '$lib/stores/nav'
   import { getNotePalette, resolveNoteTone, resolveToneShift, NOTE_TONE_KEYS, type NoteTone } from '$lib/notePalette'
+  import { readableInk } from '$lib/color'
   import { DEFAULT_ACCENT } from '$lib/accents'
   import type { Note, NoteColor, UserId } from '$lib/types'
   import { Timestamp, type Timestamp as TimestampType } from 'firebase/firestore'
-  import { Archive, ArchiveRestore, Check, Image as ImageIcon, Pencil, Pin, Search, SlidersHorizontal, ArrowUpDown, StickyNote, Trash2, X } from 'lucide-svelte'
+  import { Archive, ArchiveRestore, Check, CheckCheck, Image as ImageIcon, Pencil, Pin, Reply, Search, SlidersHorizontal, ArrowUpDown, StickyNote, Trash2, X } from 'lucide-svelte'
   import { onMount } from 'svelte'
   import { toast } from 'svelte-sonner'
+
+  const REACTION_EMOJIS = ['❤️', '😂', '👍', '🔥', '😮', '🥰', '😢']
+  type BoardView = 'new' | 'all'
 
   let notes = $state<Note[]>([])
   let unsubscribe: (() => void) | undefined
@@ -22,11 +26,23 @@
 
   // Compose form state
   let composing = $state(false)
-  let newNote = $state({ title: '', content: '', color: 't0' as NoteColor })
+  let newNote = $state({ title: '', content: '', color: 't0' as NoteColor, customColor: '' })
+  // When replying, the new note is linked into a thread.
+  let replyContext = $state<{ threadId: string; replyTo: string; toName: string } | null>(null)
 
   // View: 'corkboard' | 'archive'
   type ViewKey = 'corkboard' | 'archive'
   let activeView = $state<ViewKey>('corkboard')
+
+  // Board view: 'new' (only unread from the other user) vs 'all'. Persisted per
+  // session; defaults to 'new' so you land on what's fresh.
+  let boardView = $state<BoardView>('new')
+
+  // Thread view (a stack expanded) + reaction menu + multi-select
+  let threadRootId = $state<string | null>(null)
+  let reactionFor = $state<Note | null>(null)
+  let selectMode = $state(false)
+  let selectedIds = $state<Set<string>>(new Set())
 
   // Filter / sort state
   let showFilters = $state(false)
@@ -63,10 +79,26 @@
     return isDark ? tone.bgDark : tone.bgLight
   }
 
-  function noteVars(tone: NoteTone): string {
-    const bg = isDark ? tone.bgDark : tone.bgLight
-    const ink = isDark ? tone.inkDark : tone.inkLight
-    return `--note-bg:${bg};--note-ink:${ink};--note-tack:${tone.tack};`
+  function noteVars(tone: NoteTone, customColor?: string): string {
+    const custom = customColor?.trim()
+    const bg = custom || (isDark ? tone.bgDark : tone.bgLight)
+    const ink = custom ? readableInk(custom) : (isDark ? tone.inkDark : tone.inkLight)
+    const tack = custom || tone.tack
+    return `--note-bg:${bg};--note-ink:${ink};--note-tack:${tack};`
+  }
+
+  // Full inline style for a board note: colour + tilt + vertical jitter (to
+  // break the rigid-column illusion of a masonry).
+  function noteStyle(note: Note): string {
+    return `${noteVars(toneOf(note), note.customColor)}--rot:${getNoteRotation(note.id)}deg;margin-top:${getNoteJitter(note.id)}rem`
+  }
+
+  // Deterministic small top margin so notes don't align across columns.
+  function getNoteJitter(noteId: string | undefined): number {
+    if (!noteId) return 0
+    let hash = 0
+    for (let i = 0; i < noteId.length; i++) hash = (hash * 17 + noteId.charCodeAt(i)) & 0xffffffff
+    return (hash % 5) * 0.35 // 0 .. 1.4rem
   }
 
   function signatureFor(userId: UserId): string {
@@ -87,6 +119,12 @@
     // Open the compose form directly when arriving via a quick-add link.
     if (consumeQueryParam('add') !== null) composing = true
 
+    // Restore the per-session board view (defaults to "new").
+    try {
+      const v = sessionStorage.getItem('notes-board-view')
+      if (v === 'new' || v === 'all') boardView = v
+    } catch { /* private mode */ }
+
     unsubscribe = subscribeToCollection<Note>('notes', (items) => {
       notes = items
     })
@@ -105,27 +143,44 @@
     if (!newNote.title.trim() && !newNote.content.trim()) return
 
     try {
-      await addDocument<Note>(
-        'notes',
-        {
-          type: 'note',
-          title: newNote.title,
-          content: newNote.content,
-          tags: [],
-          read: false,
-          archived: false,
-          color: newNote.color
-        },
-        $activeUser
-      )
-      newNote = { title: '', content: '', color: 't0' }
+      const doc: Partial<Note> = {
+        type: 'note',
+        title: newNote.title,
+        content: newNote.content,
+        tags: [],
+        read: false,
+        archived: false,
+        color: newNote.color,
+      }
+      if (newNote.customColor.trim()) doc.customColor = newNote.customColor.trim()
+      if (replyContext) {
+        doc.threadId = replyContext.threadId
+        doc.replyTo = replyContext.replyTo
+      }
+      await addDocument<Note>('notes', doc as Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>, $activeUser)
+      const wasReply = !!replyContext
+      newNote = { title: '', content: '', color: 't0', customColor: '' }
       composing = false
+      replyContext = null
       hapticSuccess()
-      toast.success('Note pinned to board')
+      toast.success(wasReply ? 'Reply added' : 'Note pinned to board')
     } catch (e) {
       console.error('Failed to pin note:', e)
       toast.error('Failed to pin note')
     }
+  }
+
+  function startReply(note: Note): void {
+    if (!note.id) return
+    replyContext = {
+      threadId: note.threadId ?? note.id,
+      replyTo: note.id,
+      toName: note.createdBy === $activeUser ? 'yourself' : getDisplayNameForUser(note.createdBy),
+    }
+    newNote = { title: '', content: '', color: newNote.color, customColor: '' }
+    composing = true
+    selectedNote = null
+    threadRootId = null
   }
 
   async function saveEditedNote(): Promise<void> {
@@ -134,7 +189,8 @@
       await updateDocument<Note>('notes', editingNote.id, {
         title: editingNote.title,
         content: editingNote.content,
-        color: editingNote.color
+        color: editingNote.color,
+        customColor: editingNote.customColor?.trim() || ''
       }, $activeUser)
       editingNote = null
       hapticSuccess()
@@ -170,6 +226,84 @@
       pinned: !note.pinned
     }, $activeUser)
   }
+
+  // ===== Reactions =====
+  async function toggleReaction(note: Note, emoji: string): Promise<void> {
+    if (!note.id) return
+    hapticLight()
+    const reactions: Record<string, UserId[]> = { ...(note.reactions ?? {}) }
+    const users = new Set(reactions[emoji] ?? [])
+    if (users.has($activeUser)) users.delete($activeUser)
+    else users.add($activeUser)
+    if (users.size === 0) delete reactions[emoji]
+    else reactions[emoji] = [...users]
+    reactionFor = null
+    await updateDocument<Note>('notes', note.id, { reactions }, $activeUser)
+  }
+  function reactionEntries(note: Note): Array<[string, UserId[]]> {
+    return Object.entries(note.reactions ?? {}).filter(([, u]) => u.length > 0)
+  }
+
+  // ===== Long-press → reaction menu =====
+  let pressTimer: ReturnType<typeof setTimeout> | null = null
+  let longPressed = false
+  function onNotePointerDown(note: Note): void {
+    if (selectMode) return
+    longPressed = false
+    if (pressTimer) clearTimeout(pressTimer)
+    pressTimer = setTimeout(() => {
+      longPressed = true
+      hapticMedium()
+      reactionFor = note
+    }, 450)
+  }
+  function cancelPress(): void {
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null }
+  }
+
+  // ===== Multi-select =====
+  function toggleSelectMode(): void {
+    selectMode = !selectMode
+    selectedIds = new Set()
+  }
+  function toggleSelected(id: string | undefined): void {
+    if (!id) return
+    const s = new Set(selectedIds)
+    if (s.has(id)) s.delete(id); else s.add(id)
+    selectedIds = s
+  }
+  async function bulkArchive(): Promise<void> {
+    hapticLight()
+    for (const id of selectedIds) await updateDocument<Note>('notes', id, { archived: true }, $activeUser)
+    toast.success(`Archived ${selectedIds.size} note${selectedIds.size === 1 ? '' : 's'}`)
+    selectedIds = new Set(); selectMode = false
+  }
+  async function bulkMarkRead(): Promise<void> {
+    for (const id of selectedIds) {
+      const n = notes.find(x => x.id === id)
+      if (n && !n.read && n.createdBy !== $activeUser) {
+        await updateDocument<Note>('notes', id, { read: true, readAt: Timestamp.now() }, $activeUser)
+      }
+    }
+    selectedIds = new Set(); selectMode = false
+  }
+  function bulkDelete(): void {
+    const count = selectedIds.size
+    pendingConfirm = {
+      message: `Tear up ${count} note${count === 1 ? '' : 's'} permanently?`,
+      onConfirm: async () => {
+        pendingConfirm = null
+        for (const id of selectedIds) await deleteDocument('notes', id)
+        toast.success(`Tore up ${count} note${count === 1 ? '' : 's'}`)
+        selectedIds = new Set(); selectMode = false
+      }
+    }
+  }
+
+  // ===== Board view (new/all) persisted per session =====
+  $effect(() => {
+    try { sessionStorage.setItem('notes-board-view', boardView) } catch { /* private mode */ }
+  })
 
   // Confirm dialog state
   let pendingConfirm = $state<{ message: string; onConfirm: () => void } | null>(null)
@@ -253,6 +387,7 @@
   let boardNotes = $derived.by(() => {
     const q = searchText.trim().toLowerCase()
     let list = notes.filter(n => !n.archived)
+    if (boardView === 'new') list = list.filter(n => !n.read && n.createdBy !== $activeUser)
     if (authorFilter !== 'all') list = list.filter(n => n.createdBy === authorFilter)
     if (unreadOnly) list = list.filter(n => !n.read && n.createdBy !== $activeUser)
     if (q) list = list.filter(n =>
@@ -270,8 +405,52 @@
     })
   })
 
+  function threadKeyOf(n: Note): string {
+    return n.threadId ?? n.id ?? ''
+  }
+
+  // Group the filtered board into threads; each renders as a stack whose face
+  // is the most recent note, sorted like the flat board.
+  let boardThreads = $derived.by(() => {
+    const groups = new Map<string, Note[]>()
+    for (const n of boardNotes) {
+      const key = threadKeyOf(n)
+      const arr = groups.get(key)
+      if (arr) arr.push(n); else groups.set(key, [n])
+    }
+    const fullCount = (key: string) => notes.filter(n => !n.archived && threadKeyOf(n) === key).length
+    const list = [...groups.entries()].map(([key, ns]) => {
+      const face = [...ns].sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0))[0]
+      return { key, face, count: fullCount(key) }
+    })
+    return list.sort((a, b) => {
+      if (a.face.pinned && !b.face.pinned) return -1
+      if (!a.face.pinned && b.face.pinned) return 1
+      const ta = a.face.createdAt?.toMillis?.() ?? 0
+      const tb = b.face.createdAt?.toMillis?.() ?? 0
+      return sortMode === 'oldest' ? ta - tb : tb - ta
+    })
+  })
+
+  // Notes belonging to the currently-open thread, oldest first.
+  let threadNotes = $derived(
+    threadRootId
+      ? notes.filter(n => !n.archived && threadKeyOf(n) === threadRootId)
+          .sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))
+      : []
+  )
+
   let totalBoardCount = $derived(notes.filter(n => !n.archived).length)
   let archivedNotes = $derived(notes.filter(n => n.archived))
+
+  // When a thread stack is tapped: open the thread modal if it has replies,
+  // otherwise the single note's detail.
+  function openThread(key: string, face: Note): void {
+    if (selectMode) { toggleSelected(face.id); return }
+    const count = notes.filter(n => !n.archived && threadKeyOf(n) === key).length
+    if (count > 1) { threadRootId = key; markAsRead(face) }
+    else openNoteDetail(face)
+  }
 
   // Unread count from other user
   let unreadCount = $derived(
@@ -283,10 +462,16 @@
     { value: 'Z', label: 'Z' },
     { value: 'T', label: 'T' },
   ]
+
+  // Optional manual override of the board background colour.
+  let corkStyle = $derived.by(() => {
+    const c = $currentPreferences?.corkboardColor?.trim()
+    return c ? `--cork-a:${c};--cork-b:${c};--cork-c:${c}` : ''
+  })
 </script>
 
 <!-- Full-bleed cork backdrop (fixed behind the page content) -->
-<div class="cork-backdrop" aria-hidden="true"></div>
+<div class="cork-backdrop" style={corkStyle} aria-hidden="true"></div>
 
 <div class="corkboard-page">
   <!-- Wooden control rail — the board's "tack & pen bin" -->
@@ -308,11 +493,24 @@
     </div>
 
     <div class="flex items-center gap-1.5">
-      {#if unreadCount > 0 && activeView === 'corkboard'}
-        <span class="unread-bubble">{unreadCount} new</span>
-      {/if}
-
       {#if activeView === 'corkboard'}
+        <div class="view-toggle" role="group" aria-label="Board view">
+          <button type="button" class="view-seg {boardView === 'new' ? 'is-on' : ''}" onclick={() => { boardView = 'new'; hapticLight(); }}>
+            New{#if unreadCount > 0}<span class="view-badge">{unreadCount}</span>{/if}
+          </button>
+          <button type="button" class="view-seg {boardView === 'all' ? 'is-on' : ''}" onclick={() => { boardView = 'all'; hapticLight(); }}>All</button>
+        </div>
+
+        <button
+          type="button"
+          class="rail-btn {selectMode ? 'is-active' : ''}"
+          onclick={toggleSelectMode}
+          aria-label="Select notes"
+          aria-pressed={selectMode}
+        >
+          <CheckCheck size={16} />
+        </button>
+
         <button
           type="button"
           class="rail-btn {showFilters || activeFilterCount > 0 ? 'is-active' : ''}"
@@ -401,15 +599,17 @@
     <div class="notes-board">
       <!-- Compose sticky inline -->
       {#if composing}
-        <div class="compose-sticky" style={noteVars(composeTone)}>
+        <div class="compose-sticky" style={noteVars(composeTone, newNote.customColor)}>
           <div class="sticky-top-tape"></div>
           <div class="p-4 pt-5 space-y-2">
             <div class="flex items-center justify-between mb-1">
-              <span class="compose-eyebrow">New note · {$displayNames[$activeUser]}</span>
+              <span class="compose-eyebrow">
+                {#if replyContext}Replying to {replyContext.toName}{:else}New note · {$displayNames[$activeUser]}{/if}
+              </span>
               <button
                 type="button"
                 class="compose-x"
-                onclick={() => { composing = false; newNote = { title: '', content: '', color: 't0' }; }}
+                onclick={() => { composing = false; replyContext = null; newNote = { title: '', content: '', color: 't0', customColor: '' }; }}
                 aria-label="Discard"
               >
                 <X size={16} />
@@ -428,60 +628,88 @@
               bind:value={newNote.content}
             ></textarea>
 
-            <!-- Tone picker (author's palette) -->
-            <div class="flex items-center gap-2 pt-1">
+            <!-- Tone picker (author's palette) + custom color -->
+            <div class="flex items-center gap-2 pt-1 flex-wrap">
               <span class="compose-eyebrow">Tone</span>
-              <div class="flex gap-1.5">
+              <div class="flex gap-1.5 items-center">
                 {#each NOTE_TONE_KEYS as key, i}
                   <button
                     type="button"
-                    class="touch-sm color-swatch {newNote.color === key ? 'is-selected' : ''}"
+                    class="touch-sm color-swatch {newNote.color === key && !newNote.customColor ? 'is-selected' : ''}"
                     style="background:{swatchBg(myPalette[i])}"
-                    onclick={() => newNote.color = key}
+                    onclick={() => { newNote.color = key; newNote.customColor = ''; }}
                     aria-label="Tone {i + 1}"
                   ></button>
                 {/each}
+                <label class="custom-swatch {newNote.customColor ? 'is-selected' : ''}" style={newNote.customColor ? `background:${newNote.customColor}` : ''} aria-label="Custom color">
+                  <input type="color" class="sr-only" value={newNote.customColor || swatchBg(composeTone)} oninput={(e) => newNote.customColor = (e.currentTarget as HTMLInputElement).value} />
+                  {#if !newNote.customColor}<Pencil size={11} />{/if}
+                </label>
               </div>
             </div>
 
             <div class="flex justify-end pt-1">
               <button type="button" class="pin-btn" onclick={addNote}>
-                <Pin size={14} />
-                Pin it
+                {#if replyContext}<Reply size={14} />Reply{:else}<Pin size={14} />Pin it{/if}
               </button>
             </div>
           </div>
         </div>
       {/if}
 
-      {#if boardNotes.length === 0 && !composing}
+      {#if boardThreads.length === 0 && !composing}
         <div class="cork-empty">
-          <EmptyState
-            icon={StickyNote}
-            title={activeFilterCount > 0 ? 'No notes match' : 'The board is empty'}
-            description={activeFilterCount > 0 ? 'Try clearing the filters.' : `Pin your first note for ${$displayNames[otherUserId]}`}
-          />
+          {#if boardView === 'new'}
+            <EmptyState
+              icon={Check}
+              title="All caught up"
+              description="No new notes from {$displayNames[otherUserId]}."
+              actionLabel="Show the whole board"
+              onAction={() => { boardView = 'all'; hapticLight(); }}
+            />
+          {:else}
+            <EmptyState
+              icon={StickyNote}
+              title={activeFilterCount > 0 ? 'No notes match' : 'The board is empty'}
+              description={activeFilterCount > 0 ? 'Try clearing the filters.' : `Pin your first note for ${$displayNames[otherUserId]}`}
+            />
+          {/if}
         </div>
       {:else}
         <div class="notes-masonry">
-          {#each boardNotes as note (note.id)}
+          {#each boardThreads as thread (thread.key)}
+            {@const note = thread.face}
             {@const isUnread = !note.read && note.createdBy !== $activeUser}
-            {@const rot = getNoteRotation(note.id)}
             {@const sig = signatureFor(note.createdBy)}
+            {@const selected = selectMode && !!note.id && selectedIds.has(note.id)}
+            {@const reacts = reactionEntries(note)}
             <div
-              class="sticky-note {note.pinned ? 'is-pinned' : ''} {isUnread ? 'is-unread' : ''}"
-              style="{noteVars(toneOf(note))}--rot:{rot}deg"
-              onclick={() => openNoteDetail(note)}
+              class="sticky-note {note.pinned ? 'is-pinned' : ''} {isUnread ? 'is-unread' : ''} {thread.count > 1 ? 'is-stack' : ''} {selected ? 'is-selected-note' : ''}"
+              style={noteStyle(note)}
+              onclick={() => { if (longPressed) { longPressed = false; return } openThread(thread.key, note) }}
               role="button"
               tabindex="0"
-              onkeydown={(e) => e.key === 'Enter' && openNoteDetail(note)}
+              onkeydown={(e) => e.key === 'Enter' && openThread(thread.key, note)}
+              onpointerdown={() => onNotePointerDown(note)}
+              onpointerup={cancelPress}
+              onpointermove={cancelPress}
+              onpointerleave={cancelPress}
             >
+              {#if thread.count > 1}
+                <div class="stack-layer stack-layer-2"></div>
+                <div class="stack-layer stack-layer-1"></div>
+              {/if}
+
               <div class="thumbtack {note.pinned ? 'thumbtack-pinned' : ''}">
                 <div class="thumbtack-head"></div>
                 <div class="thumbtack-stem"></div>
               </div>
 
-              {#if isUnread}
+              {#if selectMode}
+                <div class="select-check {selected ? 'is-on' : ''}">
+                  {#if selected}<Check size={13} />{/if}
+                </div>
+              {:else if isUnread}
                 <div class="unread-dot"></div>
               {/if}
 
@@ -503,50 +731,38 @@
                 {/if}
               </div>
 
+              {#if reacts.length}
+                <div class="note-reactions">
+                  {#each reacts as [emoji, users] (emoji)}
+                    <span class="react-chip {users.includes($activeUser) ? 'is-mine' : ''}">{emoji}{#if users.length > 1}<span class="react-n">{users.length}</span>{/if}</span>
+                  {/each}
+                </div>
+              {/if}
+
               <div class="sticky-footer">
                 <span class="sticky-author">
+                  {#if thread.count > 1}<Reply size={11} /> {thread.count} · {/if}
                   {note.createdBy === $activeUser ? 'You' : getDisplayNameForUser(note.createdBy)}
                 </span>
                 <span class="sticky-time">{getRelativeTime(note.createdAt)}</span>
               </div>
 
               <div class="sticky-actions" role="none" onclick={(e) => e.stopPropagation()}>
-                <button
-                  type="button"
-                  class="sticky-action-btn"
-                  onclick={() => togglePin(note)}
-                  aria-label={note.pinned ? 'Unpin' : 'Pin'}
-                  title={note.pinned ? 'Unpin' : 'Pin to top'}
-                >
+                <button type="button" class="sticky-action-btn" onclick={() => startReply(note)} aria-label="Reply" title="Reply">
+                  <Reply size={13} />
+                </button>
+                <button type="button" class="sticky-action-btn" onclick={() => togglePin(note)} aria-label={note.pinned ? 'Unpin' : 'Pin'} title={note.pinned ? 'Unpin' : 'Pin to top'}>
                   <Pin size={13} class={note.pinned ? 'text-accent' : ''} />
                 </button>
-                <button
-                  type="button"
-                  class="sticky-action-btn"
-                  onclick={() => toggleArchive(note)}
-                  aria-label={note.archived ? 'Unarchive' : 'Archive'}
-                  title="Archive"
-                >
+                <button type="button" class="sticky-action-btn" onclick={() => toggleArchive(note)} aria-label="Archive" title="Archive">
                   <Archive size={13} />
                 </button>
                 {#if note.createdBy === $activeUser}
-                  <button
-                    type="button"
-                    class="sticky-action-btn"
-                    onclick={() => startEditing(note)}
-                    aria-label="Edit"
-                    title="Edit"
-                  >
+                  <button type="button" class="sticky-action-btn" onclick={() => startEditing(note)} aria-label="Edit" title="Edit">
                     <Pencil size={13} />
                   </button>
                 {/if}
-                <button
-                  type="button"
-                  class="sticky-action-btn hover:text-red-500"
-                  onclick={() => note.id && removeNote(note.id)}
-                  aria-label="Delete"
-                  title="Delete"
-                >
+                <button type="button" class="sticky-action-btn hover:text-red-500" onclick={() => note.id && removeNote(note.id)} aria-label="Delete" title="Delete">
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -722,6 +938,23 @@
         </button>
       </div>
 
+      <button type="button" class="btn-primary w-full text-sm" onclick={() => selectedNote && startReply(selectedNote)}>
+        <Reply size={16} />
+        Reply
+      </button>
+
+      <!-- Reactions -->
+      <div class="flex flex-wrap items-center gap-1.5">
+        {#each REACTION_EMOJIS as emoji (emoji)}
+          {@const users = selectedNote.reactions?.[emoji] ?? []}
+          <button
+            type="button"
+            class="react-pick {users.includes($activeUser) ? 'is-mine' : ''}"
+            onclick={() => selectedNote && toggleReaction(selectedNote, emoji)}
+          >{emoji}{#if users.length}<span class="react-n">{users.length}</span>{/if}</button>
+        {/each}
+      </div>
+
       <div class="text-xs text-slate-400">
         {getDisplayNameForUser(selectedNote.createdBy)} · {formatDate(selectedNote.createdAt)}
         {#if selectedNote.read && selectedNote.readAt}
@@ -749,19 +982,23 @@
         bind:value={editingNote.content}
       ></textarea>
 
-      <!-- Tone picker -->
-      <div class="flex items-center gap-3">
+      <!-- Tone picker + custom color -->
+      <div class="flex items-center gap-3 flex-wrap">
         <span class="text-sm text-slate-500">Tone:</span>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
           {#each NOTE_TONE_KEYS as key, i}
             <button
               type="button"
-              class="touch-sm color-swatch-lg {editingNote.color === key ? 'is-selected' : ''}"
+              class="touch-sm color-swatch-lg {editingNote.color === key && !editingNote.customColor ? 'is-selected' : ''}"
               style="background:{swatchBg(myPalette[i])}"
-              onclick={() => { if (editingNote) editingNote.color = key }}
+              onclick={() => { if (editingNote) { editingNote.color = key; editingNote.customColor = '' } }}
               aria-label="Tone {i + 1}"
             ></button>
           {/each}
+          <label class="custom-swatch-lg {editingNote.customColor ? 'is-selected' : ''}" style={editingNote.customColor ? `background:${editingNote.customColor}` : ''} aria-label="Custom color">
+            <input type="color" class="sr-only" value={editingNote.customColor || '#e11d48'} oninput={(e) => { if (editingNote) editingNote.customColor = (e.currentTarget as HTMLInputElement).value }} />
+            {#if !editingNote.customColor}<Pencil size={13} />{/if}
+          </label>
         </div>
       </div>
 
@@ -786,6 +1023,58 @@
   onCancel={() => pendingConfirm = null}
 />
 
+<!-- Long-press reaction menu -->
+{#if reactionFor}
+  <button type="button" class="reaction-backdrop" onclick={() => reactionFor = null} aria-label="Close reactions"></button>
+  <div class="reaction-menu" role="menu">
+    {#each REACTION_EMOJIS as emoji (emoji)}
+      <button type="button" class="react-emoji" onclick={() => reactionFor && toggleReaction(reactionFor, emoji)}>{emoji}</button>
+    {/each}
+  </div>
+{/if}
+
+<!-- Multi-select bulk action bar -->
+{#if selectMode && selectedIds.size > 0}
+  <div class="bulk-bar">
+    <span class="bulk-count">{selectedIds.size} selected</span>
+    <div class="flex items-center gap-1.5">
+      <button type="button" class="bulk-btn" onclick={bulkMarkRead}><Check size={16} /><span class="hidden sm:inline">Read</span></button>
+      <button type="button" class="bulk-btn" onclick={bulkArchive}><Archive size={16} /><span class="hidden sm:inline">Archive</span></button>
+      <button type="button" class="bulk-btn bulk-danger" onclick={bulkDelete}><Trash2 size={16} /><span class="hidden sm:inline">Delete</span></button>
+    </div>
+  </div>
+{/if}
+
+<!-- Thread modal (an expanded stack) -->
+<Modal open={threadRootId !== null} onclose={() => threadRootId = null} title="Thread">
+  {#if threadRootId}
+    <div class="space-y-3">
+      {#each threadNotes as n (n.id)}
+        {@const tone = toneOf(n)}
+        <div class="thread-note" style={noteVars(tone, n.customColor)}>
+          <div class="flex items-center justify-between mb-1">
+            <span class="thread-author">{n.createdBy === $activeUser ? 'You' : getDisplayNameForUser(n.createdBy)}</span>
+            <span class="thread-time">{getRelativeTime(n.createdAt)}</span>
+          </div>
+          {#if n.title}<h4 class="font-bold text-sm mb-0.5" style="color:var(--note-ink)">{n.title}</h4>{/if}
+          {#if n.content}<p class="text-sm whitespace-pre-wrap" style="color:var(--note-ink);opacity:0.85">{n.content}</p>{/if}
+          {#if reactionEntries(n).length}
+            <div class="note-reactions" style="position:static;margin-top:0.4rem">
+              {#each reactionEntries(n) as [emoji, users] (emoji)}
+                <span class="react-chip {users.includes($activeUser) ? 'is-mine' : ''}">{emoji}{#if users.length > 1}<span class="react-n">{users.length}</span>{/if}</span>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/each}
+      <button type="button" class="btn-primary w-full text-sm" onclick={() => { const root = threadNotes[0]; if (root) startReply(root) }}>
+        <Reply size={16} />
+        Reply to thread
+      </button>
+    </div>
+  {/if}
+</Modal>
+
 <style>
   /* ===== CORK BACKDROP (full-bleed page background) ===== */
   .cork-backdrop {
@@ -793,16 +1082,22 @@
     inset: 0;
     z-index: 0;
     pointer-events: none;
+    --cork-a: #d4b895;
+    --cork-b: #c8a882;
+    --cork-c: #b9986f;
     background:
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E"),
-      radial-gradient(120% 120% at 50% 0%, #d4b895 0%, #c8a882 55%, #b9986f 100%);
+      radial-gradient(120% 120% at 50% 0%, var(--cork-a) 0%, var(--cork-b) 55%, var(--cork-c) 100%);
     box-shadow: inset 0 8px 24px rgba(0,0,0,0.18);
   }
 
   :global(.dark) .cork-backdrop {
+    --cork-a: #8a6a44;
+    --cork-b: #7a5c3a;
+    --cork-c: #654b30;
     background:
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.13'/%3E%3C/svg%3E"),
-      radial-gradient(120% 120% at 50% 0%, #8a6a44 0%, #7a5c3a 55%, #654b30 100%);
+      radial-gradient(120% 120% at 50% 0%, var(--cork-a) 0%, var(--cork-b) 55%, var(--cork-c) 100%);
     box-shadow: inset 0 8px 30px rgba(0,0,0,0.4);
   }
 
@@ -852,16 +1147,6 @@
   .cork-subtitle {
     font-size: 0.7rem;
     color: rgba(253,246,233,0.75);
-  }
-
-  .unread-bubble {
-    background: var(--color-accent);
-    color: white;
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 0.2rem 0.55rem;
-    border-radius: 999px;
-    letter-spacing: 0.02em;
   }
 
   /* Rail buttons (brass tacks in the bin) */
@@ -1324,4 +1609,183 @@
     background: var(--color-accent);
     box-shadow: 0 0 0 1.5px white;
   }
+
+  /* ===== New/All view toggle (rail) ===== */
+  .view-toggle {
+    display: inline-flex;
+    background: rgba(0,0,0,0.18);
+    border-radius: 0.6rem;
+    padding: 0.15rem;
+    gap: 0.1rem;
+  }
+  .view-seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 1.9rem;
+    padding: 0 0.6rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fdf6e9;
+  }
+  .view-seg.is-on { background: var(--color-accent); }
+  .view-badge {
+    font-size: 0.6rem;
+    font-weight: 800;
+    background: rgba(255,255,255,0.28);
+    border-radius: 999px;
+    padding: 0.02rem 0.28rem;
+  }
+
+  /* ===== Stack layers (threads) ===== */
+  .sticky-note.is-stack { position: relative; }
+  .stack-layer {
+    position: absolute;
+    inset: 0;
+    border-radius: 2px;
+    background: var(--note-bg);
+    box-shadow: 2px 3px 8px rgba(0,0,0,0.15);
+    z-index: -1;
+  }
+  .stack-layer-1 { transform: rotate(2.5deg) translate(3px, 3px); filter: brightness(0.97); }
+  .stack-layer-2 { transform: rotate(-3deg) translate(-2px, 5px); filter: brightness(0.94); }
+
+  /* ===== Select mode ===== */
+  .sticky-note.is-selected-note { outline: 3px solid var(--color-accent); outline-offset: 2px; }
+  .select-check {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    width: 1.3rem;
+    height: 1.3rem;
+    border-radius: 50%;
+    background: var(--color-surface);
+    border: 2px solid var(--color-accent);
+    display: grid;
+    place-items: center;
+    color: var(--color-accent);
+    z-index: 3;
+  }
+  .select-check.is-on { background: var(--color-accent); color: #fff; }
+
+  /* ===== Reactions ===== */
+  .note-reactions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.4rem;
+  }
+  .react-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.12rem;
+    font-size: 0.72rem;
+    line-height: 1;
+    padding: 0.15rem 0.35rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.6);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+  }
+  :global(.dark) .react-chip { background: rgba(0,0,0,0.3); }
+  .react-chip.is-mine { outline: 1.5px solid var(--color-accent); }
+  .react-n { font-size: 0.62rem; font-weight: 700; opacity: 0.7; }
+
+  .react-pick {
+    font-size: 1.05rem;
+    line-height: 1;
+    padding: 0.3rem 0.4rem;
+    border-radius: 0.6rem;
+    background: var(--color-surface-2);
+    transition: transform 100ms, background 100ms;
+  }
+  .react-pick:hover { transform: scale(1.12); }
+  .react-pick.is-mine { outline: 2px solid var(--color-accent); }
+
+  /* ===== Custom color swatches ===== */
+  .custom-swatch, .custom-swatch-lg {
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1.5px dashed rgba(0,0,0,0.3);
+    cursor: pointer;
+    color: rgba(0,0,0,0.5);
+    background: conic-gradient(from 0deg, #f43f5e, #f59e0b, #10b981, #3b82f6, #8b5cf6, #f43f5e);
+  }
+  .custom-swatch { width: 1.2rem; height: 1.2rem; }
+  .custom-swatch-lg { width: 1.7rem; height: 1.7rem; }
+  .custom-swatch.is-selected, .custom-swatch-lg.is-selected {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-style: solid;
+  }
+
+  /* ===== Long-press reaction menu ===== */
+  .reaction-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0,0,0,0.25);
+  }
+  .reaction-menu {
+    position: fixed;
+    z-index: 61;
+    left: 50%;
+    top: 40%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    border-radius: 999px;
+    background: var(--color-surface);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  }
+  .react-emoji {
+    font-size: 1.5rem;
+    line-height: 1;
+    padding: 0.35rem;
+    border-radius: 50%;
+    transition: transform 100ms;
+  }
+  .react-emoji:hover { transform: scale(1.25); }
+
+  /* ===== Bulk action bar ===== */
+  .bulk-bar {
+    position: fixed;
+    z-index: 45;
+    left: 50%;
+    bottom: 5rem;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 0.6rem 0.5rem 1rem;
+    border-radius: 999px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.25);
+  }
+  .bulk-count { font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
+  .bulk-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    height: 2.2rem;
+    padding: 0 0.7rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    background: var(--color-surface-2);
+  }
+  .bulk-danger { color: #ef4444; }
+
+  /* ===== Thread modal notes ===== */
+  .thread-note {
+    background: var(--note-bg);
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.85rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .thread-author { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--note-ink); opacity: 0.6; }
+  .thread-time { font-size: 0.65rem; color: var(--note-ink); opacity: 0.5; }
 </style>
