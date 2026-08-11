@@ -37,7 +37,7 @@
   }
 
   function handleAddMedia(): void {
-    navigate('/search?discover=1')
+    navigate('/library/movies?add=1')
   }
 </script>
 

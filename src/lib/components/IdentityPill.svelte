@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { activeUser, displayAbbreviations, userPreferences } from '$lib/stores/app'
+  import { Heart, User } from 'lucide-svelte'
+  import { activeUser, displayAbbreviations, displayNames, userPreferences } from '$lib/stores/app'
+  import { navigate } from '$lib/stores/nav'
   import { hapticLight } from '$lib/haptics'
   import { DEFAULT_ACCENT } from '$lib/accents'
   import type { UserId } from '$lib/types'
@@ -112,6 +114,16 @@
     isExpanded = false
   }
 
+  function goProfiles(e: MouseEvent, view: 'mine' | 'theirs'): void {
+    e.stopPropagation()
+    if (justDragged) return
+    hapticLight()
+    navigate(`/profiles?view=${view}`)
+    isExpanded = false
+  }
+
+  let otherUser = $derived<UserId>($activeUser === 'Z' ? 'T' : 'Z')
+
   function handleKeydown(e: KeyboardEvent): void {
     if (e.key === 'Escape' && isExpanded) {
       isExpanded = false
@@ -141,26 +153,50 @@
   onpointercancel={onPointerUp}
 >
   {#if isExpanded}
-    <!-- Expanded picker -->
+    <!-- Expanded panel: switch identity + profile access -->
     <div
-      class="flex items-center gap-1 p-1 rounded-full bg-surface border border-[var(--color-border)] shadow-lg"
-      role="listbox"
-      aria-label="Switch user"
+      class="flex flex-col gap-2 p-2 rounded-2xl bg-surface border border-[var(--color-border)] shadow-xl w-52"
+      role="dialog"
+      aria-label="Identity and profiles"
     >
-      {#each users as userId (userId)}
-        {@const prefs = $userPreferences[userId]}
-        <button
-          type="button"
-          role="option"
-          aria-selected={$activeUser === userId}
-          class="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold transition-transform hover:scale-105 touch-manipulation
-            {$activeUser === userId ? 'ring-2 ring-offset-1 ring-accent' : ''}"
-          style:background-color={prefs?.accentColor ?? DEFAULT_ACCENT}
-          onclick={(e) => selectUser(e, userId)}
-        >
-          {$displayAbbreviations[userId]}
-        </button>
-      {/each}
+      <div class="flex items-center gap-2" role="listbox" aria-label="Switch user">
+        {#each users as userId (userId)}
+          {@const prefs = $userPreferences[userId]}
+          <button
+            type="button"
+            role="option"
+            aria-selected={$activeUser === userId}
+            class="flex-1 flex items-center gap-2 p-1.5 rounded-xl transition-colors touch-manipulation
+              {$activeUser === userId ? 'bg-accent/10' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}"
+            onclick={(e) => selectUser(e, userId)}
+          >
+            <span
+              class="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 {$activeUser === userId ? 'ring-2 ring-offset-1 ring-accent' : ''}"
+              style:background-color={prefs?.accentColor ?? DEFAULT_ACCENT}
+            >{$displayAbbreviations[userId]}</span>
+            <span class="text-sm font-medium truncate">{$displayNames[userId]}</span>
+          </button>
+        {/each}
+      </div>
+
+      <div class="h-px bg-[var(--color-border)]"></div>
+
+      <button
+        type="button"
+        class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-sm font-medium transition-colors touch-manipulation hover:bg-slate-100 dark:hover:bg-slate-800"
+        onclick={(e) => goProfiles(e, 'mine')}
+      >
+        <User size={16} class="text-accent" />
+        My keepsakes
+      </button>
+      <button
+        type="button"
+        class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-sm font-medium transition-colors touch-manipulation hover:bg-slate-100 dark:hover:bg-slate-800"
+        onclick={(e) => goProfiles(e, 'theirs')}
+      >
+        <Heart size={16} class="text-accent" />
+        {$displayNames[otherUser]}'s keepsakes
+      </button>
     </div>
   {:else}
     <!-- Collapsed trigger (tap to switch, hold and drag to move) -->

@@ -9,7 +9,7 @@
   import { toast } from 'svelte-sonner'
   import { isYouTubeAPIConfigured, requestAccessToken } from '$lib/services/youtube-sync'
   import { ACCENT_PRESETS, DEFAULT_ACCENT_Z, DEFAULT_ACCENT_T } from '$lib/accents'
-  import { TAB_DEFS, DEFAULT_BOTTOM_TABS, MAX_BOTTOM_TABS, tabDef } from '$lib/tabs'
+  import { TAB_DEFS, DEFAULT_BOTTOM_TABS, DEFAULT_MAX_TABS_SHOWN, MAX_TABS_SHOWN, clampMaxTabsShown, tabDef } from '$lib/tabs'
   import { ArrowUp, ArrowDown, Minus, Plus as PlusIcon } from 'lucide-svelte'
 
   interface Props {
@@ -39,6 +39,7 @@
   let localNoteAutoToneShift = $state(true)
   let localShowIdentityPill = $state(true)
   let localBottomTabs = $state<string[]>([])
+  let localMaxTabsShown = $state(DEFAULT_MAX_TABS_SHOWN)
 
   // App state
   let isReloading = $state(false)
@@ -108,6 +109,7 @@
       localNoteAutoToneShift = $currentPreferences.noteAutoToneShift ?? true
       localShowIdentityPill = $currentPreferences.showIdentityPill ?? true
       localBottomTabs = [...($currentPreferences.bottomTabs ?? DEFAULT_BOTTOM_TABS)]
+      localMaxTabsShown = clampMaxTabsShown($currentPreferences.maxTabsShown)
       previousUser = $activeUser
     }
   })
@@ -208,6 +210,7 @@
         noteAutoToneShift: localNoteAutoToneShift,
         showIdentityPill: localShowIdentityPill,
         bottomTabs: [...localBottomTabs],
+        maxTabsShown: localMaxTabsShown,
         lastUpdated: Date.now()
       }
     }))
@@ -325,9 +328,15 @@
   let availableTabs = $derived(TAB_DEFS.filter(t => !localBottomTabs.includes(t.key)))
 
   function addBottomTab(key: string): void {
-    if (localBottomTabs.length >= MAX_BOTTOM_TABS || localBottomTabs.includes(key)) return
+    if (localBottomTabs.includes(key)) return
     hapticLight()
     localBottomTabs = [...localBottomTabs, key]
+    savePreferences()
+  }
+
+  function handleMaxTabsChange(n: number): void {
+    hapticLight()
+    localMaxTabsShown = clampMaxTabsShown(n)
     savePreferences()
   }
 
@@ -947,7 +956,21 @@
             <span class="text-sm font-medium">Bottom bar tabs</span>
             <button type="button" class="text-xs text-accent" onclick={resetBottomTabs}>Reset</button>
           </div>
-          <p class="text-xs text-slate-400 mb-3">Choose up to {MAX_BOTTOM_TABS} tabs and drag their order with the arrows. The rest live under "More".</p>
+          <p class="text-xs text-slate-400 mb-3">Order your tabs with the arrows; anything beyond the limit below lives under "More".</p>
+
+          <!-- Max tabs shown -->
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm">Tabs shown before "More"</span>
+            <div class="flex items-center gap-2">
+              <button type="button" class="btn-icon-sm touch-sm disabled:opacity-30" disabled={localMaxTabsShown <= 2} onclick={() => handleMaxTabsChange(localMaxTabsShown - 1)} aria-label="Fewer tabs">
+                <Minus size={16} />
+              </button>
+              <span class="w-5 text-center text-sm font-semibold tabular-nums">{localMaxTabsShown}</span>
+              <button type="button" class="btn-icon-sm touch-sm disabled:opacity-30" disabled={localMaxTabsShown >= MAX_TABS_SHOWN} onclick={() => handleMaxTabsChange(localMaxTabsShown + 1)} aria-label="More tabs">
+                <PlusIcon size={16} />
+              </button>
+            </div>
+          </div>
 
           <!-- On the bar (ordered) -->
           <ul class="space-y-2 mb-3">
@@ -998,8 +1021,7 @@
                 {@const TabIcon = def.icon}
                 <button
                   type="button"
-                  class="inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full border border-[var(--color-border)] text-sm font-medium disabled:opacity-40 hover:border-accent transition-colors touch-manipulation"
-                  disabled={localBottomTabs.length >= MAX_BOTTOM_TABS}
+                  class="inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full border border-[var(--color-border)] text-sm font-medium hover:border-accent transition-colors touch-manipulation"
                   onclick={() => addBottomTab(def.key)}
                 >
                   <TabIcon size={15} />
@@ -1008,9 +1030,6 @@
                 </button>
               {/each}
             </div>
-            {#if localBottomTabs.length >= MAX_BOTTOM_TABS}
-              <p class="text-xs text-slate-400 mt-2">Remove a tab to add another (max {MAX_BOTTOM_TABS}).</p>
-            {/if}
           {/if}
         </div>
       {/if}
