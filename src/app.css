@@ -157,8 +157,14 @@
 
 :root[data-reduce-motion] button:active,
 :root[data-reduce-motion] [role="button"]:active,
-:root[data-reduce-motion] .touch-feedback:active {
+:root[data-reduce-motion] a:active,
+:root[data-reduce-motion] label:active,
+:root[data-reduce-motion] .touch-feedback:active,
+:root[data-reduce-motion] .card:active,
+:root[data-reduce-motion] .keepsake:active,
+:root[data-reduce-motion] .quick-add:active {
   transform: none !important;
+  filter: none !important;
 }
 
 /* Touch device enhancements */
@@ -214,14 +220,34 @@
     min-height: 44px;
   }
 
-  /* Add active feedback to all buttons */
+  /* Active feedback — touch is the common case, so give elements a tactile
+     response that varies by kind. */
   button,
-  [role="button"] {
-    transition: transform 75ms ease-out;
+  [role="button"],
+  a,
+  label,
+  summary {
+    transition: transform 90ms ease-out, filter 90ms ease-out;
   }
   button:active,
-  [role="button"]:active {
+  [role="button"]:active,
+  a:active,
+  label:active {
     transform: scale(0.97);
+  }
+  /* Filled buttons dip in brightness rather than only shrinking. */
+  .btn-primary:active,
+  .btn-danger:active,
+  .rail-pen:active,
+  .pin-btn:active,
+  .quick-add-plus:active {
+    filter: brightness(0.93);
+  }
+  /* Surfaces press in gently (subtler than buttons). */
+  .card:active,
+  .keepsake:active,
+  .quick-add:active {
+    transform: scale(0.985);
   }
 
   /* Increase spacing in navigation and lists for easier tapping */
