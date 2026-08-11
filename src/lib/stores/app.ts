@@ -158,6 +158,7 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
         "showIdentityPill",
         "bottomTabs",
         "maxTabsShown",
+        "corkboardColor",
     ]
 
     for (const userId of ["Z", "T"] as const) {

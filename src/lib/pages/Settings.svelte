@@ -40,6 +40,7 @@
   let localShowIdentityPill = $state(true)
   let localBottomTabs = $state<string[]>([])
   let localMaxTabsShown = $state(DEFAULT_MAX_TABS_SHOWN)
+  let localCorkboardColor = $state('')
 
   // App state
   let isReloading = $state(false)
@@ -110,6 +111,7 @@
       localShowIdentityPill = $currentPreferences.showIdentityPill ?? true
       localBottomTabs = [...($currentPreferences.bottomTabs ?? DEFAULT_BOTTOM_TABS)]
       localMaxTabsShown = clampMaxTabsShown($currentPreferences.maxTabsShown)
+      localCorkboardColor = $currentPreferences.corkboardColor ?? ''
       previousUser = $activeUser
     }
   })
@@ -211,6 +213,7 @@
         showIdentityPill: localShowIdentityPill,
         bottomTabs: [...localBottomTabs],
         maxTabsShown: localMaxTabsShown,
+        corkboardColor: localCorkboardColor || undefined,
         lastUpdated: Date.now()
       }
     }))
@@ -315,6 +318,15 @@
   function handleToneShiftToggle(): void {
     hapticLight()
     localNoteAutoToneShift = !localNoteAutoToneShift
+    savePreferences()
+  }
+
+  function handleCorkboardColorChange(): void {
+    savePreferences()
+  }
+  function clearCorkboardColor(): void {
+    hapticLight()
+    localCorkboardColor = ''
     savePreferences()
   }
 
@@ -1132,6 +1144,27 @@
           <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {localNoteAutoToneShift ? 'translate-x-5' : ''}"></span>
         </span>
       </button>
+
+      <!-- Notes board background override -->
+      <div class="flex items-center justify-between gap-3">
+        <span class="text-left">
+          <span class="block text-sm font-medium">Notes board background</span>
+          <span class="block text-xs text-slate-400">Override the corkboard color</span>
+        </span>
+        <div class="flex items-center gap-2 shrink-0">
+          <input
+            type="color"
+            class="w-9 h-9 rounded cursor-pointer border-0"
+            value={localCorkboardColor || '#c8a882'}
+            oninput={(e) => localCorkboardColor = (e.currentTarget as HTMLInputElement).value}
+            onchange={handleCorkboardColorChange}
+            aria-label="Board background color"
+          />
+          {#if localCorkboardColor}
+            <button type="button" class="btn-icon-sm touch-sm" onclick={clearCorkboardColor} aria-label="Reset board background">✕</button>
+          {/if}
+        </div>
+      </div>
     </section>
 
     <!-- App Settings -->

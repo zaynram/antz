@@ -69,6 +69,7 @@ export interface UserPreferences {
     showIdentityPill?: boolean // Show the floating identity switcher (default true)
     bottomTabs?: string[] // Ordered tab keys shown in the bottom bar (rest go under "More")
     maxTabsShown?: number // How many chosen tabs render before overflowing to "More"
+    corkboardColor?: string // Manual hex override for the notes board background
 }
 
 export type UserPreferencesMap = Record<UserId, UserPreferences>
@@ -97,8 +98,12 @@ export interface Note extends BaseDocument {
     readAt?: Timestamp
     archived?: boolean
     photos?: string[] // URLs to photos in Google Drive
-    color?: NoteColor // Sticky note color for corkboard display
+    color?: NoteColor // Sticky note tone slot for corkboard display
+    customColor?: string // Manual hex override for this note's paper color
     pinned?: boolean // Pinned to top of corkboard
+    threadId?: string // Root note id for a reply thread (unset = standalone/root)
+    replyTo?: string // The specific note id this note replies to
+    reactions?: Record<string, UserId[]> // emoji -> user ids who reacted
 }
 
 export type MediaType = "tv" | "movie" | "game"
