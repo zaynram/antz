@@ -41,6 +41,9 @@
   let unsubscribe: (() => void) | undefined
   let selectedMedia = $state<Media | null>(null)
 
+  // Local search over the existing library (distinct from the discovery search)
+  let librarySearch = $state('')
+
   // Search state (for adding new items)
   let searchQuery = $state('')
   let discoverResults = $state<TMDBSearchResult[]>([])
@@ -109,6 +112,7 @@
     filters = { ...DEFAULT_FILTERS, type }
     showAddPanel = false
     searchQuery = ''
+    librarySearch = ''
     discoverResults = []
     gameResults = []
   })
@@ -337,6 +341,14 @@
 
   let filteredMedia = $derived.by(() => {
     let result = applyFilters(typeMedia, { ...filters, type: 'all' }) // Type already filtered
+    const q = librarySearch.trim().toLowerCase()
+    if (q) {
+      result = result.filter(m =>
+        m.title.toLowerCase().includes(q) ||
+        (m.overview?.toLowerCase().includes(q) ?? false) ||
+        (m.genres?.some(g => g.toLowerCase().includes(q)) ?? false)
+      )
+    }
     result = applySort(result, sort)
     return result
   })
@@ -520,6 +532,27 @@
     </div>
   </div>
 
+  <!-- Search within the current library -->
+  <div class="relative mb-4">
+    <Search size={18} class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+    <input
+      type="search"
+      placeholder="Search your {typeInfo[type].plural.toLowerCase()}…"
+      class="input pl-11"
+      bind:value={librarySearch}
+    />
+    {#if librarySearch}
+      <button
+        type="button"
+        class="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 touch-manipulation"
+        onclick={() => librarySearch = ''}
+        aria-label="Clear search"
+      >
+        <X size={16} />
+      </button>
+    {/if}
+  </div>
+
   <!-- Add panel -->
   {#if showAddPanel}
     <div class="card p-4 mb-6" style="transform: translateZ(0);">
@@ -692,12 +725,13 @@
   <!-- Grid -->
   <div bind:this={gridContainer}>
     {#if filteredMedia.length === 0}
+      {@const isFiltered = activeFilterCount > 0 || !!librarySearch.trim()}
       <EmptyState
         icon={typeInfo[type].icon}
-        title={activeFilterCount > 0 ? `No ${typeInfo[type].plural.toLowerCase()} match your filters` : `No ${typeInfo[type].plural.toLowerCase()} in your library`}
-        description={activeFilterCount > 0 ? 'Try adjusting your filters' : `Add your first ${typeInfo[type].label.toLowerCase()}`}
-        actionLabel={activeFilterCount > 0 ? undefined : `Add ${typeInfo[type].label}`}
-        onAction={activeFilterCount > 0 ? undefined : toggleAddPanel}
+        title={isFiltered ? `No ${typeInfo[type].plural.toLowerCase()} match` : `No ${typeInfo[type].plural.toLowerCase()} in your library`}
+        description={isFiltered ? 'Try adjusting your search or filters' : `Add your first ${typeInfo[type].label.toLowerCase()}`}
+        actionLabel={isFiltered ? undefined : `Add ${typeInfo[type].label}`}
+        onAction={isFiltered ? undefined : toggleAddPanel}
       />
     {:else}
       <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->

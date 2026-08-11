@@ -11,6 +11,8 @@
   import { Timestamp } from 'firebase/firestore'
   import { Calendar, Check, ExternalLink, MapPin, Repeat, X } from 'lucide-svelte'
   import { cycleRating, getStarFill } from '$lib/utils'
+  import 'leaflet/dist/leaflet.css'
+  import type { Map as LeafletMap } from 'leaflet'
 
   interface Props {
     place: Place | null
@@ -32,6 +34,48 @@
       editedCategory = place.category
       editedBudget = place.budget ?? null
       previousPlaceId = place.id
+    }
+  })
+
+  // ===== Embedded, non-pannable location preview map =====
+  let mapEl = $state<HTMLDivElement | null>(null)
+  let miniMap: LeafletMap | undefined
+
+  $effect(() => {
+    const loc = place?.location
+    const el = mapEl
+    if (!loc || !el) return
+    const def = categoryDef(place!.category)
+    let disposed = false
+    ;(async () => {
+      const leaflet = await import('leaflet')
+      if (disposed || !mapEl) return
+      const L = leaflet.default ?? leaflet
+      // Display-only: no dragging, but pinch/scroll/buttons can still zoom.
+      miniMap = L.map(el, {
+        dragging: false,
+        scrollWheelZoom: false,
+        touchZoom: true,
+        doubleClickZoom: true,
+        boxZoom: false,
+        keyboard: false,
+        zoomControl: true,
+        attributionControl: false,
+      }).setView([loc.lat, loc.lng], 15)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(miniMap)
+      const icon = L.divIcon({
+        html: `<div class="mini-pin" style="--pin:${def.color}"><span>${def.emoji}</span></div>`,
+        className: 'mini-pin-wrap',
+        iconSize: [30, 30],
+        iconAnchor: [15, 30],
+      })
+      L.marker([loc.lat, loc.lng], { icon }).addTo(miniMap)
+      requestAnimationFrame(() => miniMap?.invalidateSize())
+    })()
+    return () => {
+      disposed = true
+      miniMap?.remove()
+      miniMap = undefined
     }
   })
 
@@ -514,7 +558,7 @@
           </div>
         </div>
 
-        <!-- Location picker -->
+        <!-- Location picker + embedded preview map -->
         <div>
           <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Location</span>
           <LocationPicker
@@ -522,6 +566,11 @@
             onChange={updateLocation}
             placeholder="Search for address..."
           />
+          {#if place.location}
+            <div class="mini-map-frame mt-2">
+              <div class="mini-map-canvas" bind:this={mapEl}></div>
+            </div>
+          {/if}
         </div>
 
         <!-- Notes -->
@@ -602,3 +651,33 @@
     </div>
   </Modal>
 {/if}
+
+<style>
+  .mini-map-frame {
+    position: relative;
+    isolation: isolate;
+    height: 180px;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+  }
+  .mini-map-canvas { position: absolute; inset: 0; background: #ece3d2; }
+  /* Same aged-cartography wash as the main Places map, lighter touch. */
+  .mini-map-frame :global(.leaflet-tile-pane) {
+    filter: grayscale(0.5) sepia(0.35) saturate(0.85) contrast(1.03) brightness(1.03);
+  }
+  :global(.dark) .mini-map-frame :global(.leaflet-tile-pane) {
+    filter: grayscale(0.6) sepia(0.25) saturate(0.7) contrast(0.95) brightness(0.72) invert(0.9) hue-rotate(180deg);
+  }
+  .mini-map-frame :global(.mini-pin-wrap) { background: transparent; border: none; }
+  .mini-map-frame :global(.mini-pin) {
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--pin);
+    border: 2px solid #fff;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.35);
+  }
+  .mini-map-frame :global(.mini-pin span) { transform: rotate(45deg); font-size: 13px; line-height: 1; }
+</style>
