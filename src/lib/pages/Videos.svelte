@@ -11,6 +11,9 @@
   import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte'
   import { syncVideoQueue, isSyncAvailable, getSyncStatusMessage, getPlatformDisplayName } from '$lib/services/video-sync'
   import { exportForGrayjay, exportVideoUrlList, createShareableVideoList, downloadExportFile, copyToClipboard } from '$lib/services/grayjay-sync'
+  import { readShare } from '$lib/services/share-intake'
+  import { consumeQueryParam } from '$lib/stores/nav'
+  import { onMount } from 'svelte'
 
   let videos = $state<Video[]>([])
   let loading = $state(true)
@@ -21,6 +24,47 @@
   let filterStatus = $state<VideoStatus | 'all'>('all')
   let syncing = $state(false)
   let showExportMenu = $state(false)
+
+  // A share from another app lands here as query params (see the manifest's
+  // share_target). Consume them once and add the link straight to the queue —
+  // no account linking or API access needed on either platform.
+  onMount(() => {
+    const shared = readShare({
+      title: consumeQueryParam('title'),
+      text: consumeQueryParam('text'),
+      url: consumeQueryParam('url'),
+    })
+    if (shared) addSharedLink(shared)
+  })
+
+  async function addSharedLink(shared: { url: string; title: string; videoId?: string }): Promise<void> {
+    if (!shared.videoId) {
+      toast.error('That link isn\'t a YouTube video yet — paste it in manually for now')
+      return
+    }
+    if (videos.some(v => v.videoId === shared.videoId)) {
+      toast('Already in your queue')
+      return
+    }
+    try {
+      await addDocument('videos', {
+        title: shared.title || 'Untitled Video',
+        url: shared.url,
+        videoId: shared.videoId,
+        thumbnailUrl: getYouTubeThumbnail(shared.videoId),
+        status: 'queued',
+        rating: null,
+        ratings: createEmptyRatings(),
+        notes: '',
+      } as Omit<Video, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>, $activeUser)
+      hapticSuccess()
+      toast.success('Added to your queue')
+    } catch (error) {
+      console.error('Error adding shared video:', error)
+      hapticError()
+      toast.error('Failed to add the shared video')
+    }
+  }
 
   // Close export menu on click outside
   $effect(() => {

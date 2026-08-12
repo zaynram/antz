@@ -36,6 +36,20 @@ export default defineConfig({
                         purpose: "any maskable",
                     },
                 ],
+                // Register as a system share target so a link can be shared into
+                // the queue straight from YouTube, Grayjay, a browser or a chat —
+                // no account linking or API access involved. GET keeps the shared
+                // data in the URL, which the client route reads directly.
+                share_target: {
+                    action: "/videos",
+                    method: "GET",
+                    enctype: "application/x-www-form-urlencoded",
+                    params: {
+                        title: "title",
+                        text: "text",
+                        url: "url",
+                    },
+                },
             },
             workbox: {
                 globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
