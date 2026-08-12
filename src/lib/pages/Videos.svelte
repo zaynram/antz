@@ -273,14 +273,14 @@
 
 </script>
 
-<div class="min-h-screen bg-slate-50 dark:bg-slate-900">
+<div class="max-w-5xl mx-auto">
   <!-- Header -->
-  <div class="bg-white dark:bg-slate-800 border-b border-[var(--color-border)] sticky top-0 z-10">
-    <div class="max-w-7xl mx-auto px-4 py-4">
+  <div class="mb-4">
+    <div>
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
           <VideoIcon size={28} class="text-accent" />
-          <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Video Queue</h1>
+          <h1 class="text-2xl font-bold">Video Queue</h1>
         </div>
         <div class="flex items-center gap-2">
           <!-- Sync button -->
@@ -380,7 +380,7 @@
   </div>
 
   <!-- Content -->
-  <div class="max-w-7xl mx-auto px-4 py-6">
+  <div class="py-2">
     {#if loading}
       <div class="text-center py-12">
         <div class="inline-block w-8 h-8 border-3 border-accent border-t-transparent rounded-full animate-spin"></div>
@@ -401,9 +401,9 @@
               onclick={() => openVideoDetail(video)}
               class="relative w-full aspect-video bg-slate-100 dark:bg-slate-900 overflow-hidden group"
             >
-              {#if video.thumbnailUrl}
+              {#if video.imageOverride || video.thumbnailUrl}
                 <img
-                  src={video.thumbnailUrl}
+                  src={video.imageOverride || video.thumbnailUrl}
                   alt={video.title}
                   class="w-full h-full object-cover group-hover:scale-105 transition-transform"
                 />

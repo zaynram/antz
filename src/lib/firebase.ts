@@ -10,13 +10,16 @@ import {
 import {
     collection,
     deleteDoc,
+    deleteField,
     doc,
     getDoc,
     getFirestore,
+    limit,
     onSnapshot,
     orderBy,
     query,
     serverTimestamp,
+    type QueryConstraint,
     setDoc,
     updateDoc,
     type DocumentData,
@@ -53,12 +56,20 @@ export function onAuthChange(callback: (user: User | null) => void): () => void 
     return onAuthStateChanged(auth, callback)
 }
 
+/**
+ * Live-subscribe to a collection. Pass `maxItems` for views that only render a
+ * bounded slice (the home dashboard, for example) so the client isn't paying to
+ * receive and re-parse the entire collection on every snapshot.
+ */
 export function subscribeToCollection<T extends DocumentData>(
     collectionName: string,
     callback: (items: T[]) => void,
-    orderByField: string = "createdAt"
+    orderByField: string = "createdAt",
+    maxItems?: number
 ): () => void {
-    const q = query(collection(db, collectionName), orderBy(orderByField, "desc"))
+    const constraints: QueryConstraint[] = [orderBy(orderByField, "desc")]
+    if (maxItems !== undefined) constraints.push(limit(maxItems))
+    const q = query(collection(db, collectionName), ...constraints)
     return onSnapshot(q, snapshot => {
         const items = snapshot.docs.map(doc => ({
             id: doc.id,
@@ -108,6 +119,23 @@ export { deleteProfilePicture, uploadProfilePicture } from "./drive"
 const PREFERENCES_DOC = "preferences/shared"
 
 /**
+ * Prepare one identity's preferences for a merged write.
+ *
+ * Firestore rejects `undefined` field values outright, and because we write
+ * with `merge: true` a key that simply disappears locally would keep its old
+ * remote value — so clearing a profile picture or signature would silently come
+ * back on the next sync. Both problems are handled by turning cleared optional
+ * fields into explicit `deleteField()` sentinels.
+ */
+function preferencesForWrite(prefs: object): Record<string, unknown> {
+    const out: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(prefs)) {
+        out[key] = value === undefined ? deleteField() : value
+    }
+    return out
+}
+
+/**
  * Persist preferences to Firestore. When `userId` is given, only that user's
  * entry is written (merge), so a device signed in as one identity can never
  * overwrite the other identity's settings. Without `userId`, the full map is
@@ -121,11 +149,14 @@ export async function savePreferencesToFirestore(
     if (userId) {
         await setDoc(
             docRef,
-            { [userId]: prefs[userId], updatedAt: serverTimestamp() },
+            { [userId]: preferencesForWrite(prefs[userId] ?? {}), updatedAt: serverTimestamp() },
             { merge: true }
         )
     } else {
-        await setDoc(docRef, { ...prefs, updatedAt: serverTimestamp() }, { merge: true })
+        const all = Object.fromEntries(
+            Object.entries(prefs).map(([id, p]) => [id, preferencesForWrite(p ?? {})])
+        )
+        await setDoc(docRef, { ...all, updatedAt: serverTimestamp() }, { merge: true })
     }
 }
 

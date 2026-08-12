@@ -68,6 +68,8 @@ export interface UserPreferences {
     noteAutoToneShift?: boolean // Auto hue-shift note palette when both accents collide (default true)
     showIdentityPill?: boolean // Show the floating identity switcher (default true)
     bottomTabs?: string[] // Ordered tab keys shown in the bottom bar (rest go under "More")
+    maxTabsShown?: number // How many chosen tabs render before overflowing to "More"
+    corkboardColor?: string // Manual hex override for the notes board background
 }
 
 export type UserPreferencesMap = Record<UserId, UserPreferences>
@@ -96,8 +98,12 @@ export interface Note extends BaseDocument {
     readAt?: Timestamp
     archived?: boolean
     photos?: string[] // URLs to photos in Google Drive
-    color?: NoteColor // Sticky note color for corkboard display
+    color?: NoteColor // Sticky note tone slot for corkboard display
+    customColor?: string // Manual hex override for this note's paper color
     pinned?: boolean // Pinned to top of corkboard
+    threadId?: string // Root note id for a reply thread (unset = standalone/root)
+    replyTo?: string // The specific note id this note replies to
+    reactions?: Record<string, UserId[]> // emoji -> user ids who reacted
 }
 
 export type MediaType = "tv" | "movie" | "game"
@@ -131,11 +137,14 @@ export interface Media extends BaseDocument {
     steamId?: number
     title: string
     posterPath: string | null
+    imageOverride?: string // Manual full-URL image override when the source poster won't display
     releaseDate?: string
     overview?: string
     status: MediaStatus
     rating: number | null // Legacy field for backward compatibility
     ratings?: Record<UserId, number | null> // Per-user ratings
+    seenBy?: UserId[] // Partners who have personally watched this (couple watch-state)
+    unseenBy?: UserId[] // Partners explicitly marked NOT watched; suppresses rating-based inference
     notes: string
     progress?: MediaProgress
     // Metadata fields
@@ -190,7 +199,80 @@ export function getDisplayRating(media: Media): number | null {
     return getAverageRating(media)
 }
 
-export type PlaceCategory = "restaurant" | "cafe" | "bar" | "attraction" | "park" | "other"
+// ===== Couple watch-state =====
+// From the viewer's perspective, how this title sits between the two partners.
+export type TogethernessState = "both" | "mine" | "theirs" | "none"
+
+/**
+ * Has this specific partner personally watched the title? True when they're in
+ * `seenBy`, or (zero-effort backfill) when they've left a personal rating —
+ * a per-user rating implies they watched it. The legacy shared `rating` is
+ * intentionally ignored here since it isn't attributable to one partner.
+ */
+export function hasWatched(media: Media, user: UserId): boolean {
+    // Explicit marks win over inference, in both directions.
+    if (media.seenBy?.includes(user)) return true
+    if (media.unseenBy?.includes(user)) return false
+    const r = media.ratings?.[user]
+    return r !== null && r !== undefined
+}
+
+/** The explicit watch flags for a media item, as stored. */
+export interface WatchFlags {
+    seenBy: UserId[]
+    unseenBy: UserId[]
+}
+
+/**
+ * Set a partner's watched state explicitly. Marking un-watched records a
+ * negative so a pre-existing rating can't keep inferring "watched" — otherwise
+ * the toggle would be a no-op for anything either partner has rated.
+ */
+export function setWatched(media: Media, user: UserId, watched: boolean): WatchFlags {
+    const seen = new Set(media.seenBy ?? [])
+    const unseen = new Set(media.unseenBy ?? [])
+    if (watched) {
+        seen.add(user)
+        unseen.delete(user)
+    } else {
+        seen.delete(user)
+        unseen.add(user)
+    }
+    return {
+        seenBy: ALL_USER_IDS.filter(u => seen.has(u)),
+        unseenBy: ALL_USER_IDS.filter(u => unseen.has(u)),
+    }
+}
+
+/** Flip a partner's watched state, honouring rating-based inference. */
+export function toggleWatched(media: Media, user: UserId): WatchFlags {
+    return setWatched(media, user, !hasWatched(media, user))
+}
+
+/** Classify a title by who of the pair has seen it, from `viewer`'s POV. */
+export function watchTogetherness(media: Media, viewer: UserId, partner: UserId): TogethernessState {
+    const mine = hasWatched(media, viewer)
+    const theirs = hasWatched(media, partner)
+    if (mine && theirs) return "both"
+    if (mine) return "mine"
+    if (theirs) return "theirs"
+    return "none"
+}
+
+
+export type PlaceCategory =
+    | "restaurant"
+    | "cafe"
+    | "bar"
+    | "attraction"
+    | "park"
+    | "hotel"
+    | "shop"
+    | "museum"
+    | "beach"
+    | "viewpoint"
+    | "entertainment"
+    | "other"
 
 export interface PlaceComment {
     id: string
@@ -213,6 +295,7 @@ export interface Place extends BaseDocument {
     tags?: string[] // User-defined tags
     photos?: string[] // URLs to photos in Google Drive
     budget?: number | null // Price level: 0-4 (0=Free, 1=Inexpensive, 2=Moderate, 3=Expensive, 4=Very Expensive)
+    revisitable?: boolean // Override for visited semantics (true = revisit-likely, false = one-and-done). Defaults by category.
 }
 
 // Place rating helpers (mirror Media rating helpers)
@@ -306,6 +389,7 @@ export interface Video extends BaseDocument {
     url: string
     videoId: string // YouTube video ID
     thumbnailUrl?: string
+    imageOverride?: string // Manual full-URL image override when the source thumbnail won't display
     duration?: string // e.g., "10:23"
     channelName?: string
     status: VideoStatus
@@ -378,5 +462,6 @@ export interface HomeActivity {
     actor: UserId           // Who performed the most recent activity (updatedBy ?? createdBy)
     updatedAt: Timestamp
     posterPath?: string | null // Media poster, if available
+    imageOverride?: string     // Manual image override, if set
     mediaType?: MediaType      // Only set when type === "media"
 }

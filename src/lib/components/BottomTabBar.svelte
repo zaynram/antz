@@ -2,7 +2,7 @@
   import { MoreHorizontal } from 'lucide-svelte'
   import { navMode } from '$lib/stores/nav'
   import { currentPreferences } from '$lib/stores/app'
-  import { TAB_DEFS, resolveTabs, type TabDef } from '$lib/tabs'
+  import { TAB_DEFS, resolveTabs, clampMaxTabsShown, type TabDef } from '$lib/tabs'
   import BottomSheet from './ui/BottomSheet.svelte'
 
   interface Props {
@@ -14,12 +14,23 @@
 
   let moreOpen = $state(false)
 
-  // Primary tabs come from the user's configuration; everything else falls
-  // into the "More" sheet.
-  let primaryTabs = $derived(resolveTabs($currentPreferences?.bottomTabs))
+  // Chosen tabs come from the user's config; the first `maxTabsShown` render in
+  // the bar and any remainder (plus unchosen destinations) spill into "More".
+  let chosenTabs = $derived(resolveTabs($currentPreferences?.bottomTabs))
+  let maxShown = $derived(clampMaxTabsShown($currentPreferences?.maxTabsShown))
+  let primaryTabs = $derived(chosenTabs.slice(0, maxShown))
+  // Keepsakes lives in the identity pill's fly-out, so it's only surfaced as a
+  // navigable destination when that pill is switched off — otherwise it would
+  // add a redundant entry (and force a "More" tab) for a place you can already
+  // reach. It still appears if the user explicitly picks it for the bar.
+  let pillHidden = $derived(($currentPreferences?.showIdentityPill ?? true) === false)
   let moreItems = $derived.by(() => {
     const shown = new Set(primaryTabs.map(t => t.key))
-    return TAB_DEFS.filter(t => !shown.has(t.key))
+    const overflow = chosenTabs.slice(maxShown)
+    const unchosen = TAB_DEFS.filter(t =>
+      !chosenTabs.some(c => c.key === t.key) && (t.key !== 'profiles' || pillHidden)
+    )
+    return [...overflow, ...unchosen].filter(t => !shown.has(t.key))
   })
 
   function isActive(tab: TabDef): boolean {

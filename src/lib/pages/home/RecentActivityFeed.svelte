@@ -53,9 +53,9 @@
             class="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-surface border border-[var(--color-border)] hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors touch-manipulation text-left"
             onclick={() => onItemClick(item)}
           >
-            {#if item.posterPath}
+            {#if item.imageOverride || item.posterPath}
               <img
-                src="https://image.tmdb.org/t/p/w92{item.posterPath}"
+                src={item.imageOverride || `https://image.tmdb.org/t/p/w92${item.posterPath}`}
                 alt={item.title}
                 class="w-10 h-10 rounded-lg object-cover flex-shrink-0"
               />

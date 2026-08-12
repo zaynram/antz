@@ -7,7 +7,7 @@ import {
 } from "../firebase"
 import type { UserId, UserPreferences, UserPreferencesMap } from "../types"
 import { DEFAULT_ACCENT_Z, DEFAULT_ACCENT_T } from "../accents"
-import { DEFAULT_BOTTOM_TABS } from "../tabsConfig"
+import { DEFAULT_BOTTOM_TABS, DEFAULT_MAX_TABS_SHOWN } from "../tabsConfig"
 
 // Touch device detection store
 // Uses pointer: coarse media query which is more reliable than touch event detection
@@ -45,6 +45,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         noteAutoToneShift: true,
         showIdentityPill: true,
         bottomTabs: [...DEFAULT_BOTTOM_TABS],
+        maxTabsShown: DEFAULT_MAX_TABS_SHOWN,
         // 0 so an untouched default never wins the last-write-wins merge and
         // clobbers real synced settings from another device.
         lastUpdated: 0,
@@ -62,6 +63,7 @@ const DEFAULT_PREFERENCES: UserPreferencesMap = {
         noteAutoToneShift: true,
         showIdentityPill: true,
         bottomTabs: [...DEFAULT_BOTTOM_TABS],
+        maxTabsShown: DEFAULT_MAX_TABS_SHOWN,
         // 0 so an untouched default never wins the last-write-wins merge and
         // clobbers real synced settings from another device.
         lastUpdated: 0,
@@ -155,6 +157,8 @@ function prefsEqual(a: UserPreferencesMap, b: UserPreferencesMap): boolean {
         "noteAutoToneShift",
         "showIdentityPill",
         "bottomTabs",
+        "maxTabsShown",
+        "corkboardColor",
     ]
 
     for (const userId of ["Z", "T"] as const) {

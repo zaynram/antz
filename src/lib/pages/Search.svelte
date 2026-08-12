@@ -83,9 +83,21 @@
       console.warn('Failed to load tips preference:', e)
     }
 
-    unsubMedia = subscribeToCollection<Media>('media', (items) => { media = items })
+    unsubMedia = subscribeToCollection<Media>('media', (items) => {
+      media = items
+      if (selectedMedia) {
+        const updated = items.find(m => m.id === selectedMedia!.id)
+        if (updated) selectedMedia = updated
+      }
+    })
     unsubNotes = subscribeToCollection<Note>('notes', (items) => { notes = items })
-    unsubPlaces = subscribeToCollection<Place>('places', (items) => { places = items })
+    unsubPlaces = subscribeToCollection<Place>('places', (items) => {
+      places = items
+      if (selectedPlace) {
+        const updated = items.find(p => p.id === selectedPlace!.id)
+        if (updated) selectedPlace = updated
+      }
+    })
 
     // Focus search input on mount (slight delay for mobile keyboards)
     setTimeout(() => searchInput?.focus(), 100)
@@ -380,20 +392,10 @@
     selectedMedia = null
   }
 
-  // Keep selected items in sync with real-time updates
-  $effect(() => {
-    if (selectedMedia) {
-      const updated = media.find(m => m.id === selectedMedia!.id)
-      if (updated) selectedMedia = updated
-    }
-  })
-
-  $effect(() => {
-    if (selectedPlace) {
-      const updated = places.find(p => p.id === selectedPlace!.id)
-      if (updated) selectedPlace = updated
-    }
-  })
+  // NB: selected-item resync happens in the Firestore callbacks above rather
+  // than in an $effect. An effect that both reads and writes `selectedMedia`
+  // only avoids self-triggering by accident of proxy identity — same shape as
+  // the modal-stack loop that froze the app.
 
   // Place modal handlers
   function openPlaceDetail(place: Place) {

@@ -7,13 +7,25 @@
   import { hapticLight, hapticMedium, hapticSuccess } from '$lib/haptics'
   import { activeUser, currentPreferences, displayNames, userPreferences } from '$lib/stores/app'
   import { consumeQueryParam } from '$lib/stores/nav'
-  import { getNotePalette, resolveNoteTone, resolveToneShift, NOTE_TONE_KEYS, type NoteTone } from '$lib/notePalette'
+  import { getNotePalette, toneIndex, resolveToneShift, NOTE_TONE_KEYS, type NoteTone } from '$lib/notePalette'
+  import { readableInk, ensureReadable } from '$lib/color'
+  import {
+    similarityClusters,
+    threadKeyOf,
+    groupKeyOf as groupKey,
+    isStackView,
+    type StackView,
+    type StackableNote,
+  } from '$lib/noteStacks'
   import { DEFAULT_ACCENT } from '$lib/accents'
   import type { Note, NoteColor, UserId } from '$lib/types'
   import { Timestamp, type Timestamp as TimestampType } from 'firebase/firestore'
-  import { Archive, ArchiveRestore, Check, Image as ImageIcon, Pencil, Pin, Search, SlidersHorizontal, ArrowUpDown, StickyNote, Trash2, X } from 'lucide-svelte'
+  import { Archive, ArchiveRestore, Check, CheckCheck, Image as ImageIcon, Pencil, Pin, Reply, Search, SlidersHorizontal, ArrowUpDown, StickyNote, Trash2, X, Link2, Unlink, Layers } from 'lucide-svelte'
   import { onMount } from 'svelte'
   import { toast } from 'svelte-sonner'
+
+  const REACTION_EMOJIS = ['❤️', '😂', '👍', '🔥', '😮', '🥰', '😢']
+  type BoardView = 'new' | 'all'
 
   let notes = $state<Note[]>([])
   let unsubscribe: (() => void) | undefined
@@ -22,15 +34,54 @@
 
   // Compose form state
   let composing = $state(false)
-  let newNote = $state({ title: '', content: '', color: 't0' as NoteColor })
+  let newNote = $state({ title: '', content: '', color: 't0' as NoteColor, customColor: '' })
+  // When replying, the new note is linked into a thread.
+  let replyContext = $state<{ threadId: string; replyTo: string; toName: string } | null>(null)
 
   // View: 'corkboard' | 'archive'
   type ViewKey = 'corkboard' | 'archive'
   let activeView = $state<ViewKey>('corkboard')
 
+  // Board view: 'new' (only unread from the other user) vs 'all'. Persisted per
+  // session; defaults to 'new' so you land on what's fresh.
+  let boardView = $state<BoardView>('new')
+
+  // Thread view (a stack expanded) + long-press context menu + multi-select
+  let threadRootId = $state<string | null>(null)
+  // A stack unstacked in-place on the board (yarn-linked linear view).
+  let expandedStackKey = $state<string | null>(null)
+  let contextFor = $state<Note | null>(null)
+  // Screen rect of the long-pressed note, so the menu anchors to it and the
+  // note can "pop out" above the dimmed backdrop.
+  let contextRect = $state<{ left: number; top: number; width: number; height: number } | null>(null)
+  let selectMode = $state(false)
+  let selectedIds = $state<Set<string>>(new Set())
+
+  // How notes are grouped into stacks on the board. "custom" honours the manual
+  // reply-thread links; the others are non-destructive views over the same notes.
+  let stackView = $state<StackView>('custom')
+  let showStackMenu = $state(false)
+  const STACK_VIEWS: Array<{ key: StackView; label: string; hint: string }> = [
+    { key: 'custom', label: 'My stacks', hint: 'Threads you linked yourself' },
+    { key: 'day', label: 'By day', hint: 'Grouped by the day posted' },
+    { key: 'week', label: 'By week', hint: 'Grouped by week' },
+    { key: 'month', label: 'By month', hint: 'Grouped by month' },
+    { key: 'year', label: 'By year', hint: 'Grouped by year' },
+    { key: 'similar', label: 'Similar', hint: 'Loosely grouped by shared words' },
+  ]
+  let stackViewDef = $derived(STACK_VIEWS.find(s => s.key === stackView) ?? STACK_VIEWS[0])
+
   // Filter / sort state
   let showFilters = $state(false)
   let searchText = $state('')
+  // Debounced copy: filtering + regrouping + a full board re-render is too much
+  // to redo on every keystroke.
+  let debouncedSearch = $state('')
+  $effect(() => {
+    const next = searchText
+    const timer = setTimeout(() => { debouncedSearch = next }, 150)
+    return () => clearTimeout(timer)
+  })
   let authorFilter = $state<'all' | UserId>('all')
   let unreadOnly = $state(false)
   type SortMode = 'newest' | 'oldest' | 'author'
@@ -49,24 +100,87 @@
     resolveToneShift($userPreferences, $currentPreferences?.noteAutoToneShift ?? true)
   )
   let isDark = $derived(($currentPreferences?.theme ?? 'dark') === 'dark')
-  let myAccent = $derived($userPreferences[$activeUser]?.accentColor ?? DEFAULT_ACCENT)
-  let myPalette = $derived(getNotePalette(myAccent, toneShift[$activeUser] ?? 0))
+
+  // There are only ever two palettes — one per identity — but a palette is ~30
+  // colour conversions to build. Derive them once instead of rebuilding per note
+  // on every render.
+  let palettes = $derived({
+    Z: getNotePalette($userPreferences.Z?.accentColor ?? DEFAULT_ACCENT, toneShift.Z ?? 0),
+    T: getNotePalette($userPreferences.T?.accentColor ?? DEFAULT_ACCENT, toneShift.T ?? 0),
+  })
+  let myPalette = $derived(palettes[$activeUser])
   let composeTone = $derived(
     myPalette[Math.max(0, (NOTE_TONE_KEYS as readonly string[]).indexOf(newNote.color))]
   )
 
   function toneOf(note: Note): NoteTone {
-    return resolveNoteTone(note.createdBy, note.color, $userPreferences, toneShift)
+    return palettes[note.createdBy][toneIndex(note.color)]
   }
 
   function swatchBg(tone: NoteTone): string {
     return isDark ? tone.bgDark : tone.bgLight
   }
 
-  function noteVars(tone: NoteTone): string {
-    const bg = isDark ? tone.bgDark : tone.bgLight
-    const ink = isDark ? tone.inkDark : tone.inkLight
-    return `--note-bg:${bg};--note-ink:${ink};--note-tack:${tone.tack};`
+  // Cache the CSS custom-property string per (tone, custom colour, theme). The
+  // uncached work — notably ensureReadable's contrast loop — is otherwise redone
+  // for every note on every render.
+  let noteVarsCache = $derived.by(() => {
+    void palettes; void isDark // rebuild the cache when either changes
+    return new Map<string, string>()
+  })
+
+  function noteVars(tone: NoteTone, customColor?: string): string {
+    const custom = customColor?.trim()
+    const key = `${tone.key}|${custom ?? ''}`
+    const hit = noteVarsCache.get(key)
+    if (hit !== undefined) return hit
+    const bg = custom || (isDark ? tone.bgDark : tone.bgLight)
+    const ink = custom ? readableInk(custom) : (isDark ? tone.inkDark : tone.inkLight)
+    const tack = custom || tone.tack
+    // The signature is drawn in the tack colour, but a custom paper colour (or a
+    // tone whose tack sits close to the paper) can make it illegible — so recolor
+    // it to guarantee contrast against this note's background.
+    const sign = ensureReadable(tack, bg, 3.2)
+    const vars = `--note-bg:${bg};--note-ink:${ink};--note-tack:${tack};--note-sign:${sign};`
+    noteVarsCache.set(key, vars)
+    return vars
+  }
+
+  // Full inline style for a board note: colour + tilt + horizontal/vertical
+  // jitter (to break the rigid-column illusion of a masonry).
+  function noteStyle(note: Note): string {
+    return `${noteVars(toneOf(note), note.customColor)}`
+      + `--rot:${getNoteRotation(note.id)}deg;`
+      + `--jy:${getNoteJitter(note.id)}rem;`
+      + `--jx:${getNoteJitterX(note.id)}rem`
+  }
+
+  // A small string hash used for deterministic jitter/sizing.
+  function hashOf(noteId: string | undefined, seed: number): number {
+    if (!noteId) return 0
+    let hash = seed
+    for (let i = 0; i < noteId.length; i++) hash = (hash * 31 + noteId.charCodeAt(i)) & 0xffffffff
+    return hash >>> 0
+  }
+
+  // Deterministic small top margin so notes don't align across rows.
+  function getNoteJitter(noteId: string | undefined): number {
+    return (hashOf(noteId, 17) % 5) * 0.35 // 0 .. 1.4rem
+  }
+
+  // Deterministic small horizontal nudge (both directions).
+  function getNoteJitterX(noteId: string | undefined): number {
+    return ((hashOf(noteId, 23) % 7) - 3) * 0.18 // -0.54 .. 0.54rem
+  }
+
+  // Size a note to its content so the board reads as varied clippings rather
+  // than a uniform grid. Photos and long text get more room.
+  function noteSizeClass(note: Note): 'xs' | 's' | 'm' | 'l' {
+    const len = (note.title?.trim().length ?? 0) + (note.content?.trim().length ?? 0)
+    if (note.photos?.length || len > 240) return 'l'
+    if (len > 110) return 'm'
+    if (len > 36) return 's'
+    return 'xs'
   }
 
   function signatureFor(userId: UserId): string {
@@ -87,6 +201,15 @@
     // Open the compose form directly when arriving via a quick-add link.
     if (consumeQueryParam('add') !== null) composing = true
 
+    // Restore the per-session board view (defaults to "new").
+    try {
+      const v = sessionStorage.getItem('notes-board-view')
+      if (v === 'new' || v === 'all') boardView = v
+      // Stack view is a lasting view preference, so it persists across sessions.
+      const sv = localStorage.getItem('notes-stack-view')
+      if (isStackView(sv)) stackView = sv
+    } catch { /* private mode */ }
+
     unsubscribe = subscribeToCollection<Note>('notes', (items) => {
       notes = items
     })
@@ -105,27 +228,44 @@
     if (!newNote.title.trim() && !newNote.content.trim()) return
 
     try {
-      await addDocument<Note>(
-        'notes',
-        {
-          type: 'note',
-          title: newNote.title,
-          content: newNote.content,
-          tags: [],
-          read: false,
-          archived: false,
-          color: newNote.color
-        },
-        $activeUser
-      )
-      newNote = { title: '', content: '', color: 't0' }
+      const doc: Partial<Note> = {
+        type: 'note',
+        title: newNote.title,
+        content: newNote.content,
+        tags: [],
+        read: false,
+        archived: false,
+        color: newNote.color,
+      }
+      if (newNote.customColor.trim()) doc.customColor = newNote.customColor.trim()
+      if (replyContext) {
+        doc.threadId = replyContext.threadId
+        doc.replyTo = replyContext.replyTo
+      }
+      await addDocument<Note>('notes', doc as Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>, $activeUser)
+      const wasReply = !!replyContext
+      newNote = { title: '', content: '', color: 't0', customColor: '' }
       composing = false
+      replyContext = null
       hapticSuccess()
-      toast.success('Note pinned to board')
+      toast.success(wasReply ? 'Reply added' : 'Note pinned to board')
     } catch (e) {
       console.error('Failed to pin note:', e)
       toast.error('Failed to pin note')
     }
+  }
+
+  function startReply(note: Note): void {
+    if (!note.id) return
+    replyContext = {
+      threadId: note.threadId ?? note.id,
+      replyTo: note.id,
+      toName: note.createdBy === $activeUser ? 'yourself' : getDisplayNameForUser(note.createdBy),
+    }
+    newNote = { title: '', content: '', color: newNote.color, customColor: '' }
+    composing = true
+    selectedNote = null
+    threadRootId = null
   }
 
   async function saveEditedNote(): Promise<void> {
@@ -134,7 +274,8 @@
       await updateDocument<Note>('notes', editingNote.id, {
         title: editingNote.title,
         content: editingNote.content,
-        color: editingNote.color
+        color: editingNote.color,
+        customColor: editingNote.customColor?.trim() || ''
       }, $activeUser)
       editingNote = null
       hapticSuccess()
@@ -169,6 +310,244 @@
     await updateDocument<Note>('notes', note.id, {
       pinned: !note.pinned
     }, $activeUser)
+  }
+
+  // ===== Reactions =====
+  async function toggleReaction(note: Note, emoji: string): Promise<void> {
+    if (!note.id) return
+    hapticLight()
+    const reactions: Record<string, UserId[]> = { ...(note.reactions ?? {}) }
+    const users = new Set(reactions[emoji] ?? [])
+    if (users.has($activeUser)) users.delete($activeUser)
+    else users.add($activeUser)
+    if (users.size === 0) delete reactions[emoji]
+    else reactions[emoji] = [...users]
+    await updateDocument<Note>('notes', note.id, { reactions }, $activeUser)
+  }
+  function reactionEntries(note: Note): Array<[string, UserId[]]> {
+    return Object.entries(note.reactions ?? {}).filter(([, u]) => u.length > 0)
+  }
+
+  // ===== Long-press → select mode + context menu (mobile home-screen style) =====
+  let pressTimer: ReturnType<typeof setTimeout> | null = null
+  let longPressed = false
+  let pressStartX = 0
+  let pressStartY = 0
+  function onNotePointerDown(e: PointerEvent, note: Note): void {
+    longPressed = false
+    pressStartX = e.clientX
+    pressStartY = e.clientY
+    const el = e.currentTarget as HTMLElement
+    if (pressTimer) clearTimeout(pressTimer)
+    pressTimer = setTimeout(() => {
+      pressTimer = null
+      longPressed = true
+      hapticMedium()
+      // Enter selection (like holding a home-screen icon), select this note,
+      // and surface a context menu anchored to the note itself.
+      if (!selectMode) selectMode = true
+      if (note.id && !selectedIds.has(note.id)) toggleSelected(note.id)
+      const r = el.getBoundingClientRect()
+      contextRect = { left: r.left, top: r.top, width: r.width, height: r.height }
+      contextFor = note
+    }, 450)
+  }
+  // Only cancel the long-press on a real move (finger jitter shouldn't count),
+  // otherwise micro-movement lets the browser's own text-select/callout win.
+  function onNotePointerMove(e: PointerEvent): void {
+    if (pressTimer && Math.hypot(e.clientX - pressStartX, e.clientY - pressStartY) > 10) {
+      clearTimeout(pressTimer); pressTimer = null
+    }
+  }
+  function cancelPress(): void {
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null }
+  }
+  function closeContext(): void { contextFor = null; contextRect = null }
+
+  // Anchor the context menu to the pressed note: below it when there's room,
+  // otherwise above; left-aligned to the note but clamped into the viewport.
+  let contextMenuStyle = $derived.by(() => {
+    const r = contextRect
+    if (!r || typeof window === 'undefined') return 'left:50%;top:50%;transform:translate(-50%,-50%);width:min(20rem,calc(100vw - 2rem));'
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const menuW = Math.min(320, vw - 16)
+    const gap = 12
+    const left = Math.min(Math.max(8, r.left), vw - menuW - 8)
+    const roomBelow = vh - (r.top + r.height)
+    const vertical = roomBelow > vh * 0.42
+      ? `top:${Math.round(r.top + r.height + gap)}px;`
+      : `bottom:${Math.round(vh - r.top + gap)}px;`
+    return `left:${Math.round(left)}px;width:${menuW}px;${vertical}`
+  })
+
+  // How many notes are in the tapped note's current stack (for "expand thread").
+  function stackSizeOf(note: Note): number {
+    return stackSizes.get(groupKeyOf(note)) ?? 1
+  }
+  // "Expand stack": unstack the linked notes in a linear, yarn-threaded strip
+  // laid out on the corkboard itself (not a modal).
+  function expandFromContext(note: Note): void {
+    contextFor = null
+    selectMode = false
+    selectedIds = new Set()
+    expandedStackKey = groupKeyOf(note)
+    markAsRead(note)
+  }
+  function collapseBoardStack(): void { expandedStackKey = null }
+
+  // ===== Multi-select =====
+  function toggleSelectMode(): void {
+    selectMode = !selectMode
+    selectedIds = new Set()
+  }
+  function exitSelect(): void {
+    selectMode = false
+    selectedIds = new Set()
+  }
+  function toggleSelected(id: string | undefined): void {
+    if (!id) return
+    const s = new Set(selectedIds)
+    if (s.has(id)) s.delete(id); else s.add(id)
+    selectedIds = s
+  }
+
+  // Escape closes the context menu, else leaves select mode (when no modal is up).
+  function onWindowKeydown(e: KeyboardEvent): void {
+    if (e.key !== 'Escape') return
+    if (contextFor) { closeContext(); return }
+    if (showStackMenu) { showStackMenu = false; return }
+    if (selectedNote || threadRootId || editingNote || pendingConfirm) return
+    if (selectMode) exitSelect()
+  }
+
+  // Dismiss the stack-view menu on any click outside it.
+  $effect(() => {
+    if (!showStackMenu) return
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('.stack-picker')) showStackMenu = false
+    }
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
+  })
+
+  // While selecting, a tap on empty board space (not a note, control, menu, or
+  // modal) clears the selection first, then exits — so select mode never feels
+  // sticky. Handled at the document level to keep the board markup clean.
+  $effect(() => {
+    if (!selectMode) return
+    const handler = (e: MouseEvent) => {
+      const t = e.target as HTMLElement
+      if (t.closest('.sticky-note') || t.closest('.cork-rail') || t.closest('.filter-tray')
+        || t.closest('.bulk-bar') || t.closest('.compose-sticky') || t.closest('.context-menu')
+        || t.closest('.reaction-backdrop') || t.closest('.thread-expanded')
+        || t.closest('[role="dialog"]')) return
+      if (selectedIds.size > 0) selectedIds = new Set()
+      else exitSelect()
+    }
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
+  })
+  // Bulk ops snapshot the selection up front (so it can't shift mid-flight) and
+  // issue their writes together rather than one round trip at a time.
+  async function bulkArchive(): Promise<void> {
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
+    hapticLight()
+    exitSelect()
+    await Promise.all(ids.map(id => updateDocument<Note>('notes', id, { archived: true }, $activeUser)))
+    toast.success(`Archived ${ids.length} note${ids.length === 1 ? '' : 's'}`)
+  }
+  async function bulkMarkRead(): Promise<void> {
+    const targets = [...selectedIds]
+      .map(id => notes.find(x => x.id === id))
+      .filter((n): n is Note => !!n && !n.read && n.createdBy !== $activeUser)
+    exitSelect()
+    if (targets.length === 0) return
+    await Promise.all(targets.map(n =>
+      updateDocument<Note>('notes', n.id!, { read: true, readAt: Timestamp.now() }, $activeUser)
+    ))
+  }
+  function bulkDelete(): void {
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
+    pendingConfirm = {
+      message: `Tear up ${ids.length} note${ids.length === 1 ? '' : 's'} permanently?`,
+      onConfirm: async () => {
+        pendingConfirm = null
+        exitSelect()
+        await Promise.all(ids.map(id => deleteDocument('notes', id)))
+        toast.success(`Tore up ${ids.length} note${ids.length === 1 ? '' : 's'}`)
+      }
+    }
+  }
+
+  // ===== Linking / unlinking notes into threads =====
+  // Link the selected notes (and every note already sharing their threads) into
+  // one thread rooted at the earliest note.
+  async function bulkLink(): Promise<void> {
+    const faceIds = [...selectedIds]
+    if (faceIds.length < 2) return
+    const keys = new Set<string>()
+    for (const id of faceIds) {
+      const n = notes.find(x => x.id === id)
+      if (n) keys.add(threadKeyOf(n))
+    }
+    if (keys.size < 2) { toast('Those notes are already linked'); return }
+    // Only notes with a real id can be linked (the id is the thread key), and
+    // an all-archived selection would leave nothing to root the thread on.
+    const members = notes.filter(n => !n.archived && n.id && keys.has(threadKeyOf(n)))
+    const root = [...members].sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))[0]
+    // Root on the earliest *live* note's own id — reusing an inherited threadId
+    // could key the stack on an archived note that never appears on the board,
+    // and would leave the root note replying to itself.
+    const rootKey = root?.id
+    if (!rootKey) return
+    hapticSuccess()
+    await Promise.all(
+      members.map(m => m.id === rootKey
+        // Re-root: the root may still carry an inherited threadId pointing at an
+        // archived note, which would leave it outside its own new stack.
+        ? (root.threadId && root.threadId !== rootKey
+            ? updateDocument<Note>('notes', rootKey, { threadId: rootKey, replyTo: '' }, $activeUser)
+            : Promise.resolve())
+        : updateDocument<Note>('notes', m.id!, { threadId: rootKey, replyTo: rootKey }, $activeUser))
+    )
+    toast.success(`Linked ${members.length} notes into a thread`)
+    selectedIds = new Set(); selectMode = false
+  }
+
+  // Detach a single note from its thread; it becomes its own standalone note.
+  async function unlinkNote(note: Note): Promise<void> {
+    if (!note.id) return
+    hapticMedium()
+    await updateDocument<Note>('notes', note.id, { threadId: note.id, replyTo: '' }, $activeUser)
+    toast.success('Note unlinked')
+  }
+
+  // Whether a note can be detached from the currently-open thread (not the root).
+  // Only meaningful for manual stacks — date/similarity views are virtual.
+  function canUnlink(note: Note): boolean {
+    if (stackView !== 'custom') return false
+    const root = threadNotes[0]
+    return !!root && note.id !== root.id && threadNotes.length > 1
+  }
+
+  // ===== Board view (new/all) persisted per session =====
+  $effect(() => {
+    try { sessionStorage.setItem('notes-board-view', boardView) } catch { /* private mode */ }
+  })
+  $effect(() => {
+    try { localStorage.setItem('notes-stack-view', stackView) } catch { /* private mode */ }
+  })
+
+  function selectStackView(key: StackView): void {
+    stackView = key
+    showStackMenu = false
+    // A regrouping invalidates any expanded stack from the previous grouping.
+    expandedStackKey = null
+    threadRootId = null
+    hapticLight()
   }
 
   // Confirm dialog state
@@ -251,8 +630,9 @@
 
   // Board notes: filtered + sorted, pinned first
   let boardNotes = $derived.by(() => {
-    const q = searchText.trim().toLowerCase()
+    const q = debouncedSearch.trim().toLowerCase()
     let list = notes.filter(n => !n.archived)
+    if (boardView === 'new') list = list.filter(n => !n.read && n.createdBy !== $activeUser)
     if (authorFilter !== 'all') list = list.filter(n => n.createdBy === authorFilter)
     if (unreadOnly) list = list.filter(n => !n.read && n.createdBy !== $activeUser)
     if (q) list = list.filter(n =>
@@ -270,8 +650,80 @@
     })
   })
 
+  // ===== Stack grouping (view-dependent; pure logic lives in noteStacks.ts) =====
+  function stackable(n: Note): StackableNote {
+    return { id: n.id, threadId: n.threadId, title: n.title, content: n.content, createdAtMs: n.createdAt?.toMillis?.() ?? 0 }
+  }
+  let similarityKeys = $derived(
+    stackView === 'similar'
+      ? similarityClusters(notes.filter(n => !n.archived).map(stackable))
+      : new Map<string, string>()
+  )
+  /** The stack a note belongs to under the current view. */
+  function groupKeyOf(n: Note): string {
+    return groupKey(stackable(n), stackView, similarityKeys)
+  }
+
+  // Full (unfiltered) size of every stack, in one pass — a stack's badge counts
+  // all its notes even when filters hide some of them.
+  let stackSizes = $derived.by(() => {
+    const sizes = new Map<string, number>()
+    for (const n of notes) {
+      if (n.archived) continue
+      const key = groupKeyOf(n)
+      sizes.set(key, (sizes.get(key) ?? 0) + 1)
+    }
+    return sizes
+  })
+
+  // Group the filtered board into stacks; each renders with a face (most recent
+  // note), sorted like the flat board.
+  let boardThreads = $derived.by(() => {
+    const groups = new Map<string, Note[]>()
+    for (const n of boardNotes) {
+      const key = groupKeyOf(n)
+      const arr = groups.get(key)
+      if (arr) arr.push(n); else groups.set(key, [n])
+    }
+    const list = [...groups.entries()].map(([key, ns]) => {
+      const face = [...ns].sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0))[0]
+      return { key, face, count: stackSizes.get(key) ?? ns.length }
+    })
+    return list.sort((a, b) => {
+      if (a.face.pinned && !b.face.pinned) return -1
+      if (!a.face.pinned && b.face.pinned) return 1
+      const ta = a.face.createdAt?.toMillis?.() ?? 0
+      const tb = b.face.createdAt?.toMillis?.() ?? 0
+      return sortMode === 'oldest' ? ta - tb : tb - ta
+    })
+  })
+
+  // Notes belonging to the currently-open stack, oldest first.
+  let threadNotes = $derived(
+    threadRootId
+      ? notes.filter(n => !n.archived && groupKeyOf(n) === threadRootId)
+          .sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))
+      : []
+  )
+
+  // Notes of the stack unstacked on the board (oldest → newest, linear).
+  let expandedNotes = $derived(
+    expandedStackKey
+      ? notes.filter(n => !n.archived && groupKeyOf(n) === expandedStackKey)
+          .sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))
+      : []
+  )
+
   let totalBoardCount = $derived(notes.filter(n => !n.archived).length)
   let archivedNotes = $derived(notes.filter(n => n.archived))
+
+  // When a thread stack is tapped: open the thread modal if it has replies,
+  // otherwise the single note's detail.
+  function openThread(key: string, face: Note): void {
+    if (selectMode) { toggleSelected(face.id); return }
+    if ((stackSizes.get(key) ?? 1) > 1) { threadRootId = key; markAsRead(face) }
+    else openNoteDetail(face)
+  }
 
   // Unread count from other user
   let unreadCount = $derived(
@@ -283,12 +735,31 @@
     { value: 'Z', label: 'Z' },
     { value: 'T', label: 'T' },
   ]
+
+  // Optional manual override of the board background colour. When set, it tints
+  // the backdrop AND the control surfaces (rail + filter tray) so the whole
+  // board reads as one coloured object.
+  let corkStyle = $derived.by(() => {
+    const c = $currentPreferences?.corkboardColor?.trim()
+    if (!c) return ''
+    return [
+      `--cork-a:${c}`,
+      `--cork-b:color-mix(in srgb, ${c} 88%, #000)`,
+      `--cork-c:color-mix(in srgb, ${c} 74%, #000)`,
+      // Darker framed wood-substitute for the control rail.
+      `--cork-rail:linear-gradient(180deg, color-mix(in srgb, ${c} 68%, #241a0e) 0%, color-mix(in srgb, ${c} 52%, #1c140a) 100%)`,
+      // Softly tinted tray that still keeps inputs legible.
+      `--cork-tray:color-mix(in srgb, ${c} 30%, var(--color-surface))`,
+    ].join(';')
+  })
 </script>
 
-<!-- Full-bleed cork backdrop (fixed behind the page content) -->
-<div class="cork-backdrop" aria-hidden="true"></div>
+<svelte:window onkeydown={onWindowKeydown} />
 
-<div class="corkboard-page">
+<!-- Full-bleed cork backdrop (fixed behind the page content) -->
+<div class="cork-backdrop" style={corkStyle} aria-hidden="true"></div>
+
+<div class="corkboard-page" style={corkStyle}>
   <!-- Wooden control rail — the board's "tack & pen bin" -->
   <div class="cork-rail">
     <div class="flex items-center gap-2.5 min-w-0">
@@ -308,11 +779,61 @@
     </div>
 
     <div class="flex items-center gap-1.5">
-      {#if unreadCount > 0 && activeView === 'corkboard'}
-        <span class="unread-bubble">{unreadCount} new</span>
-      {/if}
-
       {#if activeView === 'corkboard'}
+        <div class="view-toggle" role="group" aria-label="Board view">
+          <button type="button" class="view-seg {boardView === 'new' ? 'is-on' : ''}" onclick={() => { boardView = 'new'; hapticLight(); }}>
+            New{#if unreadCount > 0}<span class="view-badge">{unreadCount}</span>{/if}
+          </button>
+          <button type="button" class="view-seg {boardView === 'all' ? 'is-on' : ''}" onclick={() => { boardView = 'all'; hapticLight(); }}>All</button>
+        </div>
+
+        <!-- Stack view: a first-class (but quiet) view modifier -->
+        <div class="stack-picker">
+          <button
+            type="button"
+            class="rail-btn {showStackMenu || stackView !== 'custom' ? 'is-active' : ''}"
+            onclick={(e) => { e.stopPropagation(); showStackMenu = !showStackMenu; hapticLight(); }}
+            aria-label="Stack view: {stackViewDef.label}"
+            aria-haspopup="menu"
+            aria-expanded={showStackMenu}
+            title="Stack view: {stackViewDef.label}"
+          >
+            <Layers size={16} />
+            {#if stackView !== 'custom'}<span class="rail-tag">{stackViewDef.label}</span>{/if}
+          </button>
+
+          {#if showStackMenu}
+            <div class="stack-menu" role="menu">
+              <p class="stack-menu-head">Stack notes by</p>
+              {#each STACK_VIEWS as sv (sv.key)}
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={stackView === sv.key}
+                  class="stack-opt {stackView === sv.key ? 'is-on' : ''}"
+                  onclick={() => selectStackView(sv.key)}
+                >
+                  <span class="stack-opt-main">
+                    <span class="stack-opt-label">{sv.label}</span>
+                    <span class="stack-opt-hint">{sv.hint}</span>
+                  </span>
+                  {#if stackView === sv.key}<Check size={15} />{/if}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+
+        <button
+          type="button"
+          class="rail-btn {selectMode ? 'is-active' : ''}"
+          onclick={toggleSelectMode}
+          aria-label="Select notes"
+          aria-pressed={selectMode}
+        >
+          <CheckCheck size={16} />
+        </button>
+
         <button
           type="button"
           class="rail-btn {showFilters || activeFilterCount > 0 ? 'is-active' : ''}"
@@ -328,7 +849,7 @@
       <button
         type="button"
         class="rail-btn {activeView === 'archive' ? 'is-active' : ''}"
-        onclick={() => { activeView = activeView === 'corkboard' ? 'archive' : 'corkboard'; hapticLight(); }}
+        onclick={() => { activeView = activeView === 'corkboard' ? 'archive' : 'corkboard'; exitSelect(); hapticLight(); }}
         aria-label={activeView === 'archive' ? 'Back to board' : 'Open archive'}
       >
         {#if activeView === 'archive'}
@@ -343,7 +864,7 @@
         <button
           type="button"
           class="rail-pen"
-          onclick={() => { composing = !composing; hapticLight(); }}
+          onclick={() => { composing = !composing; if (composing) exitSelect(); hapticLight(); }}
           aria-label="Write a note"
         >
           <Pencil size={15} />
@@ -399,17 +920,55 @@
 
   {#if activeView === 'corkboard'}
     <div class="notes-board">
+      {#if expandedStackKey && expandedNotes.length > 0}
+        <!-- Unstacked thread: notes laid out linearly on the board, strung
+             together with decorative yarn to show they're linked. -->
+        <div class="thread-expanded">
+          <div class="thread-expanded-head">
+            <button type="button" class="thread-collapse" onclick={collapseBoardStack} aria-label="Collapse stack">
+              <X size={16} /><span>Collapse</span>
+            </button>
+            <span class="thread-expanded-title"><Link2 size={14} /> Linked thread · {expandedNotes.length}</span>
+          </div>
+          <div class="thread-strip">
+            {#each expandedNotes as n, i (n.id)}
+              {@const tone = toneOf(n)}
+              {@const sig = signatureFor(n.createdBy)}
+              <div
+                class="strip-note {i === 0 ? 'is-first' : ''} {i === expandedNotes.length - 1 ? 'is-last' : ''}"
+                style={noteVars(tone, n.customColor)}
+                role="button"
+                tabindex="0"
+                onclick={() => openNoteDetail(n)}
+                onkeydown={(e) => e.key === 'Enter' && openNoteDetail(n)}
+              >
+                <span class="yarn-knot" aria-hidden="true"></span>
+                <div class="strip-order">{i + 1}</div>
+                {#if n.title}<h3 class="strip-title">{n.title}</h3>{/if}
+                {#if n.content}<p class="strip-content">{n.content}</p>{/if}
+                {#if sig}<p class="strip-sign">{sig}</p>{/if}
+                <div class="strip-foot">
+                  <span>{n.createdBy === $activeUser ? 'You' : getDisplayNameForUser(n.createdBy)}</span>
+                  <span>{getRelativeTime(n.createdAt)}</span>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {:else}
       <!-- Compose sticky inline -->
       {#if composing}
-        <div class="compose-sticky" style={noteVars(composeTone)}>
+        <div class="compose-sticky" style={noteVars(composeTone, newNote.customColor)}>
           <div class="sticky-top-tape"></div>
           <div class="p-4 pt-5 space-y-2">
             <div class="flex items-center justify-between mb-1">
-              <span class="compose-eyebrow">New note · {$displayNames[$activeUser]}</span>
+              <span class="compose-eyebrow">
+                {#if replyContext}Replying to {replyContext.toName}{:else}New note · {$displayNames[$activeUser]}{/if}
+              </span>
               <button
                 type="button"
                 class="compose-x"
-                onclick={() => { composing = false; newNote = { title: '', content: '', color: 't0' }; }}
+                onclick={() => { composing = false; replyContext = null; newNote = { title: '', content: '', color: 't0', customColor: '' }; }}
                 aria-label="Discard"
               >
                 <X size={16} />
@@ -428,60 +987,89 @@
               bind:value={newNote.content}
             ></textarea>
 
-            <!-- Tone picker (author's palette) -->
-            <div class="flex items-center gap-2 pt-1">
+            <!-- Tone picker (author's palette) + custom color -->
+            <div class="flex items-center gap-2 pt-1 flex-wrap">
               <span class="compose-eyebrow">Tone</span>
-              <div class="flex gap-1.5">
+              <div class="flex gap-1.5 items-center">
                 {#each NOTE_TONE_KEYS as key, i}
                   <button
                     type="button"
-                    class="touch-sm color-swatch {newNote.color === key ? 'is-selected' : ''}"
+                    class="touch-sm color-swatch {newNote.color === key && !newNote.customColor ? 'is-selected' : ''}"
                     style="background:{swatchBg(myPalette[i])}"
-                    onclick={() => newNote.color = key}
+                    onclick={() => { newNote.color = key; newNote.customColor = ''; }}
                     aria-label="Tone {i + 1}"
                   ></button>
                 {/each}
+                <label class="custom-swatch {newNote.customColor ? 'is-selected' : ''}" style={newNote.customColor ? `background:${newNote.customColor}` : ''} aria-label="Custom color">
+                  <input type="color" class="sr-only" value={newNote.customColor || swatchBg(composeTone)} oninput={(e) => newNote.customColor = (e.currentTarget as HTMLInputElement).value} />
+                  {#if !newNote.customColor}<Pencil size={11} />{/if}
+                </label>
               </div>
             </div>
 
             <div class="flex justify-end pt-1">
               <button type="button" class="pin-btn" onclick={addNote}>
-                <Pin size={14} />
-                Pin it
+                {#if replyContext}<Reply size={14} />Reply{:else}<Pin size={14} />Pin it{/if}
               </button>
             </div>
           </div>
         </div>
       {/if}
 
-      {#if boardNotes.length === 0 && !composing}
+      {#if boardThreads.length === 0 && !composing}
         <div class="cork-empty">
-          <EmptyState
-            icon={StickyNote}
-            title={activeFilterCount > 0 ? 'No notes match' : 'The board is empty'}
-            description={activeFilterCount > 0 ? 'Try clearing the filters.' : `Pin your first note for ${$displayNames[otherUserId]}`}
-          />
+          {#if boardView === 'new'}
+            <EmptyState
+              icon={Check}
+              title="All caught up"
+              description="No new notes from {$displayNames[otherUserId]}."
+              actionLabel="Show the whole board"
+              onAction={() => { boardView = 'all'; hapticLight(); }}
+            />
+          {:else}
+            <EmptyState
+              icon={StickyNote}
+              title={activeFilterCount > 0 ? 'No notes match' : 'The board is empty'}
+              description={activeFilterCount > 0 ? 'Try clearing the filters.' : `Pin your first note for ${$displayNames[otherUserId]}`}
+            />
+          {/if}
         </div>
       {:else}
         <div class="notes-masonry">
-          {#each boardNotes as note (note.id)}
+          {#each boardThreads as thread (thread.key)}
+            {@const note = thread.face}
             {@const isUnread = !note.read && note.createdBy !== $activeUser}
-            {@const rot = getNoteRotation(note.id)}
             {@const sig = signatureFor(note.createdBy)}
+            {@const selected = selectMode && !!note.id && selectedIds.has(note.id)}
+            {@const reacts = reactionEntries(note)}
             <div
-              class="sticky-note {note.pinned ? 'is-pinned' : ''} {isUnread ? 'is-unread' : ''}"
-              style="{noteVars(toneOf(note))}--rot:{rot}deg"
-              onclick={() => openNoteDetail(note)}
+              class="sticky-note note-{noteSizeClass(note)} {note.pinned ? 'is-pinned' : ''} {isUnread ? 'is-unread' : ''} {thread.count > 1 ? 'is-stack' : ''} {selected ? 'is-selected-note' : ''}"
+              style={noteStyle(note)}
+              onclick={() => { if (longPressed) { longPressed = false; return } openThread(thread.key, note) }}
               role="button"
               tabindex="0"
-              onkeydown={(e) => e.key === 'Enter' && openNoteDetail(note)}
+              onkeydown={(e) => e.key === 'Enter' && openThread(thread.key, note)}
+              onpointerdown={(e) => onNotePointerDown(e, note)}
+              onpointerup={cancelPress}
+              onpointermove={onNotePointerMove}
+              onpointerleave={cancelPress}
+              oncontextmenu={(e) => e.preventDefault()}
             >
+              {#if thread.count > 1}
+                <div class="stack-layer stack-layer-2"></div>
+                <div class="stack-layer stack-layer-1"></div>
+              {/if}
+
               <div class="thumbtack {note.pinned ? 'thumbtack-pinned' : ''}">
                 <div class="thumbtack-head"></div>
                 <div class="thumbtack-stem"></div>
               </div>
 
-              {#if isUnread}
+              {#if selectMode}
+                <div class="select-check {selected ? 'is-on' : ''}">
+                  {#if selected}<Check size={13} />{/if}
+                </div>
+              {:else if isUnread}
                 <div class="unread-dot"></div>
               {/if}
 
@@ -503,56 +1091,45 @@
                 {/if}
               </div>
 
+              {#if reacts.length}
+                <div class="note-reactions">
+                  {#each reacts as [emoji, users] (emoji)}
+                    <span class="react-chip {users.includes($activeUser) ? 'is-mine' : ''}">{emoji}{#if users.length > 1}<span class="react-n">{users.length}</span>{/if}</span>
+                  {/each}
+                </div>
+              {/if}
+
               <div class="sticky-footer">
                 <span class="sticky-author">
+                  {#if thread.count > 1}<Reply size={11} /> {thread.count} · {/if}
                   {note.createdBy === $activeUser ? 'You' : getDisplayNameForUser(note.createdBy)}
                 </span>
                 <span class="sticky-time">{getRelativeTime(note.createdAt)}</span>
               </div>
 
               <div class="sticky-actions" role="none" onclick={(e) => e.stopPropagation()}>
-                <button
-                  type="button"
-                  class="sticky-action-btn"
-                  onclick={() => togglePin(note)}
-                  aria-label={note.pinned ? 'Unpin' : 'Pin'}
-                  title={note.pinned ? 'Unpin' : 'Pin to top'}
-                >
+                <button type="button" class="sticky-action-btn" onclick={() => startReply(note)} aria-label="Reply" title="Reply">
+                  <Reply size={13} />
+                </button>
+                <button type="button" class="sticky-action-btn" onclick={() => togglePin(note)} aria-label={note.pinned ? 'Unpin' : 'Pin'} title={note.pinned ? 'Unpin' : 'Pin to top'}>
                   <Pin size={13} class={note.pinned ? 'text-accent' : ''} />
                 </button>
-                <button
-                  type="button"
-                  class="sticky-action-btn"
-                  onclick={() => toggleArchive(note)}
-                  aria-label={note.archived ? 'Unarchive' : 'Archive'}
-                  title="Archive"
-                >
+                <button type="button" class="sticky-action-btn" onclick={() => toggleArchive(note)} aria-label="Archive" title="Archive">
                   <Archive size={13} />
                 </button>
                 {#if note.createdBy === $activeUser}
-                  <button
-                    type="button"
-                    class="sticky-action-btn"
-                    onclick={() => startEditing(note)}
-                    aria-label="Edit"
-                    title="Edit"
-                  >
+                  <button type="button" class="sticky-action-btn" onclick={() => startEditing(note)} aria-label="Edit" title="Edit">
                     <Pencil size={13} />
                   </button>
                 {/if}
-                <button
-                  type="button"
-                  class="sticky-action-btn hover:text-red-500"
-                  onclick={() => note.id && removeNote(note.id)}
-                  aria-label="Delete"
-                  title="Delete"
-                >
+                <button type="button" class="sticky-action-btn hover:text-red-500" onclick={() => note.id && removeNote(note.id)} aria-label="Delete" title="Delete">
                   <Trash2 size={13} />
                 </button>
               </div>
             </div>
           {/each}
         </div>
+      {/if}
       {/if}
     </div>
 
@@ -619,12 +1196,12 @@
   {/if}
 </div>
 
-<!-- Note Detail Modal -->
-<Modal open={!!selectedNote} onclose={closeNoteDetail} title={selectedNote?.title || 'Note'}>
+<!-- Note Detail Modal — stacks above the thread modal when opened from a stack -->
+<Modal open={!!selectedNote} onclose={closeNoteDetail} title={selectedNote?.title || 'Note'} zIndex={60}>
   {#snippet header()}
     {#if selectedNote}
       {@const tone = toneOf(selectedNote)}
-      <div class="relative modal-note-header p-6 shrink-0" style={noteVars(tone)}>
+      <div class="relative modal-note-header p-6 shrink-0" style={noteVars(tone, selectedNote.customColor)}>
         <button
           class="absolute top-2 right-2 w-11 h-11 rounded-full bg-black/10 flex items-center justify-center hover:bg-black/20 transition-colors touch-manipulation"
           onclick={closeNoteDetail}
@@ -722,6 +1299,23 @@
         </button>
       </div>
 
+      <button type="button" class="btn-primary w-full text-sm" onclick={() => selectedNote && startReply(selectedNote)}>
+        <Reply size={16} />
+        Reply
+      </button>
+
+      <!-- Reactions -->
+      <div class="flex flex-wrap items-center gap-1.5">
+        {#each REACTION_EMOJIS as emoji (emoji)}
+          {@const users = selectedNote.reactions?.[emoji] ?? []}
+          <button
+            type="button"
+            class="react-pick {users.includes($activeUser) ? 'is-mine' : ''}"
+            onclick={() => selectedNote && toggleReaction(selectedNote, emoji)}
+          >{emoji}{#if users.length}<span class="react-n">{users.length}</span>{/if}</button>
+        {/each}
+      </div>
+
       <div class="text-xs text-slate-400">
         {getDisplayNameForUser(selectedNote.createdBy)} · {formatDate(selectedNote.createdAt)}
         {#if selectedNote.read && selectedNote.readAt}
@@ -749,19 +1343,23 @@
         bind:value={editingNote.content}
       ></textarea>
 
-      <!-- Tone picker -->
-      <div class="flex items-center gap-3">
+      <!-- Tone picker + custom color -->
+      <div class="flex items-center gap-3 flex-wrap">
         <span class="text-sm text-slate-500">Tone:</span>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
           {#each NOTE_TONE_KEYS as key, i}
             <button
               type="button"
-              class="touch-sm color-swatch-lg {editingNote.color === key ? 'is-selected' : ''}"
+              class="touch-sm color-swatch-lg {editingNote.color === key && !editingNote.customColor ? 'is-selected' : ''}"
               style="background:{swatchBg(myPalette[i])}"
-              onclick={() => { if (editingNote) editingNote.color = key }}
+              onclick={() => { if (editingNote) { editingNote.color = key; editingNote.customColor = '' } }}
               aria-label="Tone {i + 1}"
             ></button>
           {/each}
+          <label class="custom-swatch-lg {editingNote.customColor ? 'is-selected' : ''}" style={editingNote.customColor ? `background:${editingNote.customColor}` : ''} aria-label="Custom color">
+            <input type="color" class="sr-only" value={editingNote.customColor || '#e11d48'} oninput={(e) => { if (editingNote) editingNote.customColor = (e.currentTarget as HTMLInputElement).value }} />
+            {#if !editingNote.customColor}<Pencil size={13} />{/if}
+          </label>
         </div>
       </div>
 
@@ -786,6 +1384,112 @@
   onCancel={() => pendingConfirm = null}
 />
 
+<!-- Long-press reaction menu -->
+{#if contextFor}
+  {@const cf = contextFor}
+  <button type="button" class="reaction-backdrop" onclick={closeContext} aria-label="Close menu"></button>
+  {#if contextRect}
+    <!-- The pressed note, lifted above the dim so the menu clearly belongs to it. -->
+    <div
+      class="context-lift"
+      style="left:{contextRect.left}px;top:{contextRect.top}px;width:{contextRect.width}px;{noteVars(toneOf(cf), cf.customColor)}"
+      aria-hidden="true"
+    >
+      {#if cf.title}<h3 class="lift-title">{cf.title}</h3>{/if}
+      {#if cf.content}<p class="lift-content">{cf.content}</p>{/if}
+    </div>
+  {/if}
+  <div class="context-menu" style={contextMenuStyle} role="menu">
+    <!-- Reactions -->
+    <div class="context-reacts">
+      {#each REACTION_EMOJIS as emoji (emoji)}
+        {@const mine = (cf.reactions?.[emoji] ?? []).includes($activeUser)}
+        <button type="button" role="menuitemcheckbox" aria-checked={mine} aria-label="React {emoji}" class="react-emoji {mine ? 'is-mine' : ''}" onclick={() => toggleReaction(cf, emoji)}>{emoji}</button>
+      {/each}
+    </div>
+    <div class="context-actions">
+      {#if stackSizeOf(cf) > 1}
+        <button type="button" role="menuitem" class="context-btn context-yarn" onclick={() => expandFromContext(cf)}>
+          <Layers size={16} /><span>Expand stack</span><span class="yarn-badge">{stackSizeOf(cf)}</span>
+        </button>
+      {/if}
+      <button type="button" role="menuitem" class="context-btn" onclick={() => { closeContext(); selectMode = false; selectedIds = new Set(); startReply(cf) }}>
+        <Reply size={16} /><span>Reply</span>
+      </button>
+      <button type="button" role="menuitem" class="context-btn" onclick={() => { togglePin(cf); closeContext() }}>
+        <Pin size={16} class={cf.pinned ? 'text-accent' : ''} /><span>{cf.pinned ? 'Unpin' : 'Pin'}</span>
+      </button>
+      <button type="button" role="menuitem" class="context-btn" onclick={() => { toggleArchive(cf); closeContext() }}>
+        <Archive size={16} /><span>Archive</span>
+      </button>
+      <button type="button" role="menuitem" class="context-btn context-danger" onclick={() => { closeContext(); cf.id && removeNote(cf.id) }}>
+        <Trash2 size={16} /><span>Delete</span>
+      </button>
+    </div>
+    <p class="context-hint">Tap notes to select more · long-press for this menu</p>
+  </div>
+{/if}
+
+<!-- Multi-select bulk action bar -->
+{#if selectMode && selectedIds.size > 0}
+  <div class="bulk-bar">
+    <span class="bulk-count">{selectedIds.size} selected</span>
+    <div class="flex items-center gap-1.5">
+      <button type="button" class="bulk-btn" onclick={bulkLink} disabled={selectedIds.size < 2} title="Link into a thread"><Link2 size={16} /><span class="hidden sm:inline">Link</span></button>
+      <button type="button" class="bulk-btn" onclick={bulkMarkRead}><Check size={16} /><span class="hidden sm:inline">Read</span></button>
+      <button type="button" class="bulk-btn" onclick={bulkArchive}><Archive size={16} /><span class="hidden sm:inline">Archive</span></button>
+      <button type="button" class="bulk-btn bulk-danger" onclick={bulkDelete}><Trash2 size={16} /><span class="hidden sm:inline">Delete</span></button>
+    </div>
+  </div>
+{/if}
+
+<!-- Thread modal (an expanded stack) — notes strung together like yarn -->
+<Modal open={threadRootId !== null} onclose={() => threadRootId = null} title="Stack">
+  {#if threadRootId}
+    <div class="thread-list">
+      {#each threadNotes as n (n.id)}
+        {@const tone = toneOf(n)}
+        <div
+          class="thread-note"
+          style={noteVars(tone, n.customColor)}
+          role="button"
+          tabindex="0"
+          onclick={() => openNoteDetail(n)}
+          onkeydown={(e) => e.key === 'Enter' && openNoteDetail(n)}
+        >
+          <div class="flex items-center justify-between mb-1">
+            <span class="thread-author">{n.createdBy === $activeUser ? 'You' : getDisplayNameForUser(n.createdBy)}</span>
+            <div class="flex items-center gap-1.5">
+              <span class="thread-time">{getRelativeTime(n.createdAt)}</span>
+              {#if canUnlink(n)}
+                <button type="button" class="thread-unlink touch-sm" onclick={(e) => { e.stopPropagation(); unlinkNote(n) }} aria-label="Unlink from thread" title="Unlink from thread">
+                  <Unlink size={13} />
+                </button>
+              {/if}
+            </div>
+          </div>
+          {#if n.title}<h4 class="font-bold text-sm mb-0.5" style="color:var(--note-ink)">{n.title}</h4>{/if}
+          {#if n.content}<p class="text-sm whitespace-pre-wrap line-clamp-4" style="color:var(--note-ink);opacity:0.85">{n.content}</p>{/if}
+          {#if reactionEntries(n).length}
+            <div class="note-reactions" style="position:static;margin-top:0.4rem">
+              {#each reactionEntries(n) as [emoji, users] (emoji)}
+                <span class="react-chip {users.includes($activeUser) ? 'is-mine' : ''}">{emoji}{#if users.length > 1}<span class="react-n">{users.length}</span>{/if}</span>
+              {/each}
+            </div>
+          {/if}
+          <span class="thread-open-hint">Tap to open →</span>
+        </div>
+      {/each}
+      {#if stackView === 'custom'}
+        <button type="button" class="btn-primary w-full text-sm" onclick={() => { const root = threadNotes[0]; if (root) startReply(root) }}>
+          <Reply size={16} />
+          Reply to thread
+        </button>
+      {/if}
+    </div>
+  {/if}
+</Modal>
+
 <style>
   /* ===== CORK BACKDROP (full-bleed page background) ===== */
   .cork-backdrop {
@@ -793,16 +1497,22 @@
     inset: 0;
     z-index: 0;
     pointer-events: none;
+    --cork-a: #d4b895;
+    --cork-b: #c8a882;
+    --cork-c: #b9986f;
     background:
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E"),
-      radial-gradient(120% 120% at 50% 0%, #d4b895 0%, #c8a882 55%, #b9986f 100%);
+      radial-gradient(120% 120% at 50% 0%, var(--cork-a) 0%, var(--cork-b) 55%, var(--cork-c) 100%);
     box-shadow: inset 0 8px 24px rgba(0,0,0,0.18);
   }
 
   :global(.dark) .cork-backdrop {
+    --cork-a: #8a6a44;
+    --cork-b: #7a5c3a;
+    --cork-c: #654b30;
     background:
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.13'/%3E%3C/svg%3E"),
-      radial-gradient(120% 120% at 50% 0%, #8a6a44 0%, #7a5c3a 55%, #654b30 100%);
+      radial-gradient(120% 120% at 50% 0%, var(--cork-a) 0%, var(--cork-b) 55%, var(--cork-c) 100%);
     box-shadow: inset 0 8px 30px rgba(0,0,0,0.4);
   }
 
@@ -817,16 +1527,22 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 0.5rem;
+    row-gap: 0.5rem;
     padding: 0.6rem 0.85rem;
     border-radius: 0.9rem;
-    background: linear-gradient(180deg, #9a7b4f 0%, #86683f 100%);
+    background: var(--cork-rail, linear-gradient(180deg, #9a7b4f 0%, #86683f 100%));
     box-shadow:
       inset 0 1px 0 rgba(255,255,255,0.18),
       inset 0 -2px 4px rgba(0,0,0,0.25),
       0 3px 8px rgba(0,0,0,0.25);
     margin-bottom: 0.85rem;
   }
+  /* Title keeps a minimum footprint so the controls wrap to their own row on
+     narrow screens instead of overlapping "Our Board". */
+  .cork-rail > :first-child { flex: 1 1 auto; min-width: 8rem; }
+  .cork-rail > :last-child { flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
 
   .corkboard-pin-icon {
     width: 2rem;
@@ -854,16 +1570,6 @@
     color: rgba(253,246,233,0.75);
   }
 
-  .unread-bubble {
-    background: var(--color-accent);
-    color: white;
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 0.2rem 0.55rem;
-    border-radius: 999px;
-    letter-spacing: 0.02em;
-  }
-
   /* Rail buttons (brass tacks in the bin) */
   .rail-btn {
     position: relative;
@@ -881,6 +1587,61 @@
   }
   .rail-btn:hover { background: rgba(255,255,255,0.2); }
   .rail-btn.is-active { background: var(--color-accent); }
+
+  /* ===== Stack-view picker (rail) ===== */
+  .stack-picker { position: relative; }
+  .rail-tag {
+    margin-left: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .stack-menu {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    width: 15rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.4rem;
+    border-radius: 0.9rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.28);
+    animation: stackpop 0.13s ease-out;
+  }
+  @keyframes stackpop { from { opacity: 0; transform: translateY(-4px); } }
+  .stack-menu-head {
+    padding: 0.25rem 0.55rem 0.4rem;
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-text-hint, #78716c);
+  }
+  .stack-opt {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.55rem;
+    border-radius: 0.6rem;
+    text-align: left;
+    color: var(--color-text);
+    transition: background 120ms;
+  }
+  .stack-opt:hover { background: var(--color-surface-2); }
+  .stack-opt.is-on { color: var(--color-accent); }
+  .stack-opt-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .stack-opt-label { font-size: 0.85rem; font-weight: 600; }
+  .stack-opt-hint {
+    font-size: 0.68rem;
+    color: var(--color-text-hint, #78716c);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   .rail-badge {
     margin-left: 0.3rem;
@@ -916,12 +1677,12 @@
     padding: 0.6rem 0.7rem;
     margin-bottom: 0.85rem;
     border-radius: 0.85rem;
-    background: rgba(255,255,255,0.82);
+    background: var(--cork-tray, rgba(255,255,255,0.82));
     backdrop-filter: blur(4px);
     box-shadow: 0 2px 8px rgba(0,0,0,0.12);
   }
   :global(.dark) .filter-tray {
-    background: rgba(30,26,22,0.8);
+    background: var(--cork-tray, rgba(30,26,22,0.8));
   }
 
   .tray-input {
@@ -998,30 +1759,46 @@
     background: rgba(0,0,0,0.2);
   }
 
+  /* Organic wrapping flow. Notes are sized to their content (flex-basis below)
+     for variety, but grow to fill the row so the board never bunches in the
+     middle or leaves large empty chunks. Ragged bases + jitter keep it from
+     reading as fixed columns. */
   .notes-masonry {
-    columns: 2;
-    column-gap: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.5rem 0.6rem;
   }
-  @media (min-width: 640px) { .notes-masonry { columns: 3; } }
-  @media (min-width: 900px) { .notes-masonry { columns: 4; } }
 
   /* ===== STICKY NOTE ===== */
   .sticky-note {
-    break-inside: avoid;
     position: relative;
-    margin-bottom: 0.75rem;
+    flex: 1 1 12rem; /* grow to fill the row; basis set per size below */
+    max-width: 16rem;
     border-radius: 2px;
     padding: 0.875rem 0.875rem 0.6rem;
     cursor: pointer;
     background: var(--note-bg, #fef08a);
     color: var(--note-ink, #1c1917);
-    transform: rotate(var(--rot, 0deg));
+    margin-top: var(--jy, 0);
+    transform: translateX(var(--jx, 0)) rotate(var(--rot, 0deg));
     transition: transform 150ms ease, box-shadow 150ms ease;
     box-shadow: 2px 3px 10px rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.1);
+    /* Long-press should open our menu, not select text or the OS callout. */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
   }
 
+  /* Content-driven bases + growth caps: small clippings stay tighter, fuller
+     notes are allowed to spread wider. */
+  .sticky-note.note-xs { flex-basis: 8rem;  max-width: 11rem; }
+  .sticky-note.note-s  { flex-basis: 10rem; max-width: 13rem; }
+  .sticky-note.note-m  { flex-basis: 12rem; max-width: 15rem; }
+  .sticky-note.note-l  { flex-basis: 14rem; max-width: 19rem; }
+
   .sticky-note:hover, .sticky-note:focus-visible {
-    transform: rotate(0deg) scale(1.02);
+    transform: translateX(var(--jx, 0)) rotate(0deg) scale(1.03);
     box-shadow: 4px 8px 20px rgba(0,0,0,0.25);
     outline: none;
     z-index: 10;
@@ -1096,6 +1873,14 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+  /* Collapse the visible text toward each note's size so short notes stay
+     small and long ones earn their extra room. */
+  .note-xs .sticky-content { -webkit-line-clamp: 3; line-clamp: 3; }
+  .note-s  .sticky-content { -webkit-line-clamp: 4; line-clamp: 4; }
+  .note-m  .sticky-content { -webkit-line-clamp: 7; line-clamp: 7; }
+  .note-l  .sticky-content { -webkit-line-clamp: 12; line-clamp: 12; }
+  .note-xs .sticky-title { font-size: 0.8rem; }
+  .note-l  .sticky-title { font-size: 0.95rem; }
 
   .sticky-photos {
     display: flex;
@@ -1112,8 +1897,8 @@
     font-style: italic;
     font-size: 0.8rem;
     font-weight: 600;
-    color: var(--note-tack);
-    opacity: 0.85;
+    color: var(--note-sign, var(--note-tack));
+    opacity: 0.95;
     word-break: break-word;
   }
 
@@ -1324,4 +2109,447 @@
     background: var(--color-accent);
     box-shadow: 0 0 0 1.5px white;
   }
+
+  /* ===== New/All view toggle (rail) ===== */
+  .view-toggle {
+    display: inline-flex;
+    background: rgba(0,0,0,0.18);
+    border-radius: 0.6rem;
+    padding: 0.15rem;
+    gap: 0.1rem;
+  }
+  .view-seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 1.9rem;
+    padding: 0 0.6rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fdf6e9;
+  }
+  .view-seg.is-on { background: var(--color-accent); }
+  .view-badge {
+    font-size: 0.6rem;
+    font-weight: 800;
+    background: rgba(255,255,255,0.28);
+    border-radius: 999px;
+    padding: 0.02rem 0.28rem;
+  }
+
+  /* ===== Stack layers (threads) ===== */
+  .sticky-note.is-stack { position: relative; }
+  .stack-layer {
+    position: absolute;
+    inset: 0;
+    border-radius: 2px;
+    background: var(--note-bg);
+    box-shadow: 2px 3px 8px rgba(0,0,0,0.15);
+    z-index: -1;
+  }
+  .stack-layer-1 { transform: rotate(2.5deg) translate(3px, 3px); filter: brightness(0.97); }
+  .stack-layer-2 { transform: rotate(-3deg) translate(-2px, 5px); filter: brightness(0.94); }
+
+  /* ===== Select mode ===== */
+  .sticky-note.is-selected-note { outline: 3px solid var(--color-accent); outline-offset: 2px; }
+  .select-check {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    width: 1.3rem;
+    height: 1.3rem;
+    border-radius: 50%;
+    background: var(--color-surface);
+    border: 2px solid var(--color-accent);
+    display: grid;
+    place-items: center;
+    color: var(--color-accent);
+    z-index: 3;
+  }
+  .select-check.is-on { background: var(--color-accent); color: #fff; }
+
+  /* ===== Reactions ===== */
+  .note-reactions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.4rem;
+  }
+  .react-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.12rem;
+    font-size: 0.72rem;
+    line-height: 1;
+    padding: 0.15rem 0.35rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.6);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+  }
+  :global(.dark) .react-chip { background: rgba(0,0,0,0.3); }
+  .react-chip.is-mine { outline: 1.5px solid var(--color-accent); }
+  .react-n { font-size: 0.62rem; font-weight: 700; opacity: 0.7; }
+
+  .react-pick {
+    font-size: 1.05rem;
+    line-height: 1;
+    padding: 0.3rem 0.4rem;
+    border-radius: 0.6rem;
+    background: var(--color-surface-2);
+    transition: transform 100ms, background 100ms;
+  }
+  .react-pick:hover { transform: scale(1.12); }
+  .react-pick.is-mine { outline: 2px solid var(--color-accent); }
+
+  /* ===== Custom color swatches ===== */
+  .custom-swatch, .custom-swatch-lg {
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1.5px dashed rgba(0,0,0,0.3);
+    cursor: pointer;
+    color: rgba(0,0,0,0.5);
+    background: conic-gradient(from 0deg, #f43f5e, #f59e0b, #10b981, #3b82f6, #8b5cf6, #f43f5e);
+  }
+  .custom-swatch { width: 1.2rem; height: 1.2rem; }
+  .custom-swatch-lg { width: 1.7rem; height: 1.7rem; }
+  .custom-swatch.is-selected, .custom-swatch-lg.is-selected {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-style: solid;
+  }
+
+  /* ===== Long-press reaction menu ===== */
+  .reaction-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0,0,0,0.25);
+  }
+  .react-emoji {
+    font-size: 1.5rem;
+    line-height: 1;
+    padding: 0.35rem;
+    border-radius: 50%;
+    transition: transform 100ms;
+  }
+  .react-emoji:hover { transform: scale(1.25); }
+  .react-emoji.is-mine { background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
+
+  /* ===== Long-press context menu (anchored to the pressed note) ===== */
+  .context-menu {
+    position: fixed;
+    z-index: 62;
+    padding: 0.6rem;
+    border-radius: 1rem;
+    background: var(--color-surface);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    animation: ctxpop 0.14s ease-out;
+    transform-origin: top left;
+  }
+  @keyframes ctxpop { from { transform: scale(0.94); opacity: 0.4; } }
+
+  /* The lifted note that pops out above the dim. */
+  .context-lift {
+    position: fixed;
+    z-index: 61;
+    border-radius: 2px;
+    padding: 0.875rem 0.875rem 0.7rem;
+    background: var(--note-bg);
+    color: var(--note-ink);
+    box-shadow: 0 18px 44px rgba(0,0,0,0.45);
+    transform: scale(1.04);
+    transform-origin: center;
+    pointer-events: none;
+    max-height: 40vh;
+    overflow: hidden;
+    animation: liftpop 0.14s ease-out;
+  }
+  @keyframes liftpop { from { transform: scale(1); } }
+  .lift-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--note-ink);
+    margin-bottom: 0.25rem;
+    word-break: break-word;
+  }
+  .lift-content {
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--note-ink);
+    opacity: 0.82;
+    white-space: pre-wrap;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .context-reacts {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.15rem;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .context-reacts .react-emoji { font-size: 1.35rem; padding: 0.3rem; }
+  .context-actions { display: flex; flex-direction: column; gap: 0.15rem; }
+  .context-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.7rem;
+    border-radius: 0.6rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text);
+    text-align: left;
+    transition: background 120ms;
+  }
+  .context-btn:hover { background: var(--color-surface-2); }
+  .context-btn.context-danger { color: #ef4444; }
+  .context-btn .yarn-badge {
+    margin-left: auto;
+    font-size: 0.7rem;
+    font-weight: 800;
+    background: var(--color-accent);
+    color: #fff;
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+  }
+  /* "Expand stack" gets a little yarn-wrapped feel. */
+  .context-yarn {
+    background:
+      repeating-linear-gradient(45deg,
+        color-mix(in srgb, var(--color-accent) 12%, transparent) 0 6px,
+        transparent 6px 12px);
+  }
+  .context-hint {
+    margin-top: 0.4rem;
+    padding: 0 0.3rem;
+    font-size: 0.68rem;
+    color: var(--color-text-muted, #78716c);
+    text-align: center;
+  }
+
+  /* ===== Thread list (tap-to-open quick view — plain, no yarn) ===== */
+  .thread-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .thread-note {
+    position: relative;
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+  }
+  .thread-note:hover, .thread-note:focus-visible {
+    transform: translateX(2px);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    outline: none;
+  }
+  /* Yarn knot pinning each note to the string. */
+  .yarn-knot {
+    position: absolute;
+    left: -0.55rem;
+    top: 0.75rem;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--color-accent) 60%, #fff), var(--color-accent));
+    box-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  }
+  .thread-open-hint {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--note-ink);
+    opacity: 0.45;
+  }
+
+  /* ===== On-board unstacked thread (yarn-linked strip) ===== */
+  .thread-expanded { padding: 0.25rem 0.15rem 1rem; }
+  .thread-expanded-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .thread-collapse {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 999px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .thread-expanded-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--color-text-muted, #78716c);
+  }
+  /* Vertical strip — reads and taps well on a portrait phone; the yarn runs
+     straight down the left through a knot on each note. */
+  .thread-strip {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    max-width: 34rem;
+    margin: 0 auto;
+    padding: 0.5rem 0.5rem 1.5rem 1.4rem;
+  }
+  .thread-strip::before {
+    content: "";
+    position: absolute;
+    left: 0.55rem;
+    top: 1.4rem;
+    bottom: 1.6rem;
+    width: 2px;
+    background:
+      repeating-linear-gradient(to bottom,
+        var(--color-accent) 0 5px,
+        transparent 5px 9px);
+    opacity: 0.55;
+    border-radius: 2px;
+  }
+  .strip-note {
+    position: relative;
+    width: 100%;
+    background: var(--note-bg);
+    color: var(--note-ink);
+    border-radius: 2px;
+    padding: 0.9rem 0.9rem 0.7rem;
+    box-shadow: 2px 3px 12px rgba(0,0,0,0.2);
+    cursor: pointer;
+    transform: rotate(-0.6deg);
+    transition: transform 140ms ease, box-shadow 140ms ease;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .strip-note:nth-child(even) { transform: rotate(0.7deg); }
+  .strip-note:hover, .strip-note:focus-visible {
+    transform: rotate(0deg) translateX(3px);
+    box-shadow: 3px 8px 20px rgba(0,0,0,0.28);
+    outline: none;
+  }
+  /* Knot pinning each note to the vertical yarn. */
+  .strip-note .yarn-knot { left: -0.95rem; right: auto; top: 1.1rem; }
+  .strip-order {
+    position: absolute;
+    top: -0.55rem;
+    right: -0.55rem;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 50%;
+    background: var(--color-accent);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+    z-index: 2;
+  }
+  .strip-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--note-ink);
+    margin-bottom: 0.3rem;
+    word-break: break-word;
+  }
+  .strip-content {
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--note-ink);
+    opacity: 0.8;
+    white-space: pre-wrap;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 8;
+    line-clamp: 8;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .strip-sign {
+    margin-top: 0.4rem;
+    font-style: italic;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--note-sign, var(--note-tack));
+    opacity: 0.95;
+  }
+  .strip-foot {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.6rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid rgba(120,110,90,0.22);
+    font-size: 0.65rem;
+    color: var(--note-ink);
+    opacity: 0.5;
+  }
+
+  /* ===== Bulk action bar ===== */
+  .bulk-bar {
+    position: fixed;
+    z-index: 45;
+    left: 50%;
+    bottom: 5rem;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 0.6rem 0.5rem 1rem;
+    border-radius: 999px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.25);
+  }
+  .bulk-count { font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
+  .bulk-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    height: 2.2rem;
+    padding: 0 0.7rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    background: var(--color-surface-2);
+  }
+  .bulk-btn:disabled { opacity: 0.4; pointer-events: none; }
+  .bulk-danger { color: #ef4444; }
+
+  /* ===== Thread modal notes ===== */
+  .thread-note {
+    background: var(--note-bg);
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.85rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .thread-author { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--note-ink); opacity: 0.6; }
+  .thread-time { font-size: 0.65rem; color: var(--note-ink); opacity: 0.5; }
+  .thread-unlink {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 auto;
+    width: 1.5rem; height: 1.5rem; min-height: 0; padding: 0;
+    aspect-ratio: 1; border-radius: 50%;
+    color: var(--note-ink); opacity: 0.5;
+    transition: opacity 120ms, background 120ms;
+  }
+  .thread-unlink:hover { opacity: 0.9; background: rgba(0,0,0,0.08); }
 </style>

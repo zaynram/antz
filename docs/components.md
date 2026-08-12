@@ -328,9 +328,21 @@ Location input with Google Places autocomplete fallback.
 
 ---
 
-### PlaceSuggestions (`src/lib/components/PlaceSuggestions.svelte`)
+### Places map (`src/lib/pages/Places.svelte`)
 
-Displays place suggestions based on user's location preferences.
+Interactive Leaflet map (OpenStreetMap tiles with a hand-drawn "aged
+cartography" CSS skin) that is the primary surface for places. Category-colored
+teardrop pins carry an emoji glyph and a visit-count / visited badge. Includes:
+
+- A search box that filters the place list (each row centers the map on its pin)
+  and, for arbitrary queries, a "center map on …" affordance that geocodes.
+- "Locate me" auto-center and per-view **Discover** (reroll one candidate at a
+  time via Nominatim `discoverInBounds`, add to the collection).
+- Category chips + to-visit/visited filters.
+
+Category configuration (label, icon, pin emoji, color, default revisit
+semantics) lives in `src/lib/places.ts` (`CATEGORY_DEFS`). Discovery replaces
+the former `PlaceSuggestions` component.
 
 ---
 

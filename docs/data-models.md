@@ -49,6 +49,10 @@ interface Media extends BaseDocument {
   rating: number | null              // Legacy single rating (1-5)
   ratings?: Record<UserId, number | null>  // Per-user ratings
 
+  // Couple watch-state: which partners have personally watched this. A per-user
+  // rating also counts as watched (see hasWatched/watchTogetherness in types.ts).
+  seenBy?: UserId[]
+
   // User content
   notes: string
   progress?: MediaProgress
@@ -156,9 +160,19 @@ interface Place extends BaseDocument {
 
   // User tags
   tags?: string[]
+
+  // Budget / price level (0=Free … 4=Very Expensive)
+  budget?: number | null
+
+  // Visited semantics override. When set, wins over the category default
+  // (CATEGORY_DEFS[].revisitDefault): true = track repeat visits (visit count),
+  // false = one-and-done (single "visited" state).
+  revisitable?: boolean
 }
 
-type PlaceCategory = "restaurant" | "cafe" | "bar" | "attraction" | "park" | "other"
+type PlaceCategory =
+  | "restaurant" | "cafe" | "bar" | "park" | "shop" | "entertainment"
+  | "beach" | "attraction" | "museum" | "hotel" | "viewpoint" | "other"
 
 interface PlaceComment {
   id: string

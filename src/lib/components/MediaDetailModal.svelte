@@ -1,9 +1,10 @@
 <script lang="ts">
   import { tmdbConfig } from '$lib/config'
   import { updateDocument } from '$lib/firebase'
-  import { activeUser, displayNames } from '$lib/stores/app'
+  import { activeUser, displayNames, displayAbbreviations, userPreferences } from '$lib/stores/app'
   import type { Media, MediaComment, MediaStatus, UserId } from '$lib/types'
-  import { getUserRating, getAverageRating } from '$lib/types'
+  import { getUserRating, getAverageRating, hasWatched, toggleWatched } from '$lib/types'
+  import { DEFAULT_ACCENT } from '$lib/accents'
   import { Timestamp } from 'firebase/firestore'
   import { Film, Tv, Gamepad2 } from 'lucide-svelte'
   import { hapticLight } from '$lib/haptics'
@@ -20,6 +21,7 @@
   let editedNotes = $state('');
   let newComment = $state('');
   let watchDateInput = $state('');
+  let editedImageOverride = $state('');
   
   // Non-reactive tracking - prevents effect from creating dependencies on local form state
   let previousMediaId: string | undefined = undefined;
@@ -32,7 +34,8 @@
       // Only sync when viewing a different media item
       if (media.id !== previousMediaId) {
         editedNotes = media.notes || '';
-        
+        editedImageOverride = media.imageOverride || '';
+
         if (media.watchDate) {
           const d = new Date(media.watchDate.toDate());
           const year = d.getFullYear();
@@ -77,10 +80,27 @@
     await updateDocument<Media>('media', media.id, { notes: editedNotes }, $activeUser);
   }
 
+  async function updateImageOverride(): Promise<void> {
+    if (!media?.id) return;
+    await updateDocument<Media>('media', media.id, { imageOverride: editedImageOverride.trim() }, $activeUser);
+  }
+  function clearImageOverride(): void {
+    editedImageOverride = '';
+    updateImageOverride();
+  }
+
   async function updateStatus(status: MediaStatus): Promise<void> {
     if (!media?.id) return;
     hapticLight();
     await updateDocument<Media>('media', media.id, { status }, $activeUser);
+  }
+
+  const coupleUsers: UserId[] = ['Z', 'T']
+
+  async function toggleSeen(userId: UserId): Promise<void> {
+    if (!media?.id) return
+    hapticLight()
+    await updateDocument<Media>('media', media.id, toggleWatched(media, userId), $activeUser)
   }
 
   async function updateRating(userId: UserId, starIndex: number): Promise<void> {
@@ -146,9 +166,9 @@
     {#snippet header()}
       <!-- Header with poster -->
       <div class="relative shrink-0">
-        {#if media.posterPath}
+        {#if media.imageOverride || media.posterPath}
           <img
-            src={posterUrl(media.posterPath)}
+            src={posterUrl(media.imageOverride || media.posterPath)}
             alt={media.title}
             loading="lazy"
             class="w-full h-48 object-cover rounded-t-xl"
@@ -207,6 +227,29 @@
             </select>
           </div>
           
+          <div class="flex-1 min-w-[160px]">
+            <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Watched by</span>
+            <div class="flex flex-wrap gap-1.5">
+              {#each coupleUsers as u}
+                {@const seen = hasWatched(media, u)}
+                {@const accent = $userPreferences[u]?.accentColor ?? DEFAULT_ACCENT}
+                <button
+                  type="button"
+                  class="watch-chip touch-sm {seen ? 'is-seen' : ''}"
+                  style={seen ? `background-color:${accent};border-color:${accent}` : ''}
+                  onclick={() => toggleSeen(u)}
+                  aria-pressed={seen}
+                  title="{getDisplayNameForUser(u)} {seen ? 'has watched this' : 'has not watched this'}"
+                >
+                  <span class="watch-chip__badge" style={seen ? '' : `background-color:${accent}22;color:${accent}`}>
+                    {$displayAbbreviations[u]}
+                  </span>
+                  <span class="truncate">{getDisplayNameForUser(u)}</span>
+                </button>
+              {/each}
+            </div>
+          </div>
+
           <div class="flex-1 min-w-[200px]">
             <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Ratings</span>
             
@@ -326,6 +369,25 @@
           </div>
         {/if}
         
+        <!-- Custom image override -->
+        <div>
+          <label for="media-image-override" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Custom image URL</label>
+          <div class="flex gap-2">
+            <input
+              id="media-image-override"
+              type="url"
+              bind:value={editedImageOverride}
+              onblur={updateImageOverride}
+              placeholder="https://…  (overrides the poster)"
+              class="flex-1 p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-[var(--color-border)] rounded-lg focus:outline-none focus:border-accent"
+            />
+            {#if editedImageOverride}
+              <button type="button" class="btn-icon-sm touch-sm" onclick={clearImageOverride} aria-label="Clear custom image">✕</button>
+            {/if}
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Use when the poster exists but won't load.</p>
+        </div>
+
         <!-- Notes -->
         <div>
           <label for="media-notes" class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Personal Notes</label>
@@ -391,3 +453,41 @@
     </div>
   </Modal>
 {/if}
+
+<style>
+  /* Compact watched-by chips. `touch-sm` opts out of the global 44px
+     coarse-pointer minimum, which stretched these into tall slabs; the chip
+     keeps a comfortable 32px target without the wasted vertical padding. */
+  .watch-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2rem;
+    padding: 0.2rem 0.6rem 0.2rem 0.25rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--color-text-muted, #57534e);
+    max-width: 100%;
+    transition: background-color 120ms, border-color 120ms, color 120ms;
+  }
+  .watch-chip.is-seen { color: #fff; }
+  .watch-chip__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    font-size: 0.62rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .watch-chip.is-seen .watch-chip__badge {
+    background: rgba(255, 255, 255, 0.28);
+    color: #fff;
+  }
+</style>

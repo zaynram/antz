@@ -101,13 +101,38 @@ export function readableInk(bgHex: string, darkInk = "#1c1917", lightInk = "#faf
     return relativeLuminance(bgHex) > 0.45 ? darkInk : lightInk
 }
 
+/** WCAG contrast ratio between two colors (1..21). */
+export function contrastRatio(a: string, b: string): number {
+    const la = relativeLuminance(a)
+    const lb = relativeLuminance(b)
+    const hi = Math.max(la, lb)
+    const lo = Math.min(la, lb)
+    return (hi + 0.05) / (lo + 0.05)
+}
+
+/**
+ * Nudge `color`'s lightness away from `bg` until it clears a minimum contrast
+ * ratio, preserving hue and saturation so the result still reads as the same
+ * colour. Falls back to readable ink if hue-preserving adjustment can't get
+ * there. Used to keep note signatures legible against any paper colour.
+ */
+export function ensureReadable(color: string, bg: string, min = 3): string {
+    if (contrastRatio(color, bg) >= min) return color
+    const { h, s } = hexToHsl(color)
+    const darken = relativeLuminance(bg) > 0.4
+    let l = hexToHsl(color).l
+    for (let i = 0; i < 24; i++) {
+        l = darken ? l - 4 : l + 4
+        if (l <= 0 || l >= 100) break
+        const candidate = hslToHex({ h, s, l })
+        if (contrastRatio(candidate, bg) >= min) return candidate
+    }
+    return readableInk(bg)
+}
+
 export function shiftHue(hex: string, degrees: number): string {
     const hsl = hexToHsl(hex)
     return hslToHex({ ...hsl, h: hsl.h + degrees })
-}
-
-export function withHsl(hex: string, patch: Partial<HSL>): string {
-    return hslToHex({ ...hexToHsl(hex), ...patch })
 }
 
 /** Smallest absolute distance between two hues, in degrees (0..180). */

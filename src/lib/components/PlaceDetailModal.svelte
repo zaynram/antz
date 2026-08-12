@@ -7,10 +7,12 @@
   import { activeUser, displayNames } from '$lib/stores/app'
   import type { Place, PlaceCategory, PlaceComment, UserId } from '$lib/types'
   import { getPlaceAverageRating, getPlaceUserRating } from '$lib/types'
+  import { CATEGORY_DEFS, categoryDef, isRevisitable } from '$lib/places'
   import { Timestamp } from 'firebase/firestore'
-  import { Calendar, Check, Coffee, ExternalLink, MapPin, Sparkles, Trees, UtensilsCrossed, Wine, X } from 'lucide-svelte'
-  import type { ComponentType } from 'svelte'
+  import { Calendar, Check, ExternalLink, MapPin, Repeat, X } from 'lucide-svelte'
   import { cycleRating, getStarFill } from '$lib/utils'
+  import 'leaflet/dist/leaflet.css'
+  import type { Map as LeafletMap } from 'leaflet'
 
   interface Props {
     place: Place | null
@@ -26,26 +28,6 @@
 
   let previousPlaceId: string | undefined = undefined
 
-  const categoryIcons: Record<PlaceCategory, ComponentType> = {
-    restaurant: UtensilsCrossed,
-    cafe: Coffee,
-    bar: Wine,
-    attraction: Sparkles,
-    park: Trees,
-    other: MapPin
-  }
-
-  const categoryLabels: Record<PlaceCategory, string> = {
-    restaurant: 'Restaurant',
-    cafe: 'Cafe',
-    bar: 'Bar',
-    attraction: 'Attraction',
-    park: 'Park',
-    other: 'Other'
-  }
-
-  const categories: PlaceCategory[] = ['restaurant', 'cafe', 'bar', 'attraction', 'park', 'other']
-
   $effect(() => {
     if (place && place.id !== previousPlaceId) {
       editedNotes = place.notes || ''
@@ -53,6 +35,77 @@
       editedBudget = place.budget ?? null
       previousPlaceId = place.id
     }
+  })
+
+  // ===== Embedded, non-pannable location preview map =====
+  let mapEl = $state<HTMLDivElement | null>(null)
+  let miniMap: LeafletMap | undefined
+
+  // Depend on primitives, not the `place` object: the parent reassigns the
+  // selected place on every Firestore snapshot, and depending on the object
+  // would tear down and rebuild the map (losing the user's zoom and re-fetching
+  // tiles) on every unrelated write — a rating tap, a notes blur, a visit toggle.
+  let pinLat = $derived(place?.location?.lat ?? null)
+  let pinLng = $derived(place?.location?.lng ?? null)
+  let pinColor = $derived(place ? categoryDef(place.category).color : '')
+  let pinEmoji = $derived(place ? categoryDef(place.category).emoji : '')
+
+  let miniMarker: import('leaflet').Marker | undefined
+
+  $effect(() => {
+    // Only the location and the element belong here. Pin appearance is applied
+    // by the separate effect below, so changing the category doesn't destroy
+    // the map (which would drop the user's zoom and re-fetch tiles).
+    const lat = pinLat, lng = pinLng
+    const el = mapEl
+    if (lat === null || lng === null || !el) return
+    let disposed = false
+    ;(async () => {
+      const leaflet = await import('leaflet')
+      if (disposed || !mapEl) return
+      const L = leaflet.default ?? leaflet
+      // Display-only: no dragging, but pinch/scroll/buttons can still zoom.
+      miniMap = L.map(el, {
+        dragging: false,
+        scrollWheelZoom: false,
+        touchZoom: true,
+        doubleClickZoom: true,
+        boxZoom: false,
+        keyboard: false,
+        zoomControl: true,
+        attributionControl: false,
+      }).setView([lat, lng], 15)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(miniMap)
+      miniMarker = L.marker([lat, lng]).addTo(miniMap)
+      miniMarker.setIcon(makeMiniIcon(L, pinColor, pinEmoji))
+      requestAnimationFrame(() => miniMap?.invalidateSize())
+    })()
+    return () => {
+      disposed = true
+      miniMarker = undefined
+      miniMap?.remove()
+      miniMap = undefined
+    }
+  })
+
+  function makeMiniIcon(L: typeof import('leaflet'), color: string, emoji: string) {
+    return L.divIcon({
+      html: `<div class="mini-pin" style="--pin:${color}"><span>${emoji}</span></div>`,
+      className: 'mini-pin-wrap',
+      iconSize: [30, 30],
+      iconAnchor: [15, 30],
+    })
+  }
+
+  // Restyle the existing pin in place when the category changes.
+  $effect(() => {
+    const color = pinColor, emoji = pinEmoji
+    const marker = miniMarker
+    if (!marker) return
+    import('leaflet').then(leaflet => {
+      if (miniMarker !== marker) return
+      marker.setIcon(makeMiniIcon(leaflet.default ?? leaflet, color, emoji))
+    })
   })
 
   function getDisplayNameForUser(userId: UserId): string {
@@ -72,6 +125,12 @@
   async function updateBudget(): Promise<void> {
     if (!place?.id) return
     await updateDocument<Place>('places', place.id, { budget: editedBudget }, $activeUser)
+  }
+
+  async function toggleRevisitable(): Promise<void> {
+    if (!place?.id) return
+    hapticLight()
+    await updateDocument<Place>('places', place.id, { revisitable: !isRevisitable(place) }, $activeUser)
   }
 
   async function updateLocation(location: { lat: number; lng: number; address?: string } | undefined): Promise<void> {
@@ -227,7 +286,8 @@
 </script>
 
 {#if place}
-  {@const CategoryIcon = categoryIcons[place.category]}
+  {@const CategoryIcon = categoryDef(place.category).icon}
+  {@const revisit = isRevisitable(place)}
   <Modal open={true} onclose={onClose} title={place.name}>
     {#snippet header()}
       <!-- Header -->
@@ -246,8 +306,8 @@
           <div class="flex-1 min-w-0">
             <h2 class="text-xl font-bold truncate">{place.name}</h2>
             <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              <span class="capitalize">{categoryLabels[place.category]}</span>
-              {#if place.visitDates?.length}
+              <span>{categoryDef(place.category).label}</span>
+              {#if revisit && place.visitDates?.length}
                 <span>·</span>
                 <span>{place.visitDates.length} visit{place.visitDates.length === 1 ? '' : 's'}</span>
               {/if}
@@ -287,10 +347,23 @@
             <Check size={20} />
             <span>{place.visited ? 'Visited' : 'Mark as Visited'}</span>
           </button>
+
+          <button
+            type="button"
+            class="flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-medium transition-colors touch-manipulation {revisit
+              ? 'bg-accent/10 text-accent'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}"
+            onclick={toggleRevisitable}
+            title={revisit ? 'Tracking repeat visits' : 'One-and-done'}
+            aria-pressed={revisit}
+          >
+            <Repeat size={18} />
+            <span class="text-sm">{revisit ? 'Repeat' : 'One-time'}</span>
+          </button>
         </div>
 
         <!-- Visit history -->
-        {#if place.visitDates?.length}
+        {#if revisit && place.visitDates?.length}
           <div>
             <span class="block text-xs text-slate-500 dark:text-slate-400 mb-2">Visit History</span>
             <div class="flex flex-wrap gap-2">
@@ -311,8 +384,8 @@
           </div>
         {/if}
 
-        <!-- Add visit with date options -->
-        {#if place.visited}
+        <!-- Add visit with date options (only when tracking repeat visits) -->
+        {#if place.visited && revisit}
           <div>
             {#if showMode === 'single'}
               <div class="flex flex-wrap gap-2 items-end">
@@ -421,8 +494,8 @@
               onchange={updateCategory}
               class="input-sm"
             >
-              {#each categories as cat}
-                <option value={cat}>{categoryLabels[cat]}</option>
+              {#each CATEGORY_DEFS as def}
+                <option value={def.key}>{def.label}</option>
               {/each}
             </select>
           </div>
@@ -514,7 +587,7 @@
           </div>
         </div>
 
-        <!-- Location picker -->
+        <!-- Location picker + embedded preview map -->
         <div>
           <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Location</span>
           <LocationPicker
@@ -522,6 +595,11 @@
             onChange={updateLocation}
             placeholder="Search for address..."
           />
+          {#if place.location}
+            <div class="mini-map-frame mt-2">
+              <div class="mini-map-canvas" bind:this={mapEl}></div>
+            </div>
+          {/if}
         </div>
 
         <!-- Notes -->
@@ -602,3 +680,33 @@
     </div>
   </Modal>
 {/if}
+
+<style>
+  .mini-map-frame {
+    position: relative;
+    isolation: isolate;
+    height: 180px;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+  }
+  .mini-map-canvas { position: absolute; inset: 0; background: #ece3d2; }
+  /* Same aged-cartography wash as the main Places map, lighter touch. */
+  .mini-map-frame :global(.leaflet-tile-pane) {
+    filter: grayscale(0.5) sepia(0.35) saturate(0.85) contrast(1.03) brightness(1.03);
+  }
+  :global(.dark) .mini-map-frame :global(.leaflet-tile-pane) {
+    filter: grayscale(0.6) sepia(0.25) saturate(0.7) contrast(0.95) brightness(0.72) invert(0.9) hue-rotate(180deg);
+  }
+  .mini-map-frame :global(.mini-pin-wrap) { background: transparent; border: none; }
+  .mini-map-frame :global(.mini-pin) {
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--pin);
+    border: 2px solid #fff;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.35);
+  }
+  .mini-map-frame :global(.mini-pin span) { transform: rotate(45deg); font-size: 13px; line-height: 1; }
+</style>
