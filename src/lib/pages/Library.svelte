@@ -1,10 +1,11 @@
 <script lang="ts">
   import { tmdbConfig } from '$lib/config'
   import { addDocument, deleteDocument, subscribeToCollection, updateDocument } from '$lib/firebase'
-  import { activeUser, displayNames, mediaGridSize, type GridSize } from '$lib/stores/app'
-  import type { Media, MediaStatus, MediaType, TMDBSearchResult, UserId, ProductionCompany, MediaCollection } from '$lib/types'
+  import { activeUser, displayNames, displayAbbreviations, userPreferences, mediaGridSize, type GridSize } from '$lib/stores/app'
+  import type { Media, MediaStatus, MediaType, TMDBSearchResult, UserId, ProductionCompany, MediaCollection, TogethernessState } from '$lib/types'
   import { toast } from 'svelte-sonner'
-  import { getDisplayRating } from '$lib/types'
+  import { getDisplayRating, hasWatched, watchTogetherness, toggleSeenBy } from '$lib/types'
+  import { DEFAULT_ACCENT } from '$lib/accents'
   import { enrichMediaData } from '$lib/tmdb'
   import { searchGames, type WikiGameResult } from '$lib/wikipedia'
   import {
@@ -24,7 +25,7 @@
   import IconButton from '$lib/components/ui/IconButton.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
   import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte'
-    import { Film, Tv, Gamepad2, Filter, Plus, Search, X } from 'lucide-svelte'
+    import { Film, Tv, Gamepad2, Filter, Plus, Search, X, Check } from 'lucide-svelte'
   import { hapticSuccess } from '$lib/haptics'
   import { forceRepaint } from '$lib/pwa-utils'
   import { cycleRating, getStarFill } from '$lib/utils'
@@ -43,6 +44,11 @@
 
   // Local search over the existing library (distinct from the discovery search)
   let librarySearch = $state('')
+
+  // "Between Us" couple lens — filter by who of the pair has watched, from the
+  // active user's perspective.
+  let betweenUs = $state<TogethernessState | 'all'>('all')
+  let partner = $derived<UserId>($activeUser === 'Z' ? 'T' : 'Z')
 
   // Search state (for adding new items)
   let searchQuery = $state('')
@@ -88,6 +94,7 @@
 
   // Quick navigation between library types
   const libraryTypes: MediaType[] = ['movie', 'tv', 'game']
+  const coupleUsers: UserId[] = ['Z', 'T']
 
   onMount(() => {
     // Open the add/discover panel directly when arriving via a quick-add link.
@@ -349,9 +356,34 @@
         (m.genres?.some(g => g.toLowerCase().includes(q)) ?? false)
       )
     }
+    if (betweenUs !== 'all') {
+      result = result.filter(m => watchTogetherness(m, $activeUser, partner) === betweenUs)
+    }
     result = applySort(result, sort)
     return result
   })
+
+  // Counts per couple-state (over this type), for the lens chips.
+  let betweenUsCounts = $derived.by(() => {
+    const counts: Record<TogethernessState, number> = { both: 0, mine: 0, theirs: 0, none: 0 }
+    for (const m of typeMedia) counts[watchTogetherness(m, $activeUser, partner)]++
+    return counts
+  })
+
+  // The lens options, labelled from the viewer's POV.
+  let lensOptions = $derived<Array<{ key: TogethernessState | 'all'; label: string; count?: number }>>([
+    { key: 'all', label: 'All' },
+    { key: 'none', label: 'New to us', count: betweenUsCounts.none },
+    { key: 'theirs', label: 'Waiting on you', count: betweenUsCounts.theirs },
+    { key: 'mine', label: `Waiting on ${$displayNames[partner]}`, count: betweenUsCounts.mine },
+    { key: 'both', label: 'Seen together', count: betweenUsCounts.both },
+  ])
+
+  async function toggleSeen(item: Media, user: UserId): Promise<void> {
+    if (!item.id) return
+    hapticSuccess()
+    await updateDocument<Media>('media', item.id, { seenBy: toggleSeenBy(item, user) }, $activeUser)
+  }
 
   function posterUrl(path: string | null | undefined, size: 'sm' | 'md' = 'sm'): string | null {
     if (!path) return null
@@ -553,6 +585,20 @@
     {/if}
   </div>
 
+  <!-- "Between Us" couple lens -->
+  <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-none mb-4 -mx-1 px-1">
+    {#each lensOptions as opt (opt.key)}
+      <button
+        type="button"
+        class="lens-chip {betweenUs === opt.key ? 'is-on' : ''}"
+        onclick={() => { betweenUs = betweenUs === opt.key ? 'all' : opt.key }}
+      >
+        <span>{opt.label}</span>
+        {#if opt.count !== undefined && opt.count > 0}<span class="lens-count">{opt.count}</span>{/if}
+      </button>
+    {/each}
+  </div>
+
   <!-- Add panel -->
   {#if showAddPanel}
     <div class="card p-4 mb-6" style="transform: translateZ(0);">
@@ -725,7 +771,7 @@
   <!-- Grid -->
   <div bind:this={gridContainer}>
     {#if filteredMedia.length === 0}
-      {@const isFiltered = activeFilterCount > 0 || !!librarySearch.trim()}
+      {@const isFiltered = activeFilterCount > 0 || !!librarySearch.trim() || betweenUs !== 'all'}
       <EmptyState
         icon={typeInfo[type].icon}
         title={isFiltered ? `No ${typeInfo[type].plural.toLowerCase()} match` : `No ${typeInfo[type].plural.toLowerCase()} in your library`}
@@ -820,6 +866,24 @@
                 {/each}
               </div>
 
+              <!-- Seen-by (couple watch-state): tap a face to toggle who's watched -->
+              <div class="flex items-center gap-1 mt-1.5">
+                {#each coupleUsers as u}
+                  {@const seen = hasWatched(item, u)}
+                  <button
+                    type="button"
+                    class="seen-dot {seen ? 'is-seen' : ''}"
+                    style={seen ? `background-color:${$userPreferences[u]?.accentColor ?? DEFAULT_ACCENT}` : ''}
+                    onclick={(e) => { e.stopPropagation(); toggleSeen(item, u) }}
+                    aria-pressed={seen}
+                    title="{$displayNames[u]} {seen ? 'has watched — tap to unmark' : 'hasn’t watched — tap to mark'}"
+                  >
+                    <span>{$displayAbbreviations[u]}</span>
+                    {#if seen}<span class="seen-check"><Check size={9} strokeWidth={3.5} /></span>{/if}
+                  </button>
+                {/each}
+              </div>
+
               <div class="flex gap-1.5 mt-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                 {#if item.status !== 'watching'}
                   <button
@@ -854,6 +918,72 @@
     .group:focus-within .group-hover\:opacity-100 {
       opacity: 1;
     }
+  }
+
+  /* ===== "Between Us" couple lens ===== */
+  .lens-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+    padding: 0.4rem 0.8rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--color-text-muted, #57534e);
+    background: var(--color-surface-2);
+    border: 1px solid transparent;
+    transition: background 120ms, color 120ms, border-color 120ms;
+  }
+  .lens-chip.is-on {
+    background: var(--color-accent);
+    color: #fff;
+  }
+  .lens-count {
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 0.02rem 0.35rem;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.12);
+  }
+  .lens-chip.is-on .lens-count { background: rgba(255,255,255,0.25); }
+
+  /* ===== Per-card seen-by faces ===== */
+  .seen-dot {
+    position: relative;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-weight: 800;
+    color: var(--color-text-hint, #78716c);
+    background: transparent;
+    border: 1.5px dashed var(--color-border);
+    transition: transform 100ms;
+  }
+  .seen-dot.is-seen {
+    color: #fff;
+    border-style: solid;
+    border-color: transparent;
+  }
+  .seen-dot:active { transform: scale(0.9); }
+  .seen-check {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    width: 0.72rem;
+    height: 0.72rem;
+    border-radius: 50%;
+    background: #10b981;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 1.5px var(--color-surface);
   }
 
   /* ===== Cinema marquee header ===== */

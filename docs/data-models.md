@@ -49,6 +49,10 @@ interface Media extends BaseDocument {
   rating: number | null              // Legacy single rating (1-5)
   ratings?: Record<UserId, number | null>  // Per-user ratings
 
+  // Couple watch-state: which partners have personally watched this. A per-user
+  // rating also counts as watched (see hasWatched/watchTogetherness in types.ts).
+  seenBy?: UserId[]
+
   // User content
   notes: string
   progress?: MediaProgress

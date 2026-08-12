@@ -143,6 +143,7 @@ export interface Media extends BaseDocument {
     status: MediaStatus
     rating: number | null // Legacy field for backward compatibility
     ratings?: Record<UserId, number | null> // Per-user ratings
+    seenBy?: UserId[] // Which partners have personally watched this (couple watch-state)
     notes: string
     progress?: MediaProgress
     // Metadata fields
@@ -195,6 +196,40 @@ export function getAverageRating(media: Media): number | null {
 export function getDisplayRating(media: Media): number | null {
     // Priority: average of both ratings > individual rating > legacy rating
     return getAverageRating(media)
+}
+
+// ===== Couple watch-state =====
+// From the viewer's perspective, how this title sits between the two partners.
+export type TogethernessState = "both" | "mine" | "theirs" | "none"
+
+/**
+ * Has this specific partner personally watched the title? True when they're in
+ * `seenBy`, or (zero-effort backfill) when they've left a personal rating —
+ * a per-user rating implies they watched it. The legacy shared `rating` is
+ * intentionally ignored here since it isn't attributable to one partner.
+ */
+export function hasWatched(media: Media, user: UserId): boolean {
+    if (media.seenBy?.includes(user)) return true
+    const r = media.ratings?.[user]
+    return r !== null && r !== undefined
+}
+
+/** Classify a title by who of the pair has seen it, from `viewer`'s POV. */
+export function watchTogetherness(media: Media, viewer: UserId, partner: UserId): TogethernessState {
+    const mine = hasWatched(media, viewer)
+    const theirs = hasWatched(media, partner)
+    if (mine && theirs) return "both"
+    if (mine) return "mine"
+    if (theirs) return "theirs"
+    return "none"
+}
+
+/** Toggle a partner's personal "watched" flag, returning the next seenBy list. */
+export function toggleSeenBy(media: Media, user: UserId): UserId[] {
+    const set = new Set(media.seenBy ?? [])
+    if (set.has(user)) set.delete(user)
+    else set.add(user)
+    return ALL_USER_IDS.filter(u => set.has(u))
 }
 
 export type PlaceCategory =

@@ -1,9 +1,10 @@
 <script lang="ts">
   import { tmdbConfig } from '$lib/config'
   import { updateDocument } from '$lib/firebase'
-  import { activeUser, displayNames } from '$lib/stores/app'
+  import { activeUser, displayNames, displayAbbreviations, userPreferences } from '$lib/stores/app'
   import type { Media, MediaComment, MediaStatus, UserId } from '$lib/types'
-  import { getUserRating, getAverageRating } from '$lib/types'
+  import { getUserRating, getAverageRating, hasWatched, toggleSeenBy } from '$lib/types'
+  import { DEFAULT_ACCENT } from '$lib/accents'
   import { Timestamp } from 'firebase/firestore'
   import { Film, Tv, Gamepad2 } from 'lucide-svelte'
   import { hapticLight } from '$lib/haptics'
@@ -92,6 +93,14 @@
     if (!media?.id) return;
     hapticLight();
     await updateDocument<Media>('media', media.id, { status }, $activeUser);
+  }
+
+  const coupleUsers: UserId[] = ['Z', 'T']
+
+  async function toggleSeen(userId: UserId): Promise<void> {
+    if (!media?.id) return
+    hapticLight()
+    await updateDocument<Media>('media', media.id, { seenBy: toggleSeenBy(media, userId) }, $activeUser)
   }
 
   async function updateRating(userId: UserId, starIndex: number): Promise<void> {
@@ -218,6 +227,28 @@
             </select>
           </div>
           
+          <div class="flex-1 min-w-[160px]">
+            <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Watched by</span>
+            <div class="flex flex-col gap-1.5">
+              {#each coupleUsers as u}
+                {@const seen = hasWatched(media, u)}
+                <button
+                  type="button"
+                  class="flex items-center gap-2 px-2 py-1.5 rounded-xl text-sm font-medium transition-colors touch-manipulation border {seen ? 'border-transparent text-white' : 'border-[var(--color-border)] text-slate-500 dark:text-slate-400'}"
+                  style={seen ? `background-color:${$userPreferences[u]?.accentColor ?? DEFAULT_ACCENT}` : ''}
+                  onclick={() => toggleSeen(u)}
+                  aria-pressed={seen}
+                >
+                  <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 {seen ? 'bg-white/25' : ''}" style={seen ? '' : `background-color:${$userPreferences[u]?.accentColor ?? DEFAULT_ACCENT}20;color:${$userPreferences[u]?.accentColor ?? DEFAULT_ACCENT}`}>
+                    {$displayAbbreviations[u]}
+                  </span>
+                  <span class="truncate">{getDisplayNameForUser(u)}</span>
+                  <span class="ml-auto text-xs opacity-80">{seen ? 'Watched' : 'Mark'}</span>
+                </button>
+              {/each}
+            </div>
+          </div>
+
           <div class="flex-1 min-w-[200px]">
             <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Ratings</span>
             

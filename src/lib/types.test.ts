@@ -20,8 +20,24 @@ import {
     getUserRating,
     formatBudget,
     getBudgetLabel,
+    hasWatched,
+    watchTogetherness,
+    toggleSeenBy,
     type GeoLocation,
 } from "./types"
+
+function media(patch: Partial<Media>): Media {
+    return {
+        type: "movie",
+        title: "Test",
+        status: "queued",
+        rating: null,
+        notes: "",
+        posterPath: null,
+        createdBy: "Z",
+        ...patch,
+    } as Media
+}
 
 describe("Type definitions", () => {
     describe("UserId", () => {
@@ -668,6 +684,52 @@ describe("Type definitions", () => {
             it("should handle invalid budget levels", () => {
                 expect(getBudgetLabel(5)).toBe("Unknown")
                 expect(getBudgetLabel(-1)).toBe("Unknown")
+            })
+        })
+    })
+
+    describe("Couple watch-state", () => {
+        describe("hasWatched", () => {
+            it("is true when the user is in seenBy", () => {
+                expect(hasWatched(media({ seenBy: ["Z"] }), "Z")).toBe(true)
+                expect(hasWatched(media({ seenBy: ["Z"] }), "T")).toBe(false)
+            })
+            it("infers watched from a personal rating", () => {
+                expect(hasWatched(media({ ratings: { Z: 4, T: null } }), "Z")).toBe(true)
+                expect(hasWatched(media({ ratings: { Z: 4, T: null } }), "T")).toBe(false)
+            })
+            it("ignores the legacy shared rating (not attributable)", () => {
+                expect(hasWatched(media({ rating: 5 }), "Z")).toBe(false)
+                expect(hasWatched(media({ rating: 5 }), "T")).toBe(false)
+            })
+            it("is false for an untouched title", () => {
+                expect(hasWatched(media({}), "Z")).toBe(false)
+            })
+        })
+
+        describe("watchTogetherness", () => {
+            it("classifies both / mine / theirs / none from the viewer POV", () => {
+                expect(watchTogetherness(media({ seenBy: ["Z", "T"] }), "Z", "T")).toBe("both")
+                expect(watchTogetherness(media({ seenBy: ["Z"] }), "Z", "T")).toBe("mine")
+                expect(watchTogetherness(media({ seenBy: ["Z"] }), "T", "Z")).toBe("theirs")
+                expect(watchTogetherness(media({}), "Z", "T")).toBe("none")
+            })
+            it("mixes seenBy and inferred ratings", () => {
+                // Z rated it (inferred seen), T explicitly marked seen.
+                const m = media({ ratings: { Z: 5, T: null }, seenBy: ["T"] })
+                expect(watchTogetherness(m, "Z", "T")).toBe("both")
+            })
+        })
+
+        describe("toggleSeenBy", () => {
+            it("adds a user not present", () => {
+                expect(toggleSeenBy(media({ seenBy: [] }), "Z")).toEqual(["Z"])
+            })
+            it("removes a user present, preserving canonical order", () => {
+                expect(toggleSeenBy(media({ seenBy: ["Z", "T"] }), "Z")).toEqual(["T"])
+            })
+            it("handles missing seenBy", () => {
+                expect(toggleSeenBy(media({}), "T")).toEqual(["T"])
             })
         })
     })
