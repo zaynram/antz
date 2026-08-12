@@ -12,7 +12,7 @@
   import { DEFAULT_ACCENT } from '$lib/accents'
   import type { Note, NoteColor, UserId } from '$lib/types'
   import { Timestamp, type Timestamp as TimestampType } from 'firebase/firestore'
-  import { Archive, ArchiveRestore, Check, CheckCheck, Image as ImageIcon, Pencil, Pin, Reply, Search, SlidersHorizontal, ArrowUpDown, StickyNote, Trash2, X, Link2, Unlink } from 'lucide-svelte'
+  import { Archive, ArchiveRestore, Check, CheckCheck, Image as ImageIcon, Pencil, Pin, Reply, Search, SlidersHorizontal, ArrowUpDown, StickyNote, Trash2, X, Link2, Unlink, Layers } from 'lucide-svelte'
   import { onMount } from 'svelte'
   import { toast } from 'svelte-sonner'
 
@@ -38,11 +38,24 @@
   // session; defaults to 'new' so you land on what's fresh.
   let boardView = $state<BoardView>('new')
 
-  // Thread view (a stack expanded) + reaction menu + multi-select
+  // Thread view (a stack expanded) + long-press context menu + multi-select
   let threadRootId = $state<string | null>(null)
-  let reactionFor = $state<Note | null>(null)
+  let contextFor = $state<Note | null>(null)
   let selectMode = $state(false)
   let selectedIds = $state<Set<string>>(new Set())
+
+  // How notes are grouped into stacks on the board. "custom" honours the manual
+  // reply-thread links; the others are non-destructive views over the same notes.
+  type StackView = 'custom' | 'day' | 'week' | 'month' | 'year' | 'similar'
+  let stackView = $state<StackView>('custom')
+  const STACK_VIEWS: Array<{ key: StackView; label: string }> = [
+    { key: 'custom', label: 'My stacks' },
+    { key: 'day', label: 'Day' },
+    { key: 'week', label: 'Week' },
+    { key: 'month', label: 'Month' },
+    { key: 'year', label: 'Year' },
+    { key: 'similar', label: 'Similar' },
+  ]
 
   // Filter / sort state
   let showFilters = $state(false)
@@ -150,6 +163,8 @@
     try {
       const v = sessionStorage.getItem('notes-board-view')
       if (v === 'new' || v === 'all') boardView = v
+      const sv = sessionStorage.getItem('notes-stack-view')
+      if (sv && STACK_VIEWS.some(s => s.key === sv)) stackView = sv as StackView
     } catch { /* private mode */ }
 
     unsubscribe = subscribeToCollection<Note>('notes', (items) => {
@@ -264,28 +279,43 @@
     else users.add($activeUser)
     if (users.size === 0) delete reactions[emoji]
     else reactions[emoji] = [...users]
-    reactionFor = null
     await updateDocument<Note>('notes', note.id, { reactions }, $activeUser)
   }
   function reactionEntries(note: Note): Array<[string, UserId[]]> {
     return Object.entries(note.reactions ?? {}).filter(([, u]) => u.length > 0)
   }
 
-  // ===== Long-press → reaction menu =====
+  // ===== Long-press → select mode + context menu (mobile home-screen style) =====
   let pressTimer: ReturnType<typeof setTimeout> | null = null
   let longPressed = false
   function onNotePointerDown(note: Note): void {
-    if (selectMode) return
     longPressed = false
     if (pressTimer) clearTimeout(pressTimer)
     pressTimer = setTimeout(() => {
       longPressed = true
       hapticMedium()
-      reactionFor = note
+      // Enter selection (like holding a home-screen icon), select this note,
+      // and surface a context menu for per-note actions.
+      if (!selectMode) selectMode = true
+      if (note.id && !selectedIds.has(note.id)) toggleSelected(note.id)
+      contextFor = note
     }, 450)
   }
   function cancelPress(): void {
     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null }
+  }
+  function closeContext(): void { contextFor = null }
+
+  // How many notes are in the tapped note's current stack (for "expand thread").
+  function stackSizeOf(note: Note): number {
+    return notes.filter(n => !n.archived && groupKeyOf(n) === groupKeyOf(note)).length
+  }
+  function expandFromContext(note: Note): void {
+    contextFor = null
+    selectMode = false
+    selectedIds = new Set()
+    threadRootId = groupKeyOf(note)
+    markAsRead(note)
   }
 
   // ===== Multi-select =====
@@ -361,7 +391,9 @@
   }
 
   // Whether a note can be detached from the currently-open thread (not the root).
+  // Only meaningful for manual stacks — date/similarity views are virtual.
   function canUnlink(note: Note): boolean {
+    if (stackView !== 'custom') return false
     const root = threadNotes[0]
     return !!root && note.id !== root.id && threadNotes.length > 1
   }
@@ -369,6 +401,9 @@
   // ===== Board view (new/all) persisted per session =====
   $effect(() => {
     try { sessionStorage.setItem('notes-board-view', boardView) } catch { /* private mode */ }
+  })
+  $effect(() => {
+    try { sessionStorage.setItem('notes-stack-view', stackView) } catch { /* private mode */ }
   })
 
   // Confirm dialog state
@@ -475,16 +510,70 @@
     return n.threadId ?? n.id ?? ''
   }
 
-  // Group the filtered board into threads; each renders as a stack whose face
-  // is the most recent note, sorted like the flat board.
+  // ===== Stack grouping (view-dependent) =====
+  function isoWeek(d: Date): number {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+    const day = date.getUTCDay() || 7
+    date.setUTCDate(date.getUTCDate() + 4 - day)
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
+    return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+  }
+  function dateBucket(n: Note): string {
+    const d = n.createdAt?.toDate?.() ?? new Date(0)
+    const y = d.getFullYear()
+    if (stackView === 'year') return `y:${y}`
+    if (stackView === 'month') return `m:${y}-${d.getMonth()}`
+    if (stackView === 'week') return `w:${y}-${isoWeek(d)}`
+    return `d:${y}-${d.getMonth()}-${d.getDate()}`
+  }
+  function noteTokens(n: Note): Set<string> {
+    const text = `${n.title ?? ''} ${n.content ?? ''}`.toLowerCase()
+    return new Set(text.split(/[^a-z0-9]+/).filter(w => w.length > 3))
+  }
+  // Simplistic greedy similarity clustering: a note joins the first cluster it
+  // shares enough significant words with, else it starts its own. Just for fun.
+  let similarityKeys = $derived.by(() => {
+    const map = new Map<string, string>()
+    if (stackView !== 'similar') return map
+    const sorted = [...notes.filter(n => !n.archived && n.id)]
+      .sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))
+    const clusters: Array<{ key: string; tokens: Set<string> }> = []
+    for (const n of sorted) {
+      const toks = noteTokens(n)
+      let best: { key: string; tokens: Set<string> } | null = null
+      let bestScore = 0
+      for (const c of clusters) {
+        let score = 0
+        for (const t of toks) if (c.tokens.has(t)) score++
+        if (score > bestScore) { bestScore = score; best = c }
+      }
+      if (best && bestScore >= 2) {
+        map.set(n.id!, best.key)
+        for (const t of toks) best.tokens.add(t)
+      } else {
+        clusters.push({ key: n.id!, tokens: toks })
+        map.set(n.id!, n.id!)
+      }
+    }
+    return map
+  })
+  // The stack a note belongs to under the current view.
+  function groupKeyOf(n: Note): string {
+    if (stackView === 'custom') return threadKeyOf(n)
+    if (stackView === 'similar') return similarityKeys.get(n.id ?? '') ?? n.id ?? ''
+    return dateBucket(n)
+  }
+
+  // Group the filtered board into stacks; each renders with a face (most recent
+  // note), sorted like the flat board.
   let boardThreads = $derived.by(() => {
     const groups = new Map<string, Note[]>()
     for (const n of boardNotes) {
-      const key = threadKeyOf(n)
+      const key = groupKeyOf(n)
       const arr = groups.get(key)
       if (arr) arr.push(n); else groups.set(key, [n])
     }
-    const fullCount = (key: string) => notes.filter(n => !n.archived && threadKeyOf(n) === key).length
+    const fullCount = (key: string) => notes.filter(n => !n.archived && groupKeyOf(n) === key).length
     const list = [...groups.entries()].map(([key, ns]) => {
       const face = [...ns].sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0))[0]
       return { key, face, count: fullCount(key) }
@@ -498,10 +587,10 @@
     })
   })
 
-  // Notes belonging to the currently-open thread, oldest first.
+  // Notes belonging to the currently-open stack, oldest first.
   let threadNotes = $derived(
     threadRootId
-      ? notes.filter(n => !n.archived && threadKeyOf(n) === threadRootId)
+      ? notes.filter(n => !n.archived && groupKeyOf(n) === threadRootId)
           .sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))
       : []
   )
@@ -513,7 +602,7 @@
   // otherwise the single note's detail.
   function openThread(key: string, face: Note): void {
     if (selectMode) { toggleSelected(face.id); return }
-    const count = notes.filter(n => !n.archived && threadKeyOf(n) === key).length
+    const count = notes.filter(n => !n.archived && groupKeyOf(n) === key).length
     if (count > 1) { threadRootId = key; markAsRead(face) }
     else openNoteDetail(face)
   }
@@ -663,6 +752,15 @@
           <option value="newest">Newest</option>
           <option value="oldest">Oldest</option>
           <option value="author">By author</option>
+        </select>
+      </label>
+
+      <label class="tray-sort">
+        <Layers size={14} class="text-slate-400" />
+        <select bind:value={stackView} aria-label="Stack notes by">
+          {#each STACK_VIEWS as sv}
+            <option value={sv.key}>{sv.label}</option>
+          {/each}
         </select>
       </label>
 
@@ -912,8 +1010,8 @@
   {/if}
 </div>
 
-<!-- Note Detail Modal -->
-<Modal open={!!selectedNote} onclose={closeNoteDetail} title={selectedNote?.title || 'Note'}>
+<!-- Note Detail Modal — stacks above the thread modal when opened from a stack -->
+<Modal open={!!selectedNote} onclose={closeNoteDetail} title={selectedNote?.title || 'Note'} zIndex={60}>
   {#snippet header()}
     {#if selectedNote}
       {@const tone = toneOf(selectedNote)}
@@ -1101,12 +1199,37 @@
 />
 
 <!-- Long-press reaction menu -->
-{#if reactionFor}
-  <button type="button" class="reaction-backdrop" onclick={() => reactionFor = null} aria-label="Close reactions"></button>
-  <div class="reaction-menu" role="menu">
-    {#each REACTION_EMOJIS as emoji (emoji)}
-      <button type="button" class="react-emoji" onclick={() => reactionFor && toggleReaction(reactionFor, emoji)}>{emoji}</button>
-    {/each}
+{#if contextFor}
+  {@const cf = contextFor}
+  <button type="button" class="reaction-backdrop" onclick={closeContext} aria-label="Close menu"></button>
+  <div class="context-menu" role="menu">
+    <!-- Reactions -->
+    <div class="context-reacts">
+      {#each REACTION_EMOJIS as emoji (emoji)}
+        {@const mine = (cf.reactions?.[emoji] ?? []).includes($activeUser)}
+        <button type="button" class="react-emoji {mine ? 'is-mine' : ''}" onclick={() => toggleReaction(cf, emoji)}>{emoji}</button>
+      {/each}
+    </div>
+    <div class="context-actions">
+      {#if stackSizeOf(cf) > 1}
+        <button type="button" class="context-btn context-yarn" onclick={() => expandFromContext(cf)}>
+          <Layers size={16} /><span>Expand stack</span><span class="yarn-badge">{stackSizeOf(cf)}</span>
+        </button>
+      {/if}
+      <button type="button" class="context-btn" onclick={() => { closeContext(); selectMode = false; selectedIds = new Set(); startReply(cf) }}>
+        <Reply size={16} /><span>Reply</span>
+      </button>
+      <button type="button" class="context-btn" onclick={() => { togglePin(cf); closeContext() }}>
+        <Pin size={16} class={cf.pinned ? 'text-accent' : ''} /><span>{cf.pinned ? 'Unpin' : 'Pin'}</span>
+      </button>
+      <button type="button" class="context-btn" onclick={() => { toggleArchive(cf); closeContext() }}>
+        <Archive size={16} /><span>Archive</span>
+      </button>
+      <button type="button" class="context-btn context-danger" onclick={() => { closeContext(); cf.id && removeNote(cf.id) }}>
+        <Trash2 size={16} /><span>Delete</span>
+      </button>
+    </div>
+    <p class="context-hint">Tap notes to select more · long-press for this menu</p>
   </div>
 {/if}
 
@@ -1123,26 +1246,34 @@
   </div>
 {/if}
 
-<!-- Thread modal (an expanded stack) -->
-<Modal open={threadRootId !== null} onclose={() => threadRootId = null} title="Thread">
+<!-- Thread modal (an expanded stack) — notes strung together like yarn -->
+<Modal open={threadRootId !== null} onclose={() => threadRootId = null} title="Stack">
   {#if threadRootId}
-    <div class="space-y-3">
+    <div class="thread-list">
       {#each threadNotes as n (n.id)}
         {@const tone = toneOf(n)}
-        <div class="thread-note" style={noteVars(tone, n.customColor)}>
+        <div
+          class="thread-note"
+          style={noteVars(tone, n.customColor)}
+          role="button"
+          tabindex="0"
+          onclick={() => openNoteDetail(n)}
+          onkeydown={(e) => e.key === 'Enter' && openNoteDetail(n)}
+        >
+          <span class="yarn-knot" aria-hidden="true"></span>
           <div class="flex items-center justify-between mb-1">
             <span class="thread-author">{n.createdBy === $activeUser ? 'You' : getDisplayNameForUser(n.createdBy)}</span>
             <div class="flex items-center gap-1.5">
               <span class="thread-time">{getRelativeTime(n.createdAt)}</span>
               {#if canUnlink(n)}
-                <button type="button" class="thread-unlink" onclick={() => unlinkNote(n)} aria-label="Unlink from thread" title="Unlink from thread">
+                <button type="button" class="thread-unlink" onclick={(e) => { e.stopPropagation(); unlinkNote(n) }} aria-label="Unlink from thread" title="Unlink from thread">
                   <Unlink size={13} />
                 </button>
               {/if}
             </div>
           </div>
           {#if n.title}<h4 class="font-bold text-sm mb-0.5" style="color:var(--note-ink)">{n.title}</h4>{/if}
-          {#if n.content}<p class="text-sm whitespace-pre-wrap" style="color:var(--note-ink);opacity:0.85">{n.content}</p>{/if}
+          {#if n.content}<p class="text-sm whitespace-pre-wrap line-clamp-4" style="color:var(--note-ink);opacity:0.85">{n.content}</p>{/if}
           {#if reactionEntries(n).length}
             <div class="note-reactions" style="position:static;margin-top:0.4rem">
               {#each reactionEntries(n) as [emoji, users] (emoji)}
@@ -1150,12 +1281,15 @@
               {/each}
             </div>
           {/if}
+          <span class="thread-open-hint">Tap to open →</span>
         </div>
       {/each}
-      <button type="button" class="btn-primary w-full text-sm" onclick={() => { const root = threadNotes[0]; if (root) startReply(root) }}>
-        <Reply size={16} />
-        Reply to thread
-      </button>
+      {#if stackView === 'custom'}
+        <button type="button" class="btn-primary w-full text-sm" onclick={() => { const root = threadNotes[0]; if (root) startReply(root) }}>
+          <Reply size={16} />
+          Reply to thread
+        </button>
+      {/if}
     </div>
   {/if}
 </Modal>
@@ -1838,19 +1972,6 @@
     z-index: 60;
     background: rgba(0,0,0,0.25);
   }
-  .reaction-menu {
-    position: fixed;
-    z-index: 61;
-    left: 50%;
-    top: 40%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    gap: 0.25rem;
-    padding: 0.5rem;
-    border-radius: 999px;
-    background: var(--color-surface);
-    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
-  }
   .react-emoji {
     font-size: 1.5rem;
     line-height: 1;
@@ -1859,6 +1980,123 @@
     transition: transform 100ms;
   }
   .react-emoji:hover { transform: scale(1.25); }
+  .react-emoji.is-mine { background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
+
+  /* ===== Long-press context menu ===== */
+  .context-menu {
+    position: fixed;
+    z-index: 61;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(20rem, calc(100vw - 2rem));
+    padding: 0.6rem;
+    border-radius: 1rem;
+    background: var(--color-surface);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    animation: ctxpop 0.14s ease-out;
+  }
+  @keyframes ctxpop { from { transform: translate(-50%, -50%) scale(0.94); opacity: 0.4; } }
+  .context-reacts {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.15rem;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .context-reacts .react-emoji { font-size: 1.35rem; padding: 0.3rem; }
+  .context-actions { display: flex; flex-direction: column; gap: 0.15rem; }
+  .context-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.7rem;
+    border-radius: 0.6rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text);
+    text-align: left;
+    transition: background 120ms;
+  }
+  .context-btn:hover { background: var(--color-surface-2); }
+  .context-btn.context-danger { color: #ef4444; }
+  .context-btn .yarn-badge {
+    margin-left: auto;
+    font-size: 0.7rem;
+    font-weight: 800;
+    background: var(--color-accent);
+    color: #fff;
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+  }
+  /* "Expand stack" gets a little yarn-wrapped feel. */
+  .context-yarn {
+    background:
+      repeating-linear-gradient(45deg,
+        color-mix(in srgb, var(--color-accent) 12%, transparent) 0 6px,
+        transparent 6px 12px);
+  }
+  .context-hint {
+    margin-top: 0.4rem;
+    padding: 0 0.3rem;
+    font-size: 0.68rem;
+    color: var(--color-text-muted, #78716c);
+    text-align: center;
+  }
+
+  /* ===== Thread / stack list (yarn-strung) ===== */
+  .thread-list {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding-left: 0.4rem;
+  }
+  /* The yarn running down the stack. */
+  .thread-list::before {
+    content: "";
+    position: absolute;
+    left: 0.15rem;
+    top: 0.6rem;
+    bottom: 2.6rem;
+    width: 2px;
+    background:
+      repeating-linear-gradient(to bottom,
+        var(--color-accent) 0 5px,
+        transparent 5px 9px);
+    opacity: 0.55;
+    border-radius: 2px;
+  }
+  .thread-note {
+    position: relative;
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+  }
+  .thread-note:hover, .thread-note:focus-visible {
+    transform: translateX(2px);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    outline: none;
+  }
+  /* Yarn knot pinning each note to the string. */
+  .yarn-knot {
+    position: absolute;
+    left: -0.55rem;
+    top: 0.75rem;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--color-accent) 60%, #fff), var(--color-accent));
+    box-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  }
+  .thread-open-hint {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--note-ink);
+    opacity: 0.45;
+  }
 
   /* ===== Bulk action bar ===== */
   .bulk-bar {

@@ -85,18 +85,26 @@
     @apply bg-surface border border-[var(--color-border)] rounded-2xl shadow-sm;
   }
 
-  /* Form input base */
+  /* Form input base — warm surface + accent focus ring (less "stock" than the
+     cool slate fields, and consistent with the card radius). */
   .input {
-    @apply w-full px-4 py-3 bg-slate-50 dark:bg-slate-800
-           border border-[var(--color-border)] rounded-lg
+    @apply w-full px-4 py-3 rounded-xl
+           border border-[var(--color-border)]
            text-slate-900 dark:text-slate-100
            focus:outline-none focus:border-accent transition-colors;
+    background-color: var(--color-surface-2);
   }
 
   .input-sm {
-    @apply w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800
-           border border-[var(--color-border)] rounded-lg
+    @apply w-full px-3 py-2 text-sm rounded-xl
+           border border-[var(--color-border)]
            focus:outline-none focus:border-accent transition-colors;
+    background-color: var(--color-surface-2);
+  }
+
+  .input:focus,
+  .input-sm:focus {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 22%, transparent);
   }
 
   /* Status indicator dots */
@@ -135,6 +143,21 @@
   /* Ensure smooth scrolling on all scroll containers */
   * {
     -webkit-overflow-scrolling: touch;
+  }
+
+  /* Snappier, less "stock" touch interactions: kill the 300ms delay and the
+     grey tap-flash (we render our own active feedback), and give keyboard
+     users a consistent accent focus ring. */
+  button, a, [role="button"], input, select, textarea, label, summary {
+    touch-action: manipulation;
+  }
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 3px;
   }
 }
 
