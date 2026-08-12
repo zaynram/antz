@@ -87,18 +87,41 @@
     return `--note-bg:${bg};--note-ink:${ink};--note-tack:${tack};`
   }
 
-  // Full inline style for a board note: colour + tilt + vertical jitter (to
-  // break the rigid-column illusion of a masonry).
+  // Full inline style for a board note: colour + tilt + horizontal/vertical
+  // jitter (to break the rigid-column illusion of a masonry).
   function noteStyle(note: Note): string {
-    return `${noteVars(toneOf(note), note.customColor)}--rot:${getNoteRotation(note.id)}deg;margin-top:${getNoteJitter(note.id)}rem`
+    return `${noteVars(toneOf(note), note.customColor)}`
+      + `--rot:${getNoteRotation(note.id)}deg;`
+      + `--jy:${getNoteJitter(note.id)}rem;`
+      + `--jx:${getNoteJitterX(note.id)}rem`
   }
 
-  // Deterministic small top margin so notes don't align across columns.
-  function getNoteJitter(noteId: string | undefined): number {
+  // A small string hash used for deterministic jitter/sizing.
+  function hashOf(noteId: string | undefined, seed: number): number {
     if (!noteId) return 0
-    let hash = 0
-    for (let i = 0; i < noteId.length; i++) hash = (hash * 17 + noteId.charCodeAt(i)) & 0xffffffff
-    return (hash % 5) * 0.35 // 0 .. 1.4rem
+    let hash = seed
+    for (let i = 0; i < noteId.length; i++) hash = (hash * 31 + noteId.charCodeAt(i)) & 0xffffffff
+    return hash >>> 0
+  }
+
+  // Deterministic small top margin so notes don't align across rows.
+  function getNoteJitter(noteId: string | undefined): number {
+    return (hashOf(noteId, 17) % 5) * 0.35 // 0 .. 1.4rem
+  }
+
+  // Deterministic small horizontal nudge (both directions).
+  function getNoteJitterX(noteId: string | undefined): number {
+    return ((hashOf(noteId, 23) % 7) - 3) * 0.18 // -0.54 .. 0.54rem
+  }
+
+  // Size a note to its content so the board reads as varied clippings rather
+  // than a uniform grid. Photos and long text get more room.
+  function noteSizeClass(note: Note): 'xs' | 's' | 'm' | 'l' {
+    const len = (note.title?.trim().length ?? 0) + (note.content?.trim().length ?? 0)
+    if (note.photos?.length || len > 240) return 'l'
+    if (len > 110) return 'm'
+    if (len > 36) return 's'
+    return 'xs'
   }
 
   function signatureFor(userId: UserId): string {
@@ -734,7 +757,7 @@
             {@const selected = selectMode && !!note.id && selectedIds.has(note.id)}
             {@const reacts = reactionEntries(note)}
             <div
-              class="sticky-note {note.pinned ? 'is-pinned' : ''} {isUnread ? 'is-unread' : ''} {thread.count > 1 ? 'is-stack' : ''} {selected ? 'is-selected-note' : ''}"
+              class="sticky-note note-{noteSizeClass(note)} {note.pinned ? 'is-pinned' : ''} {isUnread ? 'is-unread' : ''} {thread.count > 1 ? 'is-stack' : ''} {selected ? 'is-selected-note' : ''}"
               style={noteStyle(note)}
               onclick={() => { if (longPressed) { longPressed = false; return } openThread(thread.key, note) }}
               role="button"
@@ -1347,30 +1370,42 @@
     background: rgba(0,0,0,0.2);
   }
 
+  /* Organic wrapping flow — notes are sized to their content (below), so the
+     ragged widths never line up into columns the way a fixed masonry does. */
   .notes-masonry {
-    columns: 2;
-    column-gap: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.5rem 0.6rem;
   }
-  @media (min-width: 640px) { .notes-masonry { columns: 3; } }
-  @media (min-width: 900px) { .notes-masonry { columns: 4; } }
 
   /* ===== STICKY NOTE ===== */
   .sticky-note {
-    break-inside: avoid;
     position: relative;
-    margin-bottom: 0.75rem;
+    width: 12rem; /* default (m); size variants below */
     border-radius: 2px;
     padding: 0.875rem 0.875rem 0.6rem;
     cursor: pointer;
     background: var(--note-bg, #fef08a);
     color: var(--note-ink, #1c1917);
-    transform: rotate(var(--rot, 0deg));
+    margin-top: var(--jy, 0);
+    transform: translateX(var(--jx, 0)) rotate(var(--rot, 0deg));
     transition: transform 150ms ease, box-shadow 150ms ease;
     box-shadow: 2px 3px 10px rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.1);
   }
 
+  /* Content-driven sizes: small clippings vs. fuller notes. */
+  .sticky-note.note-xs { width: 8rem; }
+  .sticky-note.note-s  { width: 10rem; }
+  .sticky-note.note-m  { width: 12rem; }
+  .sticky-note.note-l  { width: 14.5rem; }
+  @media (min-width: 640px) {
+    .sticky-note.note-l { width: 16rem; }
+  }
+
   .sticky-note:hover, .sticky-note:focus-visible {
-    transform: rotate(0deg) scale(1.02);
+    transform: translateX(var(--jx, 0)) rotate(0deg) scale(1.03);
     box-shadow: 4px 8px 20px rgba(0,0,0,0.25);
     outline: none;
     z-index: 10;
@@ -1445,6 +1480,14 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+  /* Collapse the visible text toward each note's size so short notes stay
+     small and long ones earn their extra room. */
+  .note-xs .sticky-content { -webkit-line-clamp: 3; line-clamp: 3; }
+  .note-s  .sticky-content { -webkit-line-clamp: 4; line-clamp: 4; }
+  .note-m  .sticky-content { -webkit-line-clamp: 7; line-clamp: 7; }
+  .note-l  .sticky-content { -webkit-line-clamp: 12; line-clamp: 12; }
+  .note-xs .sticky-title { font-size: 0.8rem; }
+  .note-l  .sticky-title { font-size: 0.95rem; }
 
   .sticky-photos {
     display: flex;
