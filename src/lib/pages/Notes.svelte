@@ -7,7 +7,7 @@
   import { hapticLight, hapticMedium, hapticSuccess } from '$lib/haptics'
   import { activeUser, currentPreferences, displayNames, userPreferences } from '$lib/stores/app'
   import { consumeQueryParam } from '$lib/stores/nav'
-  import { getNotePalette, resolveNoteTone, resolveToneShift, NOTE_TONE_KEYS, type NoteTone } from '$lib/notePalette'
+  import { getNotePalette, toneIndex, resolveToneShift, NOTE_TONE_KEYS, type NoteTone } from '$lib/notePalette'
   import { readableInk, ensureReadable } from '$lib/color'
   import {
     similarityClusters,
@@ -74,6 +74,14 @@
   // Filter / sort state
   let showFilters = $state(false)
   let searchText = $state('')
+  // Debounced copy: filtering + regrouping + a full board re-render is too much
+  // to redo on every keystroke.
+  let debouncedSearch = $state('')
+  $effect(() => {
+    const next = searchText
+    const timer = setTimeout(() => { debouncedSearch = next }, 150)
+    return () => clearTimeout(timer)
+  })
   let authorFilter = $state<'all' | UserId>('all')
   let unreadOnly = $state(false)
   type SortMode = 'newest' | 'oldest' | 'author'
@@ -92,22 +100,40 @@
     resolveToneShift($userPreferences, $currentPreferences?.noteAutoToneShift ?? true)
   )
   let isDark = $derived(($currentPreferences?.theme ?? 'dark') === 'dark')
-  let myAccent = $derived($userPreferences[$activeUser]?.accentColor ?? DEFAULT_ACCENT)
-  let myPalette = $derived(getNotePalette(myAccent, toneShift[$activeUser] ?? 0))
+
+  // There are only ever two palettes — one per identity — but a palette is ~30
+  // colour conversions to build. Derive them once instead of rebuilding per note
+  // on every render.
+  let palettes = $derived({
+    Z: getNotePalette($userPreferences.Z?.accentColor ?? DEFAULT_ACCENT, toneShift.Z ?? 0),
+    T: getNotePalette($userPreferences.T?.accentColor ?? DEFAULT_ACCENT, toneShift.T ?? 0),
+  })
+  let myPalette = $derived(palettes[$activeUser])
   let composeTone = $derived(
     myPalette[Math.max(0, (NOTE_TONE_KEYS as readonly string[]).indexOf(newNote.color))]
   )
 
   function toneOf(note: Note): NoteTone {
-    return resolveNoteTone(note.createdBy, note.color, $userPreferences, toneShift)
+    return palettes[note.createdBy][toneIndex(note.color)]
   }
 
   function swatchBg(tone: NoteTone): string {
     return isDark ? tone.bgDark : tone.bgLight
   }
 
+  // Cache the CSS custom-property string per (tone, custom colour, theme). The
+  // uncached work — notably ensureReadable's contrast loop — is otherwise redone
+  // for every note on every render.
+  let noteVarsCache = $derived.by(() => {
+    void palettes; void isDark // rebuild the cache when either changes
+    return new Map<string, string>()
+  })
+
   function noteVars(tone: NoteTone, customColor?: string): string {
     const custom = customColor?.trim()
+    const key = `${tone.key}|${custom ?? ''}`
+    const hit = noteVarsCache.get(key)
+    if (hit !== undefined) return hit
     const bg = custom || (isDark ? tone.bgDark : tone.bgLight)
     const ink = custom ? readableInk(custom) : (isDark ? tone.inkDark : tone.inkLight)
     const tack = custom || tone.tack
@@ -115,7 +141,9 @@
     // tone whose tack sits close to the paper) can make it illegible — so recolor
     // it to guarantee contrast against this note's background.
     const sign = ensureReadable(tack, bg, 3.2)
-    return `--note-bg:${bg};--note-ink:${ink};--note-tack:${tack};--note-sign:${sign};`
+    const vars = `--note-bg:${bg};--note-ink:${ink};--note-tack:${tack};--note-sign:${sign};`
+    noteVarsCache.set(key, vars)
+    return vars
   }
 
   // Full inline style for a board note: colour + tilt + horizontal/vertical
@@ -602,7 +630,7 @@
 
   // Board notes: filtered + sorted, pinned first
   let boardNotes = $derived.by(() => {
-    const q = searchText.trim().toLowerCase()
+    const q = debouncedSearch.trim().toLowerCase()
     let list = notes.filter(n => !n.archived)
     if (boardView === 'new') list = list.filter(n => !n.read && n.createdBy !== $activeUser)
     if (authorFilter !== 'all') list = list.filter(n => n.createdBy === authorFilter)

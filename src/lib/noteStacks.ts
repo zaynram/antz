@@ -65,22 +65,42 @@ export const SIMILARITY_THRESHOLD = 2
 export function similarityClusters(notes: StackableNote[]): Map<string, string> {
     const map = new Map<string, string>()
     const sorted = [...notes].filter(n => n.id).sort((a, b) => a.createdAtMs - b.createdAtMs)
-    const clusters: Array<{ key: string; tokens: Set<string> }> = []
+
+    // Inverted index: token -> cluster keys containing it. Scoring a note then
+    // touches only the clusters that actually share a word with it, instead of
+    // scanning every cluster (which made this quadratic in the note count).
+    const postings = new Map<string, string[]>()
+    // Insertion order of cluster keys, so ties resolve to the oldest cluster
+    // exactly as the previous scan-in-order implementation did.
+    const clusterRank = new Map<string, number>()
+
     for (const n of sorted) {
         const toks = tokenize(n.title, n.content)
-        let best: { key: string; tokens: Set<string> } | null = null
-        let bestScore = 0
-        for (const c of clusters) {
-            let score = 0
-            for (const t of toks) if (c.tokens.has(t)) score++
-            if (score > bestScore) { bestScore = score; best = c }
+        const scores = new Map<string, number>()
+        for (const t of toks) {
+            const owners = postings.get(t)
+            if (!owners) continue
+            for (const key of owners) scores.set(key, (scores.get(key) ?? 0) + 1)
         }
-        if (best && bestScore >= SIMILARITY_THRESHOLD) {
-            map.set(n.id!, best.key)
-            for (const t of toks) best.tokens.add(t)
-        } else {
-            clusters.push({ key: n.id!, tokens: toks })
-            map.set(n.id!, n.id!)
+
+        let bestKey: string | null = null
+        let bestScore = 0
+        for (const [key, score] of scores) {
+            if (score > bestScore || (score === bestScore && bestKey !== null
+                && (clusterRank.get(key) ?? 0) < (clusterRank.get(bestKey) ?? 0))) {
+                bestScore = score
+                bestKey = key
+            }
+        }
+
+        const target = bestKey !== null && bestScore >= SIMILARITY_THRESHOLD ? bestKey : n.id!
+        if (target === n.id!) clusterRank.set(target, clusterRank.size)
+        map.set(n.id!, target)
+        // Absorb the note's tokens into its cluster so later notes can match it.
+        for (const t of toks) {
+            const owners = postings.get(t)
+            if (!owners) postings.set(t, [target])
+            else if (!owners.includes(target)) owners.push(target)
         }
     }
     return map

@@ -44,6 +44,13 @@
 
   // Local search over the existing library (distinct from the discovery search)
   let librarySearch = $state('')
+  // Debounced: filtering + sorting the whole shelf on each keystroke is wasteful.
+  let debouncedLibrarySearch = $state('')
+  $effect(() => {
+    const next = librarySearch
+    const timer = setTimeout(() => { debouncedLibrarySearch = next }, 150)
+    return () => clearTimeout(timer)
+  })
 
   // "Between Us" couple lens — filter by who of the pair has watched, from the
   // active user's perspective.
@@ -114,8 +121,16 @@
     }
   })
 
-  // Reset filters when type changes
+  // Reset filters when the type actually changes. This must not run on mount:
+  // onMount opens the add panel for a `?add=1` deep link (the Home quick-add),
+  // and effects flush in creation order, so an unconditional reset here would
+  // close it again before first paint.
+  let previousType: MediaType | null = null
   $effect(() => {
+    if (previousType === type) return
+    const isFirstRun = previousType === null
+    previousType = type
+    if (isFirstRun) return
     filters = { ...DEFAULT_FILTERS, type }
     showAddPanel = false
     searchQuery = ''
@@ -348,7 +363,7 @@
 
   let filteredMedia = $derived.by(() => {
     let result = applyFilters(typeMedia, { ...filters, type: 'all' }) // Type already filtered
-    const q = librarySearch.trim().toLowerCase()
+    const q = debouncedLibrarySearch.trim().toLowerCase()
     if (q) {
       result = result.filter(m =>
         m.title.toLowerCase().includes(q) ||

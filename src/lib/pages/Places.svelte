@@ -23,7 +23,7 @@
   import { forceRepaint } from '$lib/pwa-utils'
   import { consumeQueryParam } from '$lib/stores/nav'
   import 'leaflet/dist/leaflet.css'
-  import type { Map as LeafletMap, LayerGroup } from 'leaflet'
+  import type { Map as LeafletMap, LayerGroup, Marker } from 'leaflet'
 
   // ---- Data ----
   let places = $state<Place[]>([])
@@ -44,6 +44,13 @@
   // ---- UI state ----
   let showForm = $state(false)
   let searchQuery = $state('')
+  // Debounced: the list filter also drives a distance sort.
+  let debouncedPlaceSearch = $state('')
+  $effect(() => {
+    const next = searchQuery
+    const timer = setTimeout(() => { debouncedPlaceSearch = next }, 150)
+    return () => clearTimeout(timer)
+  })
   let filterCategory = $state<PlaceCategory | 'all'>('all')
   let filterStatus = $state<'all' | 'to-visit' | 'visited'>('all')
   let autoCenter = $state(false)
@@ -66,12 +73,6 @@
     return $currentPreferences.referenceLocation || $currentPreferences.currentLocation
   }
 
-  function distanceOf(place: Place): number | null {
-    const ref = refLocation()
-    if (!ref || !place.location) return null
-    return calculateDistance(ref, place.location)
-  }
-
   // Pins on the map respect category + status filters (stable while typing).
   let mapPlaces = $derived.by(() => {
     let r = places.filter(p => p.location)
@@ -87,21 +88,29 @@
     if (filterCategory !== 'all') r = r.filter(p => p.category === filterCategory)
     if (filterStatus === 'visited') r = r.filter(p => p.visited)
     else if (filterStatus === 'to-visit') r = r.filter(p => !p.visited)
-    const q = searchQuery.trim().toLowerCase()
+    const q = debouncedPlaceSearch.trim().toLowerCase()
     if (q) {
       r = r.filter(p =>
         p.name.toLowerCase().includes(q) ||
         (p.location?.address?.toLowerCase().includes(q) ?? false) ||
         categoryDef(p.category).label.toLowerCase().includes(q))
     }
-    // Sort by distance when we have a reference, else by name.
-    return [...r].sort((a, b) => {
-      const da = distanceOf(a), db = distanceOf(b)
-      if (da !== null && db !== null) return da - db
-      if (da !== null) return -1
-      if (db !== null) return 1
-      return a.name.localeCompare(b.name)
+    // Sort by distance when we have a reference, else by name. Distances are
+    // computed once per place rather than inside the comparator (which would
+    // redo a haversine on every comparison), and carried through so the list
+    // rows don't recompute them a third time.
+    const ref = refLocation()
+    const keyed = r.map(p => ({
+      place: p,
+      distance: ref && p.location ? calculateDistance(ref, p.location) : null,
+    }))
+    keyed.sort((a, b) => {
+      if (a.distance !== null && b.distance !== null) return a.distance - b.distance
+      if (a.distance !== null) return -1
+      if (b.distance !== null) return 1
+      return a.place.name.localeCompare(b.place.name)
     })
+    return keyed
   })
 
   let visitedCount = $derived(places.filter(p => p.visited).length)
@@ -159,6 +168,7 @@
       disposed = true
       if (tileFallbackTimer) clearTimeout(tileFallbackTimer)
       unsubscribe?.()
+      markers.clear()
       map?.remove()
       map = undefined
       mapReady = false
@@ -188,22 +198,60 @@
     return place.visited ? '✓' : ''
   }
 
+  // Everything about a place that its pin actually renders. Markers are only
+  // rebuilt when this changes, so unrelated writes (a rating, a note edit, the
+  // other user's activity) don't churn the whole marker layer on every snapshot.
+  function pinSignature(place: Place): string {
+    return `${place.category}|${pinBadge(place)}|${place.location!.lat},${place.location!.lng}|${place.name}`
+  }
+
+  const markers = new Map<string, { marker: Marker; signature: string }>()
+
   function rebuildSavedMarkers(): void {
     if (!L || !map || !savedLayer) return
-    savedLayer.clearLayers()
+    const seen = new Set<string>()
+
     for (const place of mapPlaces) {
       if (!place.location || !place.id) continue
-      const icon = L.divIcon({
-        html: pinHtml(place.category, pinBadge(place)),
-        className: 'map-pin-wrap',
-        iconSize: [34, 34],
-        iconAnchor: [17, 34],
-        popupAnchor: [0, -32],
+      seen.add(place.id)
+      const signature = pinSignature(place)
+      const existing = markers.get(place.id)
+
+      if (existing) {
+        // Always refresh the click target so it closes over the latest record.
+        existing.marker.off('click')
+        existing.marker.on('click', () => { selectedPlace = place })
+        if (existing.signature === signature) continue
+        existing.marker.setLatLng([place.location.lat, place.location.lng])
+        existing.marker.setIcon(makePinIcon(place))
+        existing.signature = signature
+        continue
+      }
+
+      const marker = L.marker([place.location.lat, place.location.lng], {
+        icon: makePinIcon(place),
+        title: place.name,
       })
-      const marker = L.marker([place.location.lat, place.location.lng], { icon, title: place.name })
       marker.on('click', () => { selectedPlace = place })
       marker.addTo(savedLayer)
+      markers.set(place.id, { marker, signature })
     }
+
+    for (const [id, entry] of markers) {
+      if (seen.has(id)) continue
+      savedLayer.removeLayer(entry.marker)
+      markers.delete(id)
+    }
+  }
+
+  function makePinIcon(place: Place) {
+    return L!.divIcon({
+      html: pinHtml(place.category, pinBadge(place)),
+      className: 'map-pin-wrap',
+      iconSize: [34, 34],
+      iconAnchor: [17, 34],
+      popupAnchor: [0, -32],
+    })
   }
 
   function focusPlace(place: Place): void {
@@ -613,10 +661,9 @@
 
   <!-- Place list (doubles as the search result list) -->
   <div class="flex flex-col gap-2">
-    {#each listPlaces as place (place.id)}
+    {#each listPlaces as { place, distance } (place.id)}
       {@const def = categoryDef(place.category)}
       {@const Icon = def.icon}
-      {@const distance = distanceOf(place)}
       {@const rating = getPlaceDisplayRating(place)}
       {@const revisit = isRevisitable(place)}
       {@const visits = place.visitDates?.length ?? 0}

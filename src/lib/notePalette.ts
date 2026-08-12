@@ -48,7 +48,8 @@ export const COLLISION_HUE_THRESHOLD = 34
 // How far to rotate the shifted identity's palette on collision.
 export const COLLISION_SHIFT_DEG = 42
 
-function toneIndex(color: NoteColor | string | undefined): number {
+/** Index into a palette for a stored colour (tone slot or legacy named colour). */
+export function toneIndex(color: NoteColor | string | undefined): number {
     if (!color) return 0
     return LEGACY_COLOR_INDEX[color] ?? 0
 }

@@ -12,6 +12,12 @@ function noteLabel(n: Note): string {
     return "Untitled note"
 }
 
+// The feed renders ACTIVITY_LIMIT rows drawn from three collections, so the
+// activity-only subscriptions need supply at most that many candidates each —
+// no reason to stream whole collections to the client for a six-row list.
+const ACTIVITY_LIMIT = 6
+const ACTIVITY_FETCH_LIMIT = 25
+
 interface DashboardState {
     recentActivity: HomeActivity[]
     inProgress: Media[]
@@ -77,7 +83,7 @@ function rebuildActivity(): void {
             const bTime = b.updatedAt?.toMillis?.() ?? 0
             return bTime - aTime
         })
-        .slice(0, 6)
+        .slice(0, ACTIVITY_LIMIT)
 
     const inProgress = latestMedia.filter(m => m.status === "watching")
 
@@ -98,6 +104,9 @@ export function initHomeStore(): void {
 
     _dashboardState.set(INITIAL_STATE)
 
+    // Media is deliberately NOT bounded: it also feeds the "in progress" list,
+    // and a recency limit would silently drop a title still being watched once
+    // enough other items had been touched more recently.
     unsubscribeMedia = subscribeToCollection<Media>("media", items => {
         latestMedia = items
         rebuildActivity()
@@ -106,12 +115,12 @@ export function initHomeStore(): void {
     unsubscribeNotes = subscribeToCollection<Note>("notes", items => {
         latestNotes = items
         rebuildActivity()
-    }, "updatedAt")
+    }, "updatedAt", ACTIVITY_FETCH_LIMIT)
 
     unsubscribePlaces = subscribeToCollection<Place>("places", items => {
         latestPlaces = items
         rebuildActivity()
-    }, "updatedAt")
+    }, "updatedAt", ACTIVITY_FETCH_LIMIT)
 }
 
 export function cleanupHomeStore(): void {
