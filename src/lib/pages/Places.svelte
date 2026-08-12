@@ -23,7 +23,7 @@
   import { forceRepaint } from '$lib/pwa-utils'
   import { consumeQueryParam } from '$lib/stores/nav'
   import 'leaflet/dist/leaflet.css'
-  import type { Map as LeafletMap, LayerGroup, Marker } from 'leaflet'
+  import type { Map as LeafletMap, LayerGroup } from 'leaflet'
 
   // ---- Data ----
   let places = $state<Place[]>([])
@@ -40,7 +40,6 @@
   // Only reveal the map once its first tiles have painted, so we don't flash a
   // bright half-loaded map (especially jarring in dark mode).
   let tilesLoaded = $state(false)
-  const markerById = new Map<string, Marker>()
 
   // ---- UI state ----
   let showForm = $state(false)
@@ -188,7 +187,6 @@
   function rebuildSavedMarkers(): void {
     if (!L || !map || !savedLayer) return
     savedLayer.clearLayers()
-    markerById.clear()
     for (const place of mapPlaces) {
       if (!place.location || !place.id) continue
       const icon = L.divIcon({
@@ -201,7 +199,6 @@
       const marker = L.marker([place.location.lat, place.location.lng], { icon, title: place.name })
       marker.on('click', () => { selectedPlace = place })
       marker.addTo(savedLayer)
-      markerById.set(place.id, marker)
     }
   }
 
@@ -257,15 +254,23 @@
     return { west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }
   }
 
+  // Nominatim is rate-limited (~1.5s), so a search can still be in flight after
+  // the panel is closed or another search starts. Stamp each run and ignore any
+  // response that is no longer the current one, otherwise a late result drops a
+  // stray pin and flies the map somewhere the user didn't ask for.
+  let discoverRunId = 0
+
   async function runDiscovery(): Promise<void> {
     const bounds = currentBounds()
     if (!bounds) return
+    const runId = ++discoverRunId
     discoverLoading = true
     discoverError = null
     discoverCandidates = []
     discoverIndex = 0
     try {
       const found = await discoverInBounds(CATEGORY_QUERY[discoverCategory], bounds, 12)
+      if (runId !== discoverRunId || !discoverOpen) return
       // Drop candidates that essentially match a place we already have.
       const known = new Set(places.map(p => p.name.toLowerCase()))
       discoverCandidates = found.filter(c => !known.has(c.name.toLowerCase()))
@@ -273,10 +278,13 @@
         discoverError = `No new ${categoryDef(discoverCategory).label.toLowerCase()} spots in view — pan the map and try again.`
       }
     } catch (e) {
+      if (runId !== discoverRunId || !discoverOpen) return
       discoverError = e instanceof Error ? e.message : 'Discovery failed'
     } finally {
-      discoverLoading = false
-      renderDiscoverPin()
+      if (runId === discoverRunId) {
+        discoverLoading = false
+        if (discoverOpen) renderDiscoverPin()
+      }
     }
   }
 
@@ -309,6 +317,8 @@
 
   function closeDiscovery(): void {
     discoverOpen = false
+    discoverRunId++ // invalidate any in-flight search
+    discoverLoading = false
     discoverCandidates = []
     discoverIndex = 0
     discoverError = null

@@ -3,7 +3,7 @@
   import { updateDocument } from '$lib/firebase'
   import { activeUser, displayNames, displayAbbreviations, userPreferences } from '$lib/stores/app'
   import type { Media, MediaComment, MediaStatus, UserId } from '$lib/types'
-  import { getUserRating, getAverageRating, hasWatched, toggleSeenBy } from '$lib/types'
+  import { getUserRating, getAverageRating, hasWatched, toggleWatched } from '$lib/types'
   import { DEFAULT_ACCENT } from '$lib/accents'
   import { Timestamp } from 'firebase/firestore'
   import { Film, Tv, Gamepad2 } from 'lucide-svelte'
@@ -100,7 +100,7 @@
   async function toggleSeen(userId: UserId): Promise<void> {
     if (!media?.id) return
     hapticLight()
-    await updateDocument<Media>('media', media.id, { seenBy: toggleSeenBy(media, userId) }, $activeUser)
+    await updateDocument<Media>('media', media.id, toggleWatched(media, userId), $activeUser)
   }
 
   async function updateRating(userId: UserId, starIndex: number): Promise<void> {

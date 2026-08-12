@@ -4,7 +4,7 @@
   import { activeUser, displayNames, displayAbbreviations, userPreferences, mediaGridSize, type GridSize } from '$lib/stores/app'
   import type { Media, MediaStatus, MediaType, TMDBSearchResult, UserId, ProductionCompany, MediaCollection, TogethernessState } from '$lib/types'
   import { toast } from 'svelte-sonner'
-  import { getDisplayRating, hasWatched, watchTogetherness, toggleSeenBy } from '$lib/types'
+  import { getDisplayRating, hasWatched, watchTogetherness, toggleWatched } from '$lib/types'
   import { DEFAULT_ACCENT } from '$lib/accents'
   import { enrichMediaData } from '$lib/tmdb'
   import { searchGames, type WikiGameResult } from '$lib/wikipedia'
@@ -382,7 +382,7 @@
   async function toggleSeen(item: Media, user: UserId): Promise<void> {
     if (!item.id) return
     hapticSuccess()
-    await updateDocument<Media>('media', item.id, { seenBy: toggleSeenBy(item, user) }, $activeUser)
+    await updateDocument<Media>('media', item.id, toggleWatched(item, user), $activeUser)
   }
 
   function posterUrl(path: string | null | undefined, size: 'sm' | 'md' = 'sm'): string | null {

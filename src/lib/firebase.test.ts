@@ -33,6 +33,7 @@ vi.mock("firebase/firestore", () => ({
         return { id: "generated-id", path: `${collectionOrDb.name}/generated-id` }
     }),
     deleteDoc: vi.fn(() => Promise.resolve()),
+    deleteField: vi.fn(() => ({ __delete: true })),
     getDoc: vi.fn(() => Promise.resolve({ exists: () => false, data: () => null })),
     onSnapshot: vi.fn((_query, _callback) => {
         // Mock unsubscribe function
@@ -292,6 +293,25 @@ describe("Firebase utilities", () => {
             expect(data).toHaveProperty("Z")
             expect(data).toHaveProperty("T")
             expect(call[2]).toEqual({ merge: true })
+        })
+
+        it("converts cleared optional fields into deleteField sentinels", async () => {
+            // Firestore rejects `undefined`, and under merge:true a dropped key
+            // would keep its old remote value — so a cleared profile picture
+            // would reappear on the next sync.
+            const cleared = {
+                Z: { name: "Zed", profilePicture: undefined, noteSignature: undefined },
+            } as unknown as UserPreferencesMap
+
+            await savePreferencesToFirestore(cleared, "Z")
+
+            const data = vi.mocked(firestore.setDoc).mock.calls[0][1] as Record<string, unknown>
+            const entry = data.Z as Record<string, unknown>
+
+            expect(entry.name).toBe("Zed")
+            expect(entry.profilePicture).toEqual({ __delete: true })
+            expect(entry.noteSignature).toEqual({ __delete: true })
+            expect(Object.values(entry)).not.toContain(undefined)
         })
     })
 })

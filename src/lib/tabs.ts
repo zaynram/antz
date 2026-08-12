@@ -4,7 +4,7 @@
 // any remainder (plus unchosen destinations) spill into the "More" sheet.
 
 import type { ComponentType } from "svelte"
-import { Home, Library, StickyNote, MapPin, Video, Settings } from "lucide-svelte"
+import { Home, Library, StickyNote, MapPin, Video, Settings, Heart } from "lucide-svelte"
 import { DEFAULT_BOTTOM_TABS, DEFAULT_MAX_TABS_SHOWN, MAX_TABS_SHOWN } from "./tabsConfig"
 
 export { DEFAULT_BOTTOM_TABS, DEFAULT_MAX_TABS_SHOWN, MAX_TABS_SHOWN }
@@ -17,7 +17,9 @@ export interface TabDef {
     matchPrefix?: string // active when the route starts with this (e.g. /library)
 }
 
-// Search folded into Media discovery; Profiles moved into the identity pill.
+// Search folded into Media discovery. Profiles primarily lives in the identity
+// pill, but stays registered here so it remains reachable (via "More", or by
+// adding it to the bar) when the pill is switched off in Settings.
 export const TAB_DEFS: TabDef[] = [
     { key: "home", label: "Home", path: "/", icon: Home },
     { key: "media", label: "Media", path: "/library/movies", icon: Library, matchPrefix: "/library" },
@@ -25,6 +27,7 @@ export const TAB_DEFS: TabDef[] = [
     { key: "places", label: "Places", path: "/places", icon: MapPin },
     { key: "videos", label: "Videos", path: "/videos", icon: Video },
     { key: "settings", label: "Settings", path: "/settings", icon: Settings },
+    { key: "profiles", label: "Keepsakes", path: "/profiles", icon: Heart },
 ]
 
 export function tabDef(key: string): TabDef | undefined {

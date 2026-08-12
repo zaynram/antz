@@ -135,10 +135,6 @@ export function shiftHue(hex: string, degrees: number): string {
     return hslToHex({ ...hsl, h: hsl.h + degrees })
 }
 
-export function withHsl(hex: string, patch: Partial<HSL>): string {
-    return hslToHex({ ...hexToHsl(hex), ...patch })
-}
-
 /** Smallest absolute distance between two hues, in degrees (0..180). */
 export function hueDistance(a: number, b: number): number {
     const d = Math.abs(((a - b) % 360 + 360) % 360)

@@ -90,6 +90,9 @@
         { width: window.innerWidth, height: window.innerHeight },
         EDGE_MARGIN,
       )
+      // Dragging across the viewport midpoint has to flip the panel, or an
+      // open fly-out ends up hanging off the edge it was dragged toward.
+      if (isExpanded) computePlacement()
     }
   }
 
