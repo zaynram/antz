@@ -14,10 +14,12 @@ import {
     doc,
     getDoc,
     getFirestore,
+    limit,
     onSnapshot,
     orderBy,
     query,
     serverTimestamp,
+    type QueryConstraint,
     setDoc,
     updateDoc,
     type DocumentData,
@@ -54,12 +56,20 @@ export function onAuthChange(callback: (user: User | null) => void): () => void 
     return onAuthStateChanged(auth, callback)
 }
 
+/**
+ * Live-subscribe to a collection. Pass `maxItems` for views that only render a
+ * bounded slice (the home dashboard, for example) so the client isn't paying to
+ * receive and re-parse the entire collection on every snapshot.
+ */
 export function subscribeToCollection<T extends DocumentData>(
     collectionName: string,
     callback: (items: T[]) => void,
-    orderByField: string = "createdAt"
+    orderByField: string = "createdAt",
+    maxItems?: number
 ): () => void {
-    const q = query(collection(db, collectionName), orderBy(orderByField, "desc"))
+    const constraints: QueryConstraint[] = [orderBy(orderByField, "desc")]
+    if (maxItems !== undefined) constraints.push(limit(maxItems))
+    const q = query(collection(db, collectionName), ...constraints)
     return onSnapshot(q, snapshot => {
         const items = snapshot.docs.map(doc => ({
             id: doc.id,

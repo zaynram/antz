@@ -119,6 +119,21 @@ describe("noteStacks", () => {
         it("returns an empty map for no notes", () => {
             expect(similarityClusters([]).size).toBe(0)
         })
+
+        it("stays fast on a large, mostly-distinct board", () => {
+            // Guards the inverted-index implementation: the previous
+            // cluster-scanning version was quadratic and took ~150ms here.
+            const notes: StackableNote[] = Array.from({ length: 1000 }, (_, i) => ({
+                id: `n${i}`,
+                title: `Subject ${i}`,
+                content: `Distinct body text number ${i} about topic ${i}`,
+                createdAtMs: at(2026, 0, 1) + i * 1000,
+            }))
+            const started = performance.now()
+            const map = similarityClusters(notes)
+            expect(map.size).toBe(1000)
+            expect(performance.now() - started).toBeLessThan(150)
+        })
     })
 
     describe("threadKeyOf", () => {

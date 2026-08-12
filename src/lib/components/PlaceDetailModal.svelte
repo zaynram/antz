@@ -50,8 +50,13 @@
   let pinColor = $derived(place ? categoryDef(place.category).color : '')
   let pinEmoji = $derived(place ? categoryDef(place.category).emoji : '')
 
+  let miniMarker: import('leaflet').Marker | undefined
+
   $effect(() => {
-    const lat = pinLat, lng = pinLng, color = pinColor, emoji = pinEmoji
+    // Only the location and the element belong here. Pin appearance is applied
+    // by the separate effect below, so changing the category doesn't destroy
+    // the map (which would drop the user's zoom and re-fetch tiles).
+    const lat = pinLat, lng = pinLng
     const el = mapEl
     if (lat === null || lng === null || !el) return
     let disposed = false
@@ -71,20 +76,36 @@
         attributionControl: false,
       }).setView([lat, lng], 15)
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(miniMap)
-      const icon = L.divIcon({
-        html: `<div class="mini-pin" style="--pin:${color}"><span>${emoji}</span></div>`,
-        className: 'mini-pin-wrap',
-        iconSize: [30, 30],
-        iconAnchor: [15, 30],
-      })
-      L.marker([lat, lng], { icon }).addTo(miniMap)
+      miniMarker = L.marker([lat, lng]).addTo(miniMap)
+      miniMarker.setIcon(makeMiniIcon(L, pinColor, pinEmoji))
       requestAnimationFrame(() => miniMap?.invalidateSize())
     })()
     return () => {
       disposed = true
+      miniMarker = undefined
       miniMap?.remove()
       miniMap = undefined
     }
+  })
+
+  function makeMiniIcon(L: typeof import('leaflet'), color: string, emoji: string) {
+    return L.divIcon({
+      html: `<div class="mini-pin" style="--pin:${color}"><span>${emoji}</span></div>`,
+      className: 'mini-pin-wrap',
+      iconSize: [30, 30],
+      iconAnchor: [15, 30],
+    })
+  }
+
+  // Restyle the existing pin in place when the category changes.
+  $effect(() => {
+    const color = pinColor, emoji = pinEmoji
+    const marker = miniMarker
+    if (!marker) return
+    import('leaflet').then(leaflet => {
+      if (miniMarker !== marker) return
+      marker.setIcon(makeMiniIcon(leaflet.default ?? leaflet, color, emoji))
+    })
   })
 
   function getDisplayNameForUser(userId: UserId): string {
