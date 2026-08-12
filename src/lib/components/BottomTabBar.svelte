@@ -19,10 +19,17 @@
   let chosenTabs = $derived(resolveTabs($currentPreferences?.bottomTabs))
   let maxShown = $derived(clampMaxTabsShown($currentPreferences?.maxTabsShown))
   let primaryTabs = $derived(chosenTabs.slice(0, maxShown))
+  // Keepsakes lives in the identity pill's fly-out, so it's only surfaced as a
+  // navigable destination when that pill is switched off — otherwise it would
+  // add a redundant entry (and force a "More" tab) for a place you can already
+  // reach. It still appears if the user explicitly picks it for the bar.
+  let pillHidden = $derived(($currentPreferences?.showIdentityPill ?? true) === false)
   let moreItems = $derived.by(() => {
     const shown = new Set(primaryTabs.map(t => t.key))
     const overflow = chosenTabs.slice(maxShown)
-    const unchosen = TAB_DEFS.filter(t => !chosenTabs.some(c => c.key === t.key))
+    const unchosen = TAB_DEFS.filter(t =>
+      !chosenTabs.some(c => c.key === t.key) && (t.key !== 'profiles' || pillHidden)
+    )
     return [...overflow, ...unchosen].filter(t => !shown.has(t.key))
   })
 

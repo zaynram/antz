@@ -27,7 +27,7 @@
   let grabDY = 0
   let startX = 0
   let startY = 0
-  let justDragged = false
+  let dragEndedAt = 0
 
   onMount(() => {
     try {
@@ -70,7 +70,10 @@
     startY = e.clientY
     dragging = false
     pointerId = e.pointerId
-    pillEl.setPointerCapture(e.pointerId)
+    // NB: capture is deliberately NOT taken here. Capturing on pointerdown
+    // retargets the follow-up click to the capturing element, so the inner
+    // button never receives it and a plain tap could never open the fly-out.
+    // Capture is taken below, once a drag actually starts.
   }
 
   function onPointerMove(e: PointerEvent): void {
@@ -80,6 +83,9 @@
     if (!dragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
       dragging = true
       hapticLight()
+      // Now that this is a drag rather than a tap, take the pointer so the
+      // gesture keeps tracking even if it leaves the pill.
+      try { pillEl.setPointerCapture(e.pointerId) } catch { /* not capturable */ }
     }
     if (dragging) {
       e.preventDefault()
@@ -102,8 +108,9 @@
     pointerId = null
     if (dragging) {
       // Suppress the click that follows a drag so it doesn't toggle/select.
-      justDragged = true
-      setTimeout(() => { justDragged = false }, 0)
+      // Timestamp rather than a 0ms timer: on touch the click can land in a
+      // later task, by which point a timer-cleared flag would already be gone.
+      dragEndedAt = Date.now()
       try {
         if (pos) localStorage.setItem(STORAGE_KEY, JSON.stringify(pos))
       } catch (err) {
@@ -115,14 +122,14 @@
 
   function toggle(e: MouseEvent): void {
     e.stopPropagation()
-    if (justDragged) return
+    if (Date.now() - dragEndedAt < 400) return
     if (!isExpanded) computePlacement()
     isExpanded = !isExpanded
   }
 
   function selectUser(e: MouseEvent, userId: UserId): void {
     e.stopPropagation()
-    if (justDragged) return
+    if (Date.now() - dragEndedAt < 400) return
     hapticLight()
     activeUser.set(userId)
     isExpanded = false
@@ -130,7 +137,7 @@
 
   function goProfiles(e: MouseEvent, view: 'mine' | 'theirs'): void {
     e.stopPropagation()
-    if (justDragged) return
+    if (Date.now() - dragEndedAt < 400) return
     hapticLight()
     navigate(`/profiles?view=${view}`)
     isExpanded = false
