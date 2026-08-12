@@ -9,6 +9,7 @@
   import { consumeQueryParam } from '$lib/stores/nav'
   import { getNotePalette, toneIndex, resolveToneShift, NOTE_TONE_KEYS, type NoteTone } from '$lib/notePalette'
   import { readableInk, ensureReadable } from '$lib/color'
+  import { anchoredPosition, readSafeAreaInsets } from '$lib/popover'
   import {
     similarityClusters,
     threadKeyOf,
@@ -61,6 +62,27 @@
   // reply-thread links; the others are non-destructive views over the same notes.
   let stackView = $state<StackView>('custom')
   let showStackMenu = $state(false)
+  let stackBtnEl = $state<HTMLButtonElement | null>(null)
+  let stackMenuStyle = $state('')
+
+  // Position the menu against its button, clamped into the visible viewport and
+  // clear of any notch/home-bar insets — it is rendered fixed so an overflowing
+  // rail can't clip it either.
+  function placeStackMenu(): void {
+    const btn = stackBtnEl
+    if (!btn || typeof window === 'undefined') return
+    const r = btn.getBoundingClientRect()
+    const insets = readSafeAreaInsets()
+    const width = Math.min(240, window.innerWidth - insets.left - insets.right - 16)
+    const { left, top, maxHeight } = anchoredPosition(
+      { left: r.left, top: r.top, width: r.width, height: r.height },
+      { width, height: 320 },
+      { width: window.innerWidth, height: window.innerHeight },
+      8,
+      insets,
+    )
+    stackMenuStyle = `left:${Math.round(left)}px;top:${Math.round(top)}px;width:${Math.round(width)}px;max-height:${Math.round(maxHeight)}px;`
+  }
   const STACK_VIEWS: Array<{ key: StackView; label: string; hint: string }> = [
     { key: 'custom', label: 'My stacks', hint: 'Threads you linked yourself' },
     { key: 'day', label: 'By day', hint: 'Grouped by the day posted' },
@@ -420,6 +442,18 @@
     if (selectedNote || threadRootId || editingNote || pendingConfirm) return
     if (selectMode) exitSelect()
   }
+
+  // Keep the menu anchored if the viewport changes while it is open.
+  $effect(() => {
+    if (!showStackMenu) return
+    const reposition = () => placeStackMenu()
+    window.addEventListener('resize', reposition)
+    window.addEventListener('scroll', reposition, true)
+    return () => {
+      window.removeEventListener('resize', reposition)
+      window.removeEventListener('scroll', reposition, true)
+    }
+  })
 
   // Dismiss the stack-view menu on any click outside it.
   $effect(() => {
@@ -792,7 +826,8 @@
           <button
             type="button"
             class="rail-btn {showStackMenu || stackView !== 'custom' ? 'is-active' : ''}"
-            onclick={(e) => { e.stopPropagation(); showStackMenu = !showStackMenu; hapticLight(); }}
+            bind:this={stackBtnEl}
+            onclick={(e) => { e.stopPropagation(); showStackMenu = !showStackMenu; if (showStackMenu) placeStackMenu(); hapticLight(); }}
             aria-label="Stack view: {stackViewDef.label}"
             aria-haspopup="menu"
             aria-expanded={showStackMenu}
@@ -803,7 +838,7 @@
           </button>
 
           {#if showStackMenu}
-            <div class="stack-menu" role="menu">
+            <div class="stack-menu" style={stackMenuStyle} role="menu">
               <p class="stack-menu-head">Stack notes by</p>
               {#each STACK_VIEWS as sv (sv.key)}
                 <button
@@ -1598,12 +1633,10 @@
     white-space: nowrap;
   }
   .stack-menu {
-    position: absolute;
-    z-index: 40;
-    top: calc(100% + 0.5rem);
-    right: 0;
-    width: 15rem;
-    max-width: calc(100vw - 2rem);
+    position: fixed;
+    z-index: 45;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 0.4rem;
     border-radius: 0.9rem;
     background: var(--color-surface);
