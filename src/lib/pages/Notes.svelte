@@ -43,6 +43,9 @@
   // A stack unstacked in-place on the board (yarn-linked linear view).
   let expandedStackKey = $state<string | null>(null)
   let contextFor = $state<Note | null>(null)
+  // Screen rect of the long-pressed note, so the menu anchors to it and the
+  // note can "pop out" above the dimmed backdrop.
+  let contextRect = $state<{ left: number; top: number; width: number; height: number } | null>(null)
   let selectMode = $state(false)
   let selectedIds = $state<Set<string>>(new Set())
 
@@ -296,15 +299,18 @@
     longPressed = false
     pressStartX = e.clientX
     pressStartY = e.clientY
+    const el = e.currentTarget as HTMLElement
     if (pressTimer) clearTimeout(pressTimer)
     pressTimer = setTimeout(() => {
       pressTimer = null
       longPressed = true
       hapticMedium()
       // Enter selection (like holding a home-screen icon), select this note,
-      // and surface a context menu for per-note actions.
+      // and surface a context menu anchored to the note itself.
       if (!selectMode) selectMode = true
       if (note.id && !selectedIds.has(note.id)) toggleSelected(note.id)
+      const r = el.getBoundingClientRect()
+      contextRect = { left: r.left, top: r.top, width: r.width, height: r.height }
       contextFor = note
     }, 450)
   }
@@ -318,7 +324,24 @@
   function cancelPress(): void {
     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null }
   }
-  function closeContext(): void { contextFor = null }
+  function closeContext(): void { contextFor = null; contextRect = null }
+
+  // Anchor the context menu to the pressed note: below it when there's room,
+  // otherwise above; left-aligned to the note but clamped into the viewport.
+  let contextMenuStyle = $derived.by(() => {
+    const r = contextRect
+    if (!r || typeof window === 'undefined') return 'left:50%;top:50%;transform:translate(-50%,-50%);width:min(20rem,calc(100vw - 2rem));'
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const menuW = Math.min(320, vw - 16)
+    const gap = 12
+    const left = Math.min(Math.max(8, r.left), vw - menuW - 8)
+    const roomBelow = vh - (r.top + r.height)
+    const vertical = roomBelow > vh * 0.42
+      ? `top:${Math.round(r.top + r.height + gap)}px;`
+      : `bottom:${Math.round(vh - r.top + gap)}px;`
+    return `left:${Math.round(left)}px;width:${menuW}px;${vertical}`
+  })
 
   // How many notes are in the tapped note's current stack (for "expand thread").
   function stackSizeOf(note: Note): number {
@@ -1265,7 +1288,18 @@
 {#if contextFor}
   {@const cf = contextFor}
   <button type="button" class="reaction-backdrop" onclick={closeContext} aria-label="Close menu"></button>
-  <div class="context-menu" role="menu">
+  {#if contextRect}
+    <!-- The pressed note, lifted above the dim so the menu clearly belongs to it. -->
+    <div
+      class="context-lift"
+      style="left:{contextRect.left}px;top:{contextRect.top}px;width:{contextRect.width}px;{noteVars(toneOf(cf), cf.customColor)}"
+      aria-hidden="true"
+    >
+      {#if cf.title}<h3 class="lift-title">{cf.title}</h3>{/if}
+      {#if cf.content}<p class="lift-content">{cf.content}</p>{/if}
+    </div>
+  {/if}
+  <div class="context-menu" style={contextMenuStyle} role="menu">
     <!-- Reactions -->
     <div class="context-reacts">
       {#each REACTION_EMOJIS as emoji (emoji)}
@@ -1323,7 +1357,6 @@
           onclick={() => openNoteDetail(n)}
           onkeydown={(e) => e.key === 'Enter' && openNoteDetail(n)}
         >
-          <span class="yarn-knot" aria-hidden="true"></span>
           <div class="flex items-center justify-between mb-1">
             <span class="thread-author">{n.createdBy === $activeUser ? 'You' : getDisplayNameForUser(n.createdBy)}</span>
             <div class="flex items-center gap-1.5">
@@ -2049,21 +2082,56 @@
   .react-emoji:hover { transform: scale(1.25); }
   .react-emoji.is-mine { background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
 
-  /* ===== Long-press context menu ===== */
+  /* ===== Long-press context menu (anchored to the pressed note) ===== */
   .context-menu {
     position: fixed;
-    z-index: 61;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: min(20rem, calc(100vw - 2rem));
+    z-index: 62;
     padding: 0.6rem;
     border-radius: 1rem;
     background: var(--color-surface);
     box-shadow: 0 12px 40px rgba(0,0,0,0.35);
     animation: ctxpop 0.14s ease-out;
+    transform-origin: top left;
   }
-  @keyframes ctxpop { from { transform: translate(-50%, -50%) scale(0.94); opacity: 0.4; } }
+  @keyframes ctxpop { from { transform: scale(0.94); opacity: 0.4; } }
+
+  /* The lifted note that pops out above the dim. */
+  .context-lift {
+    position: fixed;
+    z-index: 61;
+    border-radius: 2px;
+    padding: 0.875rem 0.875rem 0.7rem;
+    background: var(--note-bg);
+    color: var(--note-ink);
+    box-shadow: 0 18px 44px rgba(0,0,0,0.45);
+    transform: scale(1.04);
+    transform-origin: center;
+    pointer-events: none;
+    max-height: 40vh;
+    overflow: hidden;
+    animation: liftpop 0.14s ease-out;
+  }
+  @keyframes liftpop { from { transform: scale(1); } }
+  .lift-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--note-ink);
+    margin-bottom: 0.25rem;
+    word-break: break-word;
+  }
+  .lift-content {
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--note-ink);
+    opacity: 0.82;
+    white-space: pre-wrap;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
   .context-reacts {
     display: flex;
     justify-content: space-between;
@@ -2112,28 +2180,11 @@
     text-align: center;
   }
 
-  /* ===== Thread / stack list (yarn-strung) ===== */
+  /* ===== Thread list (tap-to-open quick view — plain, no yarn) ===== */
   .thread-list {
-    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.85rem;
-    padding-left: 0.4rem;
-  }
-  /* The yarn running down the stack. */
-  .thread-list::before {
-    content: "";
-    position: absolute;
-    left: 0.15rem;
-    top: 0.6rem;
-    bottom: 2.6rem;
-    width: 2px;
-    background:
-      repeating-linear-gradient(to bottom,
-        var(--color-accent) 0 5px,
-        transparent 5px 9px);
-    opacity: 0.55;
-    border-radius: 2px;
+    gap: 0.75rem;
   }
   .thread-note {
     position: relative;
@@ -2193,54 +2244,58 @@
     font-weight: 700;
     color: var(--color-text-muted, #78716c);
   }
+  /* Vertical strip — reads and taps well on a portrait phone; the yarn runs
+     straight down the left through a knot on each note. */
   .thread-strip {
+    position: relative;
     display: flex;
-    align-items: flex-start;
-    gap: 2.5rem;
-    overflow-x: auto;
-    padding: 1.35rem 0.75rem 1.5rem;
-    scroll-snap-type: x proximity;
+    flex-direction: column;
+    gap: 1.1rem;
+    max-width: 34rem;
+    margin: 0 auto;
+    padding: 0.5rem 0.5rem 1.5rem 1.4rem;
+  }
+  .thread-strip::before {
+    content: "";
+    position: absolute;
+    left: 0.55rem;
+    top: 1.4rem;
+    bottom: 1.6rem;
+    width: 2px;
+    background:
+      repeating-linear-gradient(to bottom,
+        var(--color-accent) 0 5px,
+        transparent 5px 9px);
+    opacity: 0.55;
+    border-radius: 2px;
   }
   .strip-note {
     position: relative;
-    flex: 0 0 13rem;
-    width: 13rem;
-    scroll-snap-align: center;
+    width: 100%;
     background: var(--note-bg);
     color: var(--note-ink);
     border-radius: 2px;
     padding: 0.9rem 0.9rem 0.7rem;
     box-shadow: 2px 3px 12px rgba(0,0,0,0.2);
     cursor: pointer;
-    transform: rotate(-1deg);
+    transform: rotate(-0.6deg);
     transition: transform 140ms ease, box-shadow 140ms ease;
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
   }
-  .strip-note:nth-child(even) { transform: rotate(1.3deg); }
+  .strip-note:nth-child(even) { transform: rotate(0.7deg); }
   .strip-note:hover, .strip-note:focus-visible {
-    transform: rotate(0deg) translateY(-2px);
+    transform: rotate(0deg) translateX(3px);
     box-shadow: 3px 8px 20px rgba(0,0,0,0.28);
     outline: none;
   }
-  /* Yarn running from each note to the next. */
-  .strip-note:not(.is-last)::after {
-    content: "";
-    position: absolute;
-    top: 1.5rem;
-    right: -2.5rem;
-    width: 2.5rem;
-    border-top: 2px dashed var(--color-accent);
-    opacity: 0.6;
-    z-index: 1;
-  }
-  .strip-note .yarn-knot { left: auto; right: -0.5rem; top: 1.2rem; }
-  .strip-note.is-last .yarn-knot { display: none; }
+  /* Knot pinning each note to the vertical yarn. */
+  .strip-note .yarn-knot { left: -0.95rem; right: auto; top: 1.1rem; }
   .strip-order {
     position: absolute;
-    top: -0.6rem;
-    left: -0.6rem;
+    top: -0.55rem;
+    right: -0.55rem;
     width: 1.4rem;
     height: 1.4rem;
     border-radius: 50%;
