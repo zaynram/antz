@@ -8,7 +8,7 @@
   import { activeUser, currentPreferences, displayNames, userPreferences } from '$lib/stores/app'
   import { consumeQueryParam } from '$lib/stores/nav'
   import { getNotePalette, resolveNoteTone, resolveToneShift, NOTE_TONE_KEYS, type NoteTone } from '$lib/notePalette'
-  import { readableInk } from '$lib/color'
+  import { readableInk, ensureReadable } from '$lib/color'
   import { DEFAULT_ACCENT } from '$lib/accents'
   import type { Note, NoteColor, UserId } from '$lib/types'
   import { Timestamp, type Timestamp as TimestampType } from 'firebase/firestore'
@@ -84,7 +84,11 @@
     const bg = custom || (isDark ? tone.bgDark : tone.bgLight)
     const ink = custom ? readableInk(custom) : (isDark ? tone.inkDark : tone.inkLight)
     const tack = custom || tone.tack
-    return `--note-bg:${bg};--note-ink:${ink};--note-tack:${tack};`
+    // The signature is drawn in the tack colour, but a custom paper colour (or a
+    // tone whose tack sits close to the paper) can make it illegible — so recolor
+    // it to guarantee contrast against this note's background.
+    const sign = ensureReadable(tack, bg, 3.2)
+    return `--note-bg:${bg};--note-ink:${ink};--note-tack:${tack};--note-sign:${sign};`
   }
 
   // Full inline style for a board note: colour + tilt + horizontal/vertical
@@ -1370,20 +1374,22 @@
     background: rgba(0,0,0,0.2);
   }
 
-  /* Organic wrapping flow — notes are sized to their content (below), so the
-     ragged widths never line up into columns the way a fixed masonry does. */
+  /* Organic wrapping flow. Notes are sized to their content (flex-basis below)
+     for variety, but grow to fill the row so the board never bunches in the
+     middle or leaves large empty chunks. Ragged bases + jitter keep it from
+     reading as fixed columns. */
   .notes-masonry {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
-    justify-content: center;
     gap: 0.5rem 0.6rem;
   }
 
   /* ===== STICKY NOTE ===== */
   .sticky-note {
     position: relative;
-    width: 12rem; /* default (m); size variants below */
+    flex: 1 1 12rem; /* grow to fill the row; basis set per size below */
+    max-width: 16rem;
     border-radius: 2px;
     padding: 0.875rem 0.875rem 0.6rem;
     cursor: pointer;
@@ -1395,14 +1401,12 @@
     box-shadow: 2px 3px 10px rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.1);
   }
 
-  /* Content-driven sizes: small clippings vs. fuller notes. */
-  .sticky-note.note-xs { width: 8rem; }
-  .sticky-note.note-s  { width: 10rem; }
-  .sticky-note.note-m  { width: 12rem; }
-  .sticky-note.note-l  { width: 14.5rem; }
-  @media (min-width: 640px) {
-    .sticky-note.note-l { width: 16rem; }
-  }
+  /* Content-driven bases + growth caps: small clippings stay tighter, fuller
+     notes are allowed to spread wider. */
+  .sticky-note.note-xs { flex-basis: 8rem;  max-width: 11rem; }
+  .sticky-note.note-s  { flex-basis: 10rem; max-width: 13rem; }
+  .sticky-note.note-m  { flex-basis: 12rem; max-width: 15rem; }
+  .sticky-note.note-l  { flex-basis: 14rem; max-width: 19rem; }
 
   .sticky-note:hover, .sticky-note:focus-visible {
     transform: translateX(var(--jx, 0)) rotate(0deg) scale(1.03);
@@ -1504,8 +1508,8 @@
     font-style: italic;
     font-size: 0.8rem;
     font-weight: 600;
-    color: var(--note-tack);
-    opacity: 0.85;
+    color: var(--note-sign, var(--note-tack));
+    opacity: 0.95;
     word-break: break-word;
   }
 
