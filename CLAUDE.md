@@ -39,9 +39,9 @@ bun run deploy       # Build + Firebase deploy
 ### Directory Structure
 
 -   `src/lib/components/` - Reusable Svelte components
--   `src/lib/pages/` - Page-level components (Home, Login, Media, Notes, Places, Settings, Debug)
+-   `src/lib/pages/` - Page-level components (Home, Login, Library, Videos, Notes, Places, Profiles, Settings, Search, Debug)
 -   `src/lib/stores/` - Svelte stores for state management
--   `src/lib/services/` - Service modules (location)
+-   `src/lib/services/` - Service modules (location, video/YouTube/Grayjay sync)
 -   `src/test/` - Test setup files
 -   Tests are co-located with source (e.g., `firebase.test.ts` next to `firebase.ts`)
 
@@ -55,7 +55,20 @@ bun run deploy       # Build + Firebase deploy
 -   `src/lib/filters.ts` - Media filtering/sorting pure functions
 -   `src/lib/haptics.ts` - Haptic feedback utility (Vibration API)
 -   `src/lib/stores/app.ts` - Central Svelte stores (auth, preferences, search, touch detection)
+-   `src/lib/stores/nav.ts` - Route state (`currentPath` is query-stripped) + `consumeQueryParam`
 -   `src/App.svelte` - Root component with manual client-side routing
+
+**Pure, unit-tested helper modules** (prefer extending these over inlining logic
+in components — components should stay thin enough that the logic is testable):
+
+-   `src/lib/color.ts` - Colour maths: HSL conversion, `readableInk`, `contrastRatio`, `ensureReadable`
+-   `src/lib/notePalette.ts` - Per-identity sticky-note palettes derived from accents
+-   `src/lib/noteStacks.ts` - Notes board stack grouping (ISO week/date buckets, similarity clustering)
+-   `src/lib/places.ts` - Place category config (labels, icons, pin colours, revisit defaults, OSM mapping)
+-   `src/lib/identityPill.ts` - Floating identity pill geometry (clamping, fly-out placement)
+-   `src/lib/tabsConfig.ts` / `src/lib/tabs.ts` - Bottom-tab config. **Keep `tabsConfig.ts` free of
+    `lucide-svelte`** — importing the icon barrel into store-level code drags it into unrelated
+    tests and slows the suite dramatically.
 
 ### Routing
 
@@ -181,6 +194,20 @@ Pure functions in `filters.ts`: `applyFilters()`, `applySort()` with composable 
 -   Setup file at `src/test/setup.ts` mocks localStorage and extends expect with Jest-DOM matchers
 -   Component testing uses @testing-library/svelte
 
+### Expectation: write tests alongside new logic
+
+When adding behaviour with real logic (anything with branches, maths, dates,
+sorting, grouping, or parsing), **extract it into a pure module and unit-test it
+in the same change** rather than leaving it inline in a `.svelte` file. This is a
+standing expectation, not a nice-to-have.
+
+-   Pure logic → its own `src/lib/<name>.ts` + co-located `<name>.test.ts`
+-   Cover the boundaries, not just the happy path (year/week rollovers, empty
+    collections, missing ids, oversized inputs, both partners vs. one)
+-   Markup/CSS-only changes don't need tests — say so explicitly rather than
+    silently skipping
+-   Always run `bun run check`, `bun run build`, and `bun test:run` before shipping
+
 ## TypeScript
 
 -   Strict mode with `noUnusedLocals` and `noUnusedParameters`
@@ -260,38 +287,52 @@ Utilities in `src/app.css` for notched devices (use sparingly - they override ex
 -   Offline banner displayed when disconnected
 -   Firebase SDK handles offline Firestore persistence automatically
 
-## Search Features
+## Search & Discovery
 
-The Search page (`/`) supports two modes:
+Search is **not** a standalone destination — it lives where the content does:
 
-### Library Mode (default)
+-   **Library pages** (`/library/*`) have a search bar that filters the existing
+    collection by title / overview / genre.
+-   **Discovery** (adding new content) lives in each Library page's **Add**
+    panel: TMDB for movies & TV, Wikipedia for games (with relevance scoring).
+-   **Notes** has its own search in the filter tray; **Places** has a search
+    that filters saved places and can geocode an arbitrary query to recentre
+    the map.
 
--   Searches local Firestore collections (media, notes, places)
--   Supports advanced query syntax: `@movie`, `@tv`, `status:completed`, `rating:4+`
--   Quick filter buttons for content types
+The legacy standalone `Search` page still exists at `/search` for deep links,
+but it is not in the navigation.
 
-### Discover Mode
+## Couple Watch-State ("Between Us")
 
--   Queries external APIs for new content to add
--   TMDB API for movies and TV shows
--   Wikipedia API for games (with relevance scoring)
--   Category filters: All (6 each), Movies (15), TV (15), Games (15)
--   Auto-fetches game thumbnails when adding items without images
+Media carries a per-partner watch layer on top of the shared `status`, so the
+library can express "one of us has seen this and the other hasn't":
+
+-   `Media.seenBy?: UserId[]` — who has personally watched it.
+-   `hasWatched(media, user)` — in `seenBy`, **or** the user left a personal
+    rating (a per-user rating implies watched; the legacy shared `rating` is
+    ignored because it isn't attributable to one partner).
+-   `watchTogetherness(media, viewer, partner)` → `both | mine | theirs | none`.
+-   The Library exposes this as a lens (New to us / Waiting on you / Waiting on
+    them / Seen together) plus per-card tappable "seen" faces.
 
 ## Routes
 
 | Path              | Component | Description                           |
 | ----------------- | --------- | ------------------------------------- |
-| `/`               | Search    | Library search + Discover new content |
+| `/`               | Home      | Dashboard: recent activity, quick-add |
 | `/library/movies` | Library   | Movies collection                     |
 | `/library/tv`     | Library   | TV shows collection                   |
 | `/library/games`  | Library   | Games collection                      |
 | `/videos`         | Videos    | YouTube playlist queue                |
-| `/notes`          | Notes     | Free-form notes with tags             |
-| `/places`         | Places    | Location/venue tracking               |
-| `/profiles`       | Profiles  | Partner profiles - individual preferences |
-| `/settings`       | Settings  | Profile, theme, PWA updates           |
+| `/notes`          | Notes     | Corkboard of sticky notes             |
+| `/places`         | Places    | Interactive map + saved places        |
+| `/profiles`       | Profiles  | Partner profiles (reached via the identity pill) |
+| `/settings`       | Settings  | Profile, theme, tabs, PWA updates     |
+| `/search`         | Search    | Legacy standalone search (not in nav) |
 | `/debug`          | Debug     | Development tools                     |
+
+Routing matches on `$currentPath` (query string stripped); use
+`consumeQueryParam` for one-shot params like `?add=1`.
 
 ## Touch Device Support
 

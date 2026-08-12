@@ -120,6 +120,7 @@
     })
 
     let disposed = false
+    let tileFallbackTimer: ReturnType<typeof setTimeout> | undefined
     ;(async () => {
       const leaflet = await import('leaflet')
       if (disposed || !mapEl) return
@@ -139,7 +140,7 @@
       // Reveal once the first batch of tiles has loaded; fall back after a
       // moment so an offline/slow tile server can't leave it hidden forever.
       tiles.once('load', () => { tilesLoaded = true })
-      setTimeout(() => { tilesLoaded = true }, 2500)
+      tileFallbackTimer = setTimeout(() => { tilesLoaded = true }, 2500)
       savedLayer = L.layerGroup().addTo(map)
       discoverLayer = L.layerGroup().addTo(map)
       mapReady = true
@@ -153,6 +154,7 @@
 
     return () => {
       disposed = true
+      if (tileFallbackTimer) clearTimeout(tileFallbackTimer)
       unsubscribe?.()
       map?.remove()
       map = undefined
