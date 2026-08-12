@@ -40,6 +40,8 @@
 
   // Thread view (a stack expanded) + long-press context menu + multi-select
   let threadRootId = $state<string | null>(null)
+  // A stack unstacked in-place on the board (yarn-linked linear view).
+  let expandedStackKey = $state<string | null>(null)
   let contextFor = $state<Note | null>(null)
   let selectMode = $state(false)
   let selectedIds = $state<Set<string>>(new Set())
@@ -288,10 +290,15 @@
   // ===== Long-press → select mode + context menu (mobile home-screen style) =====
   let pressTimer: ReturnType<typeof setTimeout> | null = null
   let longPressed = false
-  function onNotePointerDown(note: Note): void {
+  let pressStartX = 0
+  let pressStartY = 0
+  function onNotePointerDown(e: PointerEvent, note: Note): void {
     longPressed = false
+    pressStartX = e.clientX
+    pressStartY = e.clientY
     if (pressTimer) clearTimeout(pressTimer)
     pressTimer = setTimeout(() => {
+      pressTimer = null
       longPressed = true
       hapticMedium()
       // Enter selection (like holding a home-screen icon), select this note,
@@ -300,6 +307,13 @@
       if (note.id && !selectedIds.has(note.id)) toggleSelected(note.id)
       contextFor = note
     }, 450)
+  }
+  // Only cancel the long-press on a real move (finger jitter shouldn't count),
+  // otherwise micro-movement lets the browser's own text-select/callout win.
+  function onNotePointerMove(e: PointerEvent): void {
+    if (pressTimer && Math.hypot(e.clientX - pressStartX, e.clientY - pressStartY) > 10) {
+      clearTimeout(pressTimer); pressTimer = null
+    }
   }
   function cancelPress(): void {
     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null }
@@ -310,13 +324,16 @@
   function stackSizeOf(note: Note): number {
     return notes.filter(n => !n.archived && groupKeyOf(n) === groupKeyOf(note)).length
   }
+  // "Expand stack": unstack the linked notes in a linear, yarn-threaded strip
+  // laid out on the corkboard itself (not a modal).
   function expandFromContext(note: Note): void {
     contextFor = null
     selectMode = false
     selectedIds = new Set()
-    threadRootId = groupKeyOf(note)
+    expandedStackKey = groupKeyOf(note)
     markAsRead(note)
   }
+  function collapseBoardStack(): void { expandedStackKey = null }
 
   // ===== Multi-select =====
   function toggleSelectMode(): void {
@@ -595,6 +612,14 @@
       : []
   )
 
+  // Notes of the stack unstacked on the board (oldest → newest, linear).
+  let expandedNotes = $derived(
+    expandedStackKey
+      ? notes.filter(n => !n.archived && groupKeyOf(n) === expandedStackKey)
+          .sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))
+      : []
+  )
+
   let totalBoardCount = $derived(notes.filter(n => !n.archived).length)
   let archivedNotes = $derived(notes.filter(n => n.archived))
 
@@ -772,6 +797,42 @@
 
   {#if activeView === 'corkboard'}
     <div class="notes-board">
+      {#if expandedStackKey && expandedNotes.length > 0}
+        <!-- Unstacked thread: notes laid out linearly on the board, strung
+             together with decorative yarn to show they're linked. -->
+        <div class="thread-expanded">
+          <div class="thread-expanded-head">
+            <button type="button" class="thread-collapse" onclick={collapseBoardStack} aria-label="Collapse stack">
+              <X size={16} /><span>Collapse</span>
+            </button>
+            <span class="thread-expanded-title"><Link2 size={14} /> Linked thread · {expandedNotes.length}</span>
+          </div>
+          <div class="thread-strip">
+            {#each expandedNotes as n, i (n.id)}
+              {@const tone = toneOf(n)}
+              {@const sig = signatureFor(n.createdBy)}
+              <div
+                class="strip-note {i === 0 ? 'is-first' : ''} {i === expandedNotes.length - 1 ? 'is-last' : ''}"
+                style={noteVars(tone, n.customColor)}
+                role="button"
+                tabindex="0"
+                onclick={() => openNoteDetail(n)}
+                onkeydown={(e) => e.key === 'Enter' && openNoteDetail(n)}
+              >
+                <span class="yarn-knot" aria-hidden="true"></span>
+                <div class="strip-order">{i + 1}</div>
+                {#if n.title}<h3 class="strip-title">{n.title}</h3>{/if}
+                {#if n.content}<p class="strip-content">{n.content}</p>{/if}
+                {#if sig}<p class="strip-sign">{sig}</p>{/if}
+                <div class="strip-foot">
+                  <span>{n.createdBy === $activeUser ? 'You' : getDisplayNameForUser(n.createdBy)}</span>
+                  <span>{getRelativeTime(n.createdAt)}</span>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {:else}
       <!-- Compose sticky inline -->
       {#if composing}
         <div class="compose-sticky" style={noteVars(composeTone, newNote.customColor)}>
@@ -865,10 +926,11 @@
               role="button"
               tabindex="0"
               onkeydown={(e) => e.key === 'Enter' && openThread(thread.key, note)}
-              onpointerdown={() => onNotePointerDown(note)}
+              onpointerdown={(e) => onNotePointerDown(e, note)}
               onpointerup={cancelPress}
-              onpointermove={cancelPress}
+              onpointermove={onNotePointerMove}
               onpointerleave={cancelPress}
+              oncontextmenu={(e) => e.preventDefault()}
             >
               {#if thread.count > 1}
                 <div class="stack-layer stack-layer-2"></div>
@@ -944,6 +1006,7 @@
             </div>
           {/each}
         </div>
+      {/if}
       {/if}
     </div>
 
@@ -1533,6 +1596,10 @@
     transform: translateX(var(--jx, 0)) rotate(var(--rot, 0deg));
     transition: transform 150ms ease, box-shadow 150ms ease;
     box-shadow: 2px 3px 10px rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.1);
+    /* Long-press should open our menu, not select text or the OS callout. */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
   }
 
   /* Content-driven bases + growth caps: small clippings stay tighter, fuller
@@ -2096,6 +2163,134 @@
     font-weight: 600;
     color: var(--note-ink);
     opacity: 0.45;
+  }
+
+  /* ===== On-board unstacked thread (yarn-linked strip) ===== */
+  .thread-expanded { padding: 0.25rem 0.15rem 1rem; }
+  .thread-expanded-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .thread-collapse {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 999px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .thread-expanded-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--color-text-muted, #78716c);
+  }
+  .thread-strip {
+    display: flex;
+    align-items: flex-start;
+    gap: 2.5rem;
+    overflow-x: auto;
+    padding: 1.35rem 0.75rem 1.5rem;
+    scroll-snap-type: x proximity;
+  }
+  .strip-note {
+    position: relative;
+    flex: 0 0 13rem;
+    width: 13rem;
+    scroll-snap-align: center;
+    background: var(--note-bg);
+    color: var(--note-ink);
+    border-radius: 2px;
+    padding: 0.9rem 0.9rem 0.7rem;
+    box-shadow: 2px 3px 12px rgba(0,0,0,0.2);
+    cursor: pointer;
+    transform: rotate(-1deg);
+    transition: transform 140ms ease, box-shadow 140ms ease;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .strip-note:nth-child(even) { transform: rotate(1.3deg); }
+  .strip-note:hover, .strip-note:focus-visible {
+    transform: rotate(0deg) translateY(-2px);
+    box-shadow: 3px 8px 20px rgba(0,0,0,0.28);
+    outline: none;
+  }
+  /* Yarn running from each note to the next. */
+  .strip-note:not(.is-last)::after {
+    content: "";
+    position: absolute;
+    top: 1.5rem;
+    right: -2.5rem;
+    width: 2.5rem;
+    border-top: 2px dashed var(--color-accent);
+    opacity: 0.6;
+    z-index: 1;
+  }
+  .strip-note .yarn-knot { left: auto; right: -0.5rem; top: 1.2rem; }
+  .strip-note.is-last .yarn-knot { display: none; }
+  .strip-order {
+    position: absolute;
+    top: -0.6rem;
+    left: -0.6rem;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 50%;
+    background: var(--color-accent);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+    z-index: 2;
+  }
+  .strip-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--note-ink);
+    margin-bottom: 0.3rem;
+    word-break: break-word;
+  }
+  .strip-content {
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--note-ink);
+    opacity: 0.8;
+    white-space: pre-wrap;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 8;
+    line-clamp: 8;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .strip-sign {
+    margin-top: 0.4rem;
+    font-style: italic;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--note-sign, var(--note-tack));
+    opacity: 0.95;
+  }
+  .strip-foot {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.6rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid rgba(120,110,90,0.22);
+    font-size: 0.65rem;
+    color: var(--note-ink);
+    opacity: 0.5;
   }
 
   /* ===== Bulk action bar ===== */
