@@ -6,6 +6,7 @@
   import { hapticLight } from '$lib/haptics'
   import { DEFAULT_ACCENT } from '$lib/accents'
   import type { UserId } from '$lib/types'
+  import { clampPosition, flyoutPlacement } from '$lib/identityPill'
 
   const STORAGE_KEY = 'identity-pill-pos'
   const DRAG_THRESHOLD = 6
@@ -16,6 +17,9 @@
   // Persisted top-left position (px). Null = default bottom-right anchor.
   let pos = $state<{ x: number; y: number } | null>(null)
   let dragging = $state(false)
+  // Which way the fly-out opens so it stays inside the viewport.
+  let openLeft = $state(true)
+  let openUp = $state(true)
 
   // Non-reactive drag internals
   let pointerId: number | null = null
@@ -34,7 +38,7 @@
     }
     // Clamp after layout so a resized viewport can't strand the pill offscreen.
     requestAnimationFrame(clampIntoView)
-    const onResize = () => clampIntoView()
+    const onResize = () => { clampIntoView(); if (isExpanded) computePlacement() }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   })
@@ -42,12 +46,18 @@
   function clampIntoView(): void {
     if (!pos || !pillEl) return
     const rect = pillEl.getBoundingClientRect()
-    const maxX = Math.max(EDGE_MARGIN, window.innerWidth - rect.width - EDGE_MARGIN)
-    const maxY = Math.max(EDGE_MARGIN, window.innerHeight - rect.height - EDGE_MARGIN)
-    pos = {
-      x: Math.min(Math.max(EDGE_MARGIN, pos.x), maxX),
-      y: Math.min(Math.max(EDGE_MARGIN, pos.y), maxY),
-    }
+    pos = clampPosition(pos, { width: rect.width, height: rect.height },
+      { width: window.innerWidth, height: window.innerHeight }, EDGE_MARGIN)
+  }
+
+  // Choose the fly-out direction from where the collapsed pill sits.
+  function computePlacement(): void {
+    if (!pillEl) return
+    const rect = pillEl.getBoundingClientRect()
+    const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    const p = flyoutPlacement(center, { width: window.innerWidth, height: window.innerHeight })
+    openLeft = p.openLeft
+    openUp = p.openUp
   }
 
   function onPointerDown(e: PointerEvent): void {
@@ -74,12 +84,12 @@
     if (dragging) {
       e.preventDefault()
       const rect = pillEl.getBoundingClientRect()
-      const maxX = window.innerWidth - rect.width - EDGE_MARGIN
-      const maxY = window.innerHeight - rect.height - EDGE_MARGIN
-      pos = {
-        x: Math.min(Math.max(EDGE_MARGIN, e.clientX - grabDX), maxX),
-        y: Math.min(Math.max(EDGE_MARGIN, e.clientY - grabDY), maxY),
-      }
+      pos = clampPosition(
+        { x: e.clientX - grabDX, y: e.clientY - grabDY },
+        { width: rect.width, height: rect.height },
+        { width: window.innerWidth, height: window.innerHeight },
+        EDGE_MARGIN,
+      )
     }
   }
 
@@ -103,6 +113,7 @@
   function toggle(e: MouseEvent): void {
     e.stopPropagation()
     if (justDragged) return
+    if (!isExpanded) computePlacement()
     isExpanded = !isExpanded
   }
 
@@ -123,6 +134,11 @@
   }
 
   let otherUser = $derived<UserId>($activeUser === 'Z' ? 'T' : 'Z')
+
+  // Panel anchored to the pill, flipping toward on-screen space.
+  let panelStyle = $derived(
+    `${openLeft ? 'right:0;' : 'left:0;'}${openUp ? 'bottom:calc(100% + 10px);' : 'top:calc(100% + 10px);'}`
+  )
 
   function handleKeydown(e: KeyboardEvent): void {
     if (e.key === 'Escape' && isExpanded) {
@@ -152,10 +168,24 @@
   onpointerup={onPointerUp}
   onpointercancel={onPointerUp}
 >
+  <!-- Collapsed trigger (tap to switch, hold and drag to move) — always the
+       anchor, so the panel can float around it without moving the pill. -->
+  <button
+    type="button"
+    aria-label="Switch user — hold and drag to move"
+    aria-expanded={isExpanded}
+    class="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg transition-transform hover:scale-105 touch-manipulation"
+    style:background-color={$userPreferences[$activeUser]?.accentColor ?? DEFAULT_ACCENT}
+    onclick={toggle}
+  >
+    {$displayAbbreviations[$activeUser]}
+  </button>
+
   {#if isExpanded}
     <!-- Expanded panel: switch identity + profile access -->
     <div
-      class="flex flex-col gap-2 p-2 rounded-2xl bg-surface border border-[var(--color-border)] shadow-xl w-52"
+      class="pill-panel flex flex-col gap-2 p-2 rounded-2xl bg-surface border border-[var(--color-border)] shadow-xl w-52"
+      style={panelStyle}
       role="dialog"
       aria-label="Identity and profiles"
     >
@@ -198,17 +228,6 @@
         {$displayNames[otherUser]}'s keepsakes
       </button>
     </div>
-  {:else}
-    <!-- Collapsed trigger (tap to switch, hold and drag to move) -->
-    <button
-      type="button"
-      aria-label="Switch user — hold and drag to move"
-      class="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg transition-transform hover:scale-105 touch-manipulation"
-      style:background-color={$userPreferences[$activeUser]?.accentColor ?? DEFAULT_ACCENT}
-      onclick={toggle}
-    >
-      {$displayAbbreviations[$activeUser]}
-    </button>
   {/if}
 </div>
 
@@ -216,4 +235,11 @@
   .pill-root :global(button) { cursor: grab; }
   .pill-root.is-dragging { cursor: grabbing; }
   .pill-root.is-dragging :global(button) { cursor: grabbing; }
+  /* Fly-out floats around the pill and never exceeds the safe viewport. */
+  .pill-panel {
+    position: absolute;
+    max-width: min(13rem, calc(100vw - 16px));
+    max-height: calc(100dvh - 16px);
+    overflow: auto;
+  }
 </style>
