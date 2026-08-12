@@ -127,6 +127,16 @@
 }
 
 @layer base {
+  /* Publish the device safe-area insets as plain custom properties so script
+     can read them (env() is not reachable from getComputedStyle directly).
+     Used to keep pop-overs clear of notches and home bars. */
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+  }
+
   /* Global text/UI scale. Multiplies the viewer's own root size (respecting
      their browser font preference) by the per-user --font-scale setting. */
   html {
