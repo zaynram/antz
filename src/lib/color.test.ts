@@ -8,6 +8,8 @@ import {
     shiftHue,
     hueDistance,
     relativeLuminance,
+    contrastRatio,
+    ensureReadable,
 } from "./color"
 
 describe("color utilities", () => {
@@ -85,6 +87,38 @@ describe("color utilities", () => {
             expect(hueDistance(350, 10)).toBe(20)
             expect(hueDistance(0, 180)).toBe(180)
             expect(hueDistance(90, 90)).toBe(0)
+        })
+    })
+
+    describe("contrastRatio", () => {
+        it("is maximal for black on white", () => {
+            expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 0)
+        })
+        it("is 1 for identical colors", () => {
+            expect(contrastRatio("#e11d48", "#e11d48")).toBeCloseTo(1, 5)
+        })
+        it("is symmetric", () => {
+            expect(contrastRatio("#123456", "#abcdef")).toBeCloseTo(
+                contrastRatio("#abcdef", "#123456"), 5
+            )
+        })
+    })
+
+    describe("ensureReadable", () => {
+        it("returns the color unchanged when it already contrasts", () => {
+            expect(ensureReadable("#1c1917", "#fef08a", 3)).toBe("#1c1917")
+        })
+        it("recolors a same-as-background signature to be legible", () => {
+            // tack === bg (the custom-color collision case)
+            const out = ensureReadable("#e11d48", "#e11d48", 3.2)
+            expect(out).not.toBe("#e11d48")
+            expect(contrastRatio(out, "#e11d48")).toBeGreaterThanOrEqual(3.2)
+        })
+        it("preserves hue while adjusting lightness", () => {
+            const out = ensureReadable("#e11d48", "#e11d48", 3.2)
+            const target = hexToHsl("#e11d48")
+            const got = hexToHsl(out)
+            expect(hueDistance(got.h, target.h)).toBeLessThanOrEqual(4)
         })
     })
 })
