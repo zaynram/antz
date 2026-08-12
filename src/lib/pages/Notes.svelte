@@ -9,6 +9,14 @@
   import { consumeQueryParam } from '$lib/stores/nav'
   import { getNotePalette, resolveNoteTone, resolveToneShift, NOTE_TONE_KEYS, type NoteTone } from '$lib/notePalette'
   import { readableInk, ensureReadable } from '$lib/color'
+  import {
+    similarityClusters,
+    threadKeyOf,
+    groupKeyOf as groupKey,
+    isStackView,
+    type StackView,
+    type StackableNote,
+  } from '$lib/noteStacks'
   import { DEFAULT_ACCENT } from '$lib/accents'
   import type { Note, NoteColor, UserId } from '$lib/types'
   import { Timestamp, type Timestamp as TimestampType } from 'firebase/firestore'
@@ -51,16 +59,17 @@
 
   // How notes are grouped into stacks on the board. "custom" honours the manual
   // reply-thread links; the others are non-destructive views over the same notes.
-  type StackView = 'custom' | 'day' | 'week' | 'month' | 'year' | 'similar'
   let stackView = $state<StackView>('custom')
-  const STACK_VIEWS: Array<{ key: StackView; label: string }> = [
-    { key: 'custom', label: 'My stacks' },
-    { key: 'day', label: 'Day' },
-    { key: 'week', label: 'Week' },
-    { key: 'month', label: 'Month' },
-    { key: 'year', label: 'Year' },
-    { key: 'similar', label: 'Similar' },
+  let showStackMenu = $state(false)
+  const STACK_VIEWS: Array<{ key: StackView; label: string; hint: string }> = [
+    { key: 'custom', label: 'My stacks', hint: 'Threads you linked yourself' },
+    { key: 'day', label: 'By day', hint: 'Grouped by the day posted' },
+    { key: 'week', label: 'By week', hint: 'Grouped by week' },
+    { key: 'month', label: 'By month', hint: 'Grouped by month' },
+    { key: 'year', label: 'By year', hint: 'Grouped by year' },
+    { key: 'similar', label: 'Similar', hint: 'Loosely grouped by shared words' },
   ]
+  let stackViewDef = $derived(STACK_VIEWS.find(s => s.key === stackView) ?? STACK_VIEWS[0])
 
   // Filter / sort state
   let showFilters = $state(false)
@@ -168,8 +177,9 @@
     try {
       const v = sessionStorage.getItem('notes-board-view')
       if (v === 'new' || v === 'all') boardView = v
-      const sv = sessionStorage.getItem('notes-stack-view')
-      if (sv && STACK_VIEWS.some(s => s.key === sv)) stackView = sv as StackView
+      // Stack view is a lasting view preference, so it persists across sessions.
+      const sv = localStorage.getItem('notes-stack-view')
+      if (isStackView(sv)) stackView = sv
     } catch { /* private mode */ }
 
     unsubscribe = subscribeToCollection<Note>('notes', (items) => {
@@ -345,7 +355,7 @@
 
   // How many notes are in the tapped note's current stack (for "expand thread").
   function stackSizeOf(note: Note): number {
-    return notes.filter(n => !n.archived && groupKeyOf(n) === groupKeyOf(note)).length
+    return stackSizes.get(groupKeyOf(note)) ?? 1
   }
   // "Expand stack": unstack the linked notes in a linear, yarn-threaded strip
   // laid out on the corkboard itself (not a modal).
@@ -378,9 +388,20 @@
   function onWindowKeydown(e: KeyboardEvent): void {
     if (e.key !== 'Escape') return
     if (contextFor) { closeContext(); return }
+    if (showStackMenu) { showStackMenu = false; return }
     if (selectedNote || threadRootId || editingNote || pendingConfirm) return
     if (selectMode) exitSelect()
   }
+
+  // Dismiss the stack-view menu on any click outside it.
+  $effect(() => {
+    if (!showStackMenu) return
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('.stack-picker')) showStackMenu = false
+    }
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
+  })
 
   // While selecting, a tap on empty board space (not a note, control, menu, or
   // modal) clears the selection first, then exits — so select mode never feels
@@ -473,8 +494,17 @@
     try { sessionStorage.setItem('notes-board-view', boardView) } catch { /* private mode */ }
   })
   $effect(() => {
-    try { sessionStorage.setItem('notes-stack-view', stackView) } catch { /* private mode */ }
+    try { localStorage.setItem('notes-stack-view', stackView) } catch { /* private mode */ }
   })
+
+  function selectStackView(key: StackView): void {
+    stackView = key
+    showStackMenu = false
+    // A regrouping invalidates any expanded stack from the previous grouping.
+    expandedStackKey = null
+    threadRootId = null
+    hapticLight()
+  }
 
   // Confirm dialog state
   let pendingConfirm = $state<{ message: string; onConfirm: () => void } | null>(null)
@@ -576,63 +606,31 @@
     })
   })
 
-  function threadKeyOf(n: Note): string {
-    return n.threadId ?? n.id ?? ''
+  // ===== Stack grouping (view-dependent; pure logic lives in noteStacks.ts) =====
+  function stackable(n: Note): StackableNote {
+    return { id: n.id, threadId: n.threadId, title: n.title, content: n.content, createdAtMs: n.createdAt?.toMillis?.() ?? 0 }
+  }
+  let similarityKeys = $derived(
+    stackView === 'similar'
+      ? similarityClusters(notes.filter(n => !n.archived).map(stackable))
+      : new Map<string, string>()
+  )
+  /** The stack a note belongs to under the current view. */
+  function groupKeyOf(n: Note): string {
+    return groupKey(stackable(n), stackView, similarityKeys)
   }
 
-  // ===== Stack grouping (view-dependent) =====
-  function isoWeek(d: Date): number {
-    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
-    const day = date.getUTCDay() || 7
-    date.setUTCDate(date.getUTCDate() + 4 - day)
-    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
-    return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
-  }
-  function dateBucket(n: Note): string {
-    const d = n.createdAt?.toDate?.() ?? new Date(0)
-    const y = d.getFullYear()
-    if (stackView === 'year') return `y:${y}`
-    if (stackView === 'month') return `m:${y}-${d.getMonth()}`
-    if (stackView === 'week') return `w:${y}-${isoWeek(d)}`
-    return `d:${y}-${d.getMonth()}-${d.getDate()}`
-  }
-  function noteTokens(n: Note): Set<string> {
-    const text = `${n.title ?? ''} ${n.content ?? ''}`.toLowerCase()
-    return new Set(text.split(/[^a-z0-9]+/).filter(w => w.length > 3))
-  }
-  // Simplistic greedy similarity clustering: a note joins the first cluster it
-  // shares enough significant words with, else it starts its own. Just for fun.
-  let similarityKeys = $derived.by(() => {
-    const map = new Map<string, string>()
-    if (stackView !== 'similar') return map
-    const sorted = [...notes.filter(n => !n.archived && n.id)]
-      .sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))
-    const clusters: Array<{ key: string; tokens: Set<string> }> = []
-    for (const n of sorted) {
-      const toks = noteTokens(n)
-      let best: { key: string; tokens: Set<string> } | null = null
-      let bestScore = 0
-      for (const c of clusters) {
-        let score = 0
-        for (const t of toks) if (c.tokens.has(t)) score++
-        if (score > bestScore) { bestScore = score; best = c }
-      }
-      if (best && bestScore >= 2) {
-        map.set(n.id!, best.key)
-        for (const t of toks) best.tokens.add(t)
-      } else {
-        clusters.push({ key: n.id!, tokens: toks })
-        map.set(n.id!, n.id!)
-      }
+  // Full (unfiltered) size of every stack, in one pass — a stack's badge counts
+  // all its notes even when filters hide some of them.
+  let stackSizes = $derived.by(() => {
+    const sizes = new Map<string, number>()
+    for (const n of notes) {
+      if (n.archived) continue
+      const key = groupKeyOf(n)
+      sizes.set(key, (sizes.get(key) ?? 0) + 1)
     }
-    return map
+    return sizes
   })
-  // The stack a note belongs to under the current view.
-  function groupKeyOf(n: Note): string {
-    if (stackView === 'custom') return threadKeyOf(n)
-    if (stackView === 'similar') return similarityKeys.get(n.id ?? '') ?? n.id ?? ''
-    return dateBucket(n)
-  }
 
   // Group the filtered board into stacks; each renders with a face (most recent
   // note), sorted like the flat board.
@@ -643,10 +641,9 @@
       const arr = groups.get(key)
       if (arr) arr.push(n); else groups.set(key, [n])
     }
-    const fullCount = (key: string) => notes.filter(n => !n.archived && groupKeyOf(n) === key).length
     const list = [...groups.entries()].map(([key, ns]) => {
       const face = [...ns].sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0))[0]
-      return { key, face, count: fullCount(key) }
+      return { key, face, count: stackSizes.get(key) ?? ns.length }
     })
     return list.sort((a, b) => {
       if (a.face.pinned && !b.face.pinned) return -1
@@ -680,8 +677,7 @@
   // otherwise the single note's detail.
   function openThread(key: string, face: Note): void {
     if (selectMode) { toggleSelected(face.id); return }
-    const count = notes.filter(n => !n.archived && groupKeyOf(n) === key).length
-    if (count > 1) { threadRootId = key; markAsRead(face) }
+    if ((stackSizes.get(key) ?? 1) > 1) { threadRootId = key; markAsRead(face) }
     else openNoteDetail(face)
   }
 
@@ -745,6 +741,43 @@
             New{#if unreadCount > 0}<span class="view-badge">{unreadCount}</span>{/if}
           </button>
           <button type="button" class="view-seg {boardView === 'all' ? 'is-on' : ''}" onclick={() => { boardView = 'all'; hapticLight(); }}>All</button>
+        </div>
+
+        <!-- Stack view: a first-class (but quiet) view modifier -->
+        <div class="stack-picker">
+          <button
+            type="button"
+            class="rail-btn {showStackMenu || stackView !== 'custom' ? 'is-active' : ''}"
+            onclick={(e) => { e.stopPropagation(); showStackMenu = !showStackMenu; hapticLight(); }}
+            aria-label="Stack view: {stackViewDef.label}"
+            aria-haspopup="menu"
+            aria-expanded={showStackMenu}
+            title="Stack view: {stackViewDef.label}"
+          >
+            <Layers size={16} />
+            {#if stackView !== 'custom'}<span class="rail-tag">{stackViewDef.label}</span>{/if}
+          </button>
+
+          {#if showStackMenu}
+            <div class="stack-menu" role="menu">
+              <p class="stack-menu-head">Stack notes by</p>
+              {#each STACK_VIEWS as sv (sv.key)}
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={stackView === sv.key}
+                  class="stack-opt {stackView === sv.key ? 'is-on' : ''}"
+                  onclick={() => selectStackView(sv.key)}
+                >
+                  <span class="stack-opt-main">
+                    <span class="stack-opt-label">{sv.label}</span>
+                    <span class="stack-opt-hint">{sv.hint}</span>
+                  </span>
+                  {#if stackView === sv.key}<Check size={15} />{/if}
+                </button>
+              {/each}
+            </div>
+          {/if}
         </div>
 
         <button
@@ -832,15 +865,6 @@
           <option value="newest">Newest</option>
           <option value="oldest">Oldest</option>
           <option value="author">By author</option>
-        </select>
-      </label>
-
-      <label class="tray-sort">
-        <Layers size={14} class="text-slate-400" />
-        <select bind:value={stackView} aria-label="Stack notes by">
-          {#each STACK_VIEWS as sv}
-            <option value={sv.key}>{sv.label}</option>
-          {/each}
         </select>
       </label>
 
@@ -1519,6 +1543,61 @@
   }
   .rail-btn:hover { background: rgba(255,255,255,0.2); }
   .rail-btn.is-active { background: var(--color-accent); }
+
+  /* ===== Stack-view picker (rail) ===== */
+  .stack-picker { position: relative; }
+  .rail-tag {
+    margin-left: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .stack-menu {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    width: 15rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.4rem;
+    border-radius: 0.9rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.28);
+    animation: stackpop 0.13s ease-out;
+  }
+  @keyframes stackpop { from { opacity: 0; transform: translateY(-4px); } }
+  .stack-menu-head {
+    padding: 0.25rem 0.55rem 0.4rem;
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-text-hint, #78716c);
+  }
+  .stack-opt {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.55rem;
+    border-radius: 0.6rem;
+    text-align: left;
+    color: var(--color-text);
+    transition: background 120ms;
+  }
+  .stack-opt:hover { background: var(--color-surface-2); }
+  .stack-opt.is-on { color: var(--color-accent); }
+  .stack-opt-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .stack-opt-label { font-size: 0.85rem; font-weight: 600; }
+  .stack-opt-hint {
+    font-size: 0.68rem;
+    color: var(--color-text-hint, #78716c);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   .rail-badge {
     margin-left: 0.3rem;

@@ -6,7 +6,7 @@
   import { hapticLight } from '$lib/haptics'
   import { DEFAULT_ACCENT } from '$lib/accents'
   import type { UserId } from '$lib/types'
-  import { clampPosition, flyoutPlacement } from '$lib/identityPill'
+  import { clampPosition, flyoutPlacement, centerOf } from '$lib/identityPill'
 
   const STORAGE_KEY = 'identity-pill-pos'
   const DRAG_THRESHOLD = 6
@@ -54,7 +54,7 @@
   function computePlacement(): void {
     if (!pillEl) return
     const rect = pillEl.getBoundingClientRect()
-    const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    const center = centerOf({ x: rect.left, y: rect.top }, { width: rect.width, height: rect.height })
     const p = flyoutPlacement(center, { width: window.innerWidth, height: window.innerHeight })
     openLeft = p.openLeft
     openUp = p.openUp
