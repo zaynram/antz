@@ -22,7 +22,8 @@ import {
     getBudgetLabel,
     hasWatched,
     watchTogetherness,
-    toggleSeenBy,
+    setWatched,
+    toggleWatched,
     type GeoLocation,
 } from "./types"
 
@@ -705,6 +706,14 @@ describe("Type definitions", () => {
             it("is false for an untouched title", () => {
                 expect(hasWatched(media({}), "Z")).toBe(false)
             })
+            it("lets an explicit un-watched mark override an inferred rating", () => {
+                const m = media({ ratings: { Z: 4, T: null }, unseenBy: ["Z"] })
+                expect(hasWatched(m, "Z")).toBe(false)
+            })
+            it("prefers an explicit watched mark over an explicit un-watched one", () => {
+                const m = media({ seenBy: ["Z"], unseenBy: ["Z"] })
+                expect(hasWatched(m, "Z")).toBe(true)
+            })
         })
 
         describe("watchTogetherness", () => {
@@ -721,15 +730,43 @@ describe("Type definitions", () => {
             })
         })
 
-        describe("toggleSeenBy", () => {
-            it("adds a user not present", () => {
-                expect(toggleSeenBy(media({ seenBy: [] }), "Z")).toEqual(["Z"])
+        describe("setWatched", () => {
+            it("marks watched and clears any un-watched record", () => {
+                expect(setWatched(media({ unseenBy: ["Z"] }), "Z", true))
+                    .toEqual({ seenBy: ["Z"], unseenBy: [] })
             })
-            it("removes a user present, preserving canonical order", () => {
-                expect(toggleSeenBy(media({ seenBy: ["Z", "T"] }), "Z")).toEqual(["T"])
+            it("marks un-watched and records the negative", () => {
+                expect(setWatched(media({ seenBy: ["Z", "T"] }), "Z", false))
+                    .toEqual({ seenBy: ["T"], unseenBy: ["Z"] })
             })
-            it("handles missing seenBy", () => {
-                expect(toggleSeenBy(media({}), "T")).toEqual(["T"])
+            it("preserves canonical user order", () => {
+                expect(setWatched(media({ seenBy: ["T"] }), "Z", true).seenBy).toEqual(["Z", "T"])
+            })
+            it("leaves the other partner untouched", () => {
+                const out = setWatched(media({ ratings: { Z: null, T: 5 } }), "Z", false)
+                expect(out.unseenBy).toEqual(["Z"])
+                expect(hasWatched(media({ ratings: { Z: null, T: 5 } }), "T")).toBe(true)
+            })
+        })
+
+        describe("toggleWatched", () => {
+            it("un-marks a title that was only inferred watched from a rating", () => {
+                // Regression: toggling used to be a no-op because the rating
+                // kept inferring "watched" after removal from seenBy.
+                const m = media({ ratings: { Z: 4, T: null } })
+                expect(hasWatched(m, "Z")).toBe(true)
+                const next = toggleWatched(m, "Z")
+                expect(next.unseenBy).toEqual(["Z"])
+                expect(hasWatched(media({ ...m, ...next }), "Z")).toBe(false)
+            })
+            it("round-trips back to watched", () => {
+                const m = media({ ratings: { Z: 4, T: null } })
+                const off = toggleWatched(m, "Z")
+                const back = toggleWatched(media({ ...m, ...off }), "Z")
+                expect(hasWatched(media({ ...m, ...back }), "Z")).toBe(true)
+            })
+            it("marks an untouched title watched", () => {
+                expect(toggleWatched(media({}), "T")).toEqual({ seenBy: ["T"], unseenBy: [] })
             })
         })
     })

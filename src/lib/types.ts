@@ -143,7 +143,8 @@ export interface Media extends BaseDocument {
     status: MediaStatus
     rating: number | null // Legacy field for backward compatibility
     ratings?: Record<UserId, number | null> // Per-user ratings
-    seenBy?: UserId[] // Which partners have personally watched this (couple watch-state)
+    seenBy?: UserId[] // Partners who have personally watched this (couple watch-state)
+    unseenBy?: UserId[] // Partners explicitly marked NOT watched; suppresses rating-based inference
     notes: string
     progress?: MediaProgress
     // Metadata fields
@@ -209,9 +210,43 @@ export type TogethernessState = "both" | "mine" | "theirs" | "none"
  * intentionally ignored here since it isn't attributable to one partner.
  */
 export function hasWatched(media: Media, user: UserId): boolean {
+    // Explicit marks win over inference, in both directions.
     if (media.seenBy?.includes(user)) return true
+    if (media.unseenBy?.includes(user)) return false
     const r = media.ratings?.[user]
     return r !== null && r !== undefined
+}
+
+/** The explicit watch flags for a media item, as stored. */
+export interface WatchFlags {
+    seenBy: UserId[]
+    unseenBy: UserId[]
+}
+
+/**
+ * Set a partner's watched state explicitly. Marking un-watched records a
+ * negative so a pre-existing rating can't keep inferring "watched" — otherwise
+ * the toggle would be a no-op for anything either partner has rated.
+ */
+export function setWatched(media: Media, user: UserId, watched: boolean): WatchFlags {
+    const seen = new Set(media.seenBy ?? [])
+    const unseen = new Set(media.unseenBy ?? [])
+    if (watched) {
+        seen.add(user)
+        unseen.delete(user)
+    } else {
+        seen.delete(user)
+        unseen.add(user)
+    }
+    return {
+        seenBy: ALL_USER_IDS.filter(u => seen.has(u)),
+        unseenBy: ALL_USER_IDS.filter(u => unseen.has(u)),
+    }
+}
+
+/** Flip a partner's watched state, honouring rating-based inference. */
+export function toggleWatched(media: Media, user: UserId): WatchFlags {
+    return setWatched(media, user, !hasWatched(media, user))
 }
 
 /** Classify a title by who of the pair has seen it, from `viewer`'s POV. */
@@ -224,13 +259,6 @@ export function watchTogetherness(media: Media, viewer: UserId, partner: UserId)
     return "none"
 }
 
-/** Toggle a partner's personal "watched" flag, returning the next seenBy list. */
-export function toggleSeenBy(media: Media, user: UserId): UserId[] {
-    const set = new Set(media.seenBy ?? [])
-    if (set.has(user)) set.delete(user)
-    else set.add(user)
-    return ALL_USER_IDS.filter(u => set.has(u))
-}
 
 export type PlaceCategory =
     | "restaurant"

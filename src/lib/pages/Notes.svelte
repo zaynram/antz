@@ -420,30 +420,36 @@
     document.addEventListener('click', handler)
     return () => document.removeEventListener('click', handler)
   })
+  // Bulk ops snapshot the selection up front (so it can't shift mid-flight) and
+  // issue their writes together rather than one round trip at a time.
   async function bulkArchive(): Promise<void> {
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
     hapticLight()
-    for (const id of selectedIds) await updateDocument<Note>('notes', id, { archived: true }, $activeUser)
-    toast.success(`Archived ${selectedIds.size} note${selectedIds.size === 1 ? '' : 's'}`)
-    selectedIds = new Set(); selectMode = false
+    exitSelect()
+    await Promise.all(ids.map(id => updateDocument<Note>('notes', id, { archived: true }, $activeUser)))
+    toast.success(`Archived ${ids.length} note${ids.length === 1 ? '' : 's'}`)
   }
   async function bulkMarkRead(): Promise<void> {
-    for (const id of selectedIds) {
-      const n = notes.find(x => x.id === id)
-      if (n && !n.read && n.createdBy !== $activeUser) {
-        await updateDocument<Note>('notes', id, { read: true, readAt: Timestamp.now() }, $activeUser)
-      }
-    }
-    selectedIds = new Set(); selectMode = false
+    const targets = [...selectedIds]
+      .map(id => notes.find(x => x.id === id))
+      .filter((n): n is Note => !!n && !n.read && n.createdBy !== $activeUser)
+    exitSelect()
+    if (targets.length === 0) return
+    await Promise.all(targets.map(n =>
+      updateDocument<Note>('notes', n.id!, { read: true, readAt: Timestamp.now() }, $activeUser)
+    ))
   }
   function bulkDelete(): void {
-    const count = selectedIds.size
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
     pendingConfirm = {
-      message: `Tear up ${count} note${count === 1 ? '' : 's'} permanently?`,
+      message: `Tear up ${ids.length} note${ids.length === 1 ? '' : 's'} permanently?`,
       onConfirm: async () => {
         pendingConfirm = null
-        for (const id of selectedIds) await deleteDocument('notes', id)
-        toast.success(`Tore up ${count} note${count === 1 ? '' : 's'}`)
-        selectedIds = new Set(); selectMode = false
+        exitSelect()
+        await Promise.all(ids.map(id => deleteDocument('notes', id)))
+        toast.success(`Tore up ${ids.length} note${ids.length === 1 ? '' : 's'}`)
       }
     }
   }
@@ -460,15 +466,25 @@
       if (n) keys.add(threadKeyOf(n))
     }
     if (keys.size < 2) { toast('Those notes are already linked'); return }
-    const members = notes.filter(n => !n.archived && keys.has(threadKeyOf(n)))
+    // Only notes with a real id can be linked (the id is the thread key), and
+    // an all-archived selection would leave nothing to root the thread on.
+    const members = notes.filter(n => !n.archived && n.id && keys.has(threadKeyOf(n)))
     const root = [...members].sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))[0]
-    const rootKey = root.threadId ?? root.id ?? ''
+    // Root on the earliest *live* note's own id — reusing an inherited threadId
+    // could key the stack on an archived note that never appears on the board,
+    // and would leave the root note replying to itself.
+    const rootKey = root?.id
     if (!rootKey) return
     hapticSuccess()
-    for (const m of members) {
-      if (m.id === rootKey) continue
-      await updateDocument<Note>('notes', m.id!, { threadId: rootKey, replyTo: root.id! }, $activeUser)
-    }
+    await Promise.all(
+      members.map(m => m.id === rootKey
+        // Re-root: the root may still carry an inherited threadId pointing at an
+        // archived note, which would leave it outside its own new stack.
+        ? (root.threadId && root.threadId !== rootKey
+            ? updateDocument<Note>('notes', rootKey, { threadId: rootKey, replyTo: '' }, $activeUser)
+            : Promise.resolve())
+        : updateDocument<Note>('notes', m.id!, { threadId: rootKey, replyTo: rootKey }, $activeUser))
+    )
     toast.success(`Linked ${members.length} notes into a thread`)
     selectedIds = new Set(); selectMode = false
   }
@@ -1157,7 +1173,7 @@
   {#snippet header()}
     {#if selectedNote}
       {@const tone = toneOf(selectedNote)}
-      <div class="relative modal-note-header p-6 shrink-0" style={noteVars(tone)}>
+      <div class="relative modal-note-header p-6 shrink-0" style={noteVars(tone, selectedNote.customColor)}>
         <button
           class="absolute top-2 right-2 w-11 h-11 rounded-full bg-black/10 flex items-center justify-center hover:bg-black/20 transition-colors touch-manipulation"
           onclick={closeNoteDetail}
@@ -1360,25 +1376,25 @@
     <div class="context-reacts">
       {#each REACTION_EMOJIS as emoji (emoji)}
         {@const mine = (cf.reactions?.[emoji] ?? []).includes($activeUser)}
-        <button type="button" class="react-emoji {mine ? 'is-mine' : ''}" onclick={() => toggleReaction(cf, emoji)}>{emoji}</button>
+        <button type="button" role="menuitemcheckbox" aria-checked={mine} aria-label="React {emoji}" class="react-emoji {mine ? 'is-mine' : ''}" onclick={() => toggleReaction(cf, emoji)}>{emoji}</button>
       {/each}
     </div>
     <div class="context-actions">
       {#if stackSizeOf(cf) > 1}
-        <button type="button" class="context-btn context-yarn" onclick={() => expandFromContext(cf)}>
+        <button type="button" role="menuitem" class="context-btn context-yarn" onclick={() => expandFromContext(cf)}>
           <Layers size={16} /><span>Expand stack</span><span class="yarn-badge">{stackSizeOf(cf)}</span>
         </button>
       {/if}
-      <button type="button" class="context-btn" onclick={() => { closeContext(); selectMode = false; selectedIds = new Set(); startReply(cf) }}>
+      <button type="button" role="menuitem" class="context-btn" onclick={() => { closeContext(); selectMode = false; selectedIds = new Set(); startReply(cf) }}>
         <Reply size={16} /><span>Reply</span>
       </button>
-      <button type="button" class="context-btn" onclick={() => { togglePin(cf); closeContext() }}>
+      <button type="button" role="menuitem" class="context-btn" onclick={() => { togglePin(cf); closeContext() }}>
         <Pin size={16} class={cf.pinned ? 'text-accent' : ''} /><span>{cf.pinned ? 'Unpin' : 'Pin'}</span>
       </button>
-      <button type="button" class="context-btn" onclick={() => { toggleArchive(cf); closeContext() }}>
+      <button type="button" role="menuitem" class="context-btn" onclick={() => { toggleArchive(cf); closeContext() }}>
         <Archive size={16} /><span>Archive</span>
       </button>
-      <button type="button" class="context-btn context-danger" onclick={() => { closeContext(); cf.id && removeNote(cf.id) }}>
+      <button type="button" role="menuitem" class="context-btn context-danger" onclick={() => { closeContext(); cf.id && removeNote(cf.id) }}>
         <Trash2 size={16} /><span>Delete</span>
       </button>
     </div>

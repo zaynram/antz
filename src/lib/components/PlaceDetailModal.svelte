@@ -41,11 +41,19 @@
   let mapEl = $state<HTMLDivElement | null>(null)
   let miniMap: LeafletMap | undefined
 
+  // Depend on primitives, not the `place` object: the parent reassigns the
+  // selected place on every Firestore snapshot, and depending on the object
+  // would tear down and rebuild the map (losing the user's zoom and re-fetching
+  // tiles) on every unrelated write — a rating tap, a notes blur, a visit toggle.
+  let pinLat = $derived(place?.location?.lat ?? null)
+  let pinLng = $derived(place?.location?.lng ?? null)
+  let pinColor = $derived(place ? categoryDef(place.category).color : '')
+  let pinEmoji = $derived(place ? categoryDef(place.category).emoji : '')
+
   $effect(() => {
-    const loc = place?.location
+    const lat = pinLat, lng = pinLng, color = pinColor, emoji = pinEmoji
     const el = mapEl
-    if (!loc || !el) return
-    const def = categoryDef(place!.category)
+    if (lat === null || lng === null || !el) return
     let disposed = false
     ;(async () => {
       const leaflet = await import('leaflet')
@@ -61,15 +69,15 @@
         keyboard: false,
         zoomControl: true,
         attributionControl: false,
-      }).setView([loc.lat, loc.lng], 15)
+      }).setView([lat, lng], 15)
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(miniMap)
       const icon = L.divIcon({
-        html: `<div class="mini-pin" style="--pin:${def.color}"><span>${def.emoji}</span></div>`,
+        html: `<div class="mini-pin" style="--pin:${color}"><span>${emoji}</span></div>`,
         className: 'mini-pin-wrap',
         iconSize: [30, 30],
         iconAnchor: [15, 30],
       })
-      L.marker([loc.lat, loc.lng], { icon }).addTo(miniMap)
+      L.marker([lat, lng], { icon }).addTo(miniMap)
       requestAnimationFrame(() => miniMap?.invalidateSize())
     })()
     return () => {

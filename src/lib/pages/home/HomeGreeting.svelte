@@ -15,8 +15,19 @@
     return { greeting: 'Good night', icon: Moon }
   }
 
-  let today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-  let part = $derived(partOfDay())
+  // Re-evaluated on a timer: this is a PWA that people leave open, so an
+  // install left running overnight would otherwise still greet "Good evening"
+  // and show yesterday's date.
+  let now = $state(Date.now())
+  $effect(() => {
+    const id = setInterval(() => { now = Date.now() }, 60_000)
+    return () => clearInterval(id)
+  })
+
+  let today = $derived(
+    new Date(now).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  )
+  let part = $derived((() => { void now; return partOfDay() })())
 </script>
 
 <div class="hearth">
