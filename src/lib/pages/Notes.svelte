@@ -363,12 +363,42 @@
     selectMode = !selectMode
     selectedIds = new Set()
   }
+  function exitSelect(): void {
+    selectMode = false
+    selectedIds = new Set()
+  }
   function toggleSelected(id: string | undefined): void {
     if (!id) return
     const s = new Set(selectedIds)
     if (s.has(id)) s.delete(id); else s.add(id)
     selectedIds = s
   }
+
+  // Escape closes the context menu, else leaves select mode (when no modal is up).
+  function onWindowKeydown(e: KeyboardEvent): void {
+    if (e.key !== 'Escape') return
+    if (contextFor) { closeContext(); return }
+    if (selectedNote || threadRootId || editingNote || pendingConfirm) return
+    if (selectMode) exitSelect()
+  }
+
+  // While selecting, a tap on empty board space (not a note, control, menu, or
+  // modal) clears the selection first, then exits — so select mode never feels
+  // sticky. Handled at the document level to keep the board markup clean.
+  $effect(() => {
+    if (!selectMode) return
+    const handler = (e: MouseEvent) => {
+      const t = e.target as HTMLElement
+      if (t.closest('.sticky-note') || t.closest('.cork-rail') || t.closest('.filter-tray')
+        || t.closest('.bulk-bar') || t.closest('.compose-sticky') || t.closest('.context-menu')
+        || t.closest('.reaction-backdrop') || t.closest('.thread-expanded')
+        || t.closest('[role="dialog"]')) return
+      if (selectedIds.size > 0) selectedIds = new Set()
+      else exitSelect()
+    }
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
+  })
   async function bulkArchive(): Promise<void> {
     hapticLight()
     for (const id of selectedIds) await updateDocument<Note>('notes', id, { archived: true }, $activeUser)
@@ -684,6 +714,8 @@
   })
 </script>
 
+<svelte:window onkeydown={onWindowKeydown} />
+
 <!-- Full-bleed cork backdrop (fixed behind the page content) -->
 <div class="cork-backdrop" style={corkStyle} aria-hidden="true"></div>
 
@@ -740,7 +772,7 @@
       <button
         type="button"
         class="rail-btn {activeView === 'archive' ? 'is-active' : ''}"
-        onclick={() => { activeView = activeView === 'corkboard' ? 'archive' : 'corkboard'; hapticLight(); }}
+        onclick={() => { activeView = activeView === 'corkboard' ? 'archive' : 'corkboard'; exitSelect(); hapticLight(); }}
         aria-label={activeView === 'archive' ? 'Back to board' : 'Open archive'}
       >
         {#if activeView === 'archive'}
@@ -755,7 +787,7 @@
         <button
           type="button"
           class="rail-pen"
-          onclick={() => { composing = !composing; hapticLight(); }}
+          onclick={() => { composing = !composing; if (composing) exitSelect(); hapticLight(); }}
           aria-label="Write a note"
         >
           <Pencil size={15} />
