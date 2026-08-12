@@ -229,21 +229,22 @@
           
           <div class="flex-1 min-w-[160px]">
             <span class="block text-xs text-slate-500 dark:text-slate-400 mb-1">Watched by</span>
-            <div class="flex flex-col gap-1.5">
+            <div class="flex flex-wrap gap-1.5">
               {#each coupleUsers as u}
                 {@const seen = hasWatched(media, u)}
+                {@const accent = $userPreferences[u]?.accentColor ?? DEFAULT_ACCENT}
                 <button
                   type="button"
-                  class="flex items-center gap-2 px-2 py-1.5 rounded-xl text-sm font-medium transition-colors touch-manipulation border {seen ? 'border-transparent text-white' : 'border-[var(--color-border)] text-slate-500 dark:text-slate-400'}"
-                  style={seen ? `background-color:${$userPreferences[u]?.accentColor ?? DEFAULT_ACCENT}` : ''}
+                  class="watch-chip touch-sm {seen ? 'is-seen' : ''}"
+                  style={seen ? `background-color:${accent};border-color:${accent}` : ''}
                   onclick={() => toggleSeen(u)}
                   aria-pressed={seen}
+                  title="{getDisplayNameForUser(u)} {seen ? 'has watched this' : 'has not watched this'}"
                 >
-                  <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 {seen ? 'bg-white/25' : ''}" style={seen ? '' : `background-color:${$userPreferences[u]?.accentColor ?? DEFAULT_ACCENT}20;color:${$userPreferences[u]?.accentColor ?? DEFAULT_ACCENT}`}>
+                  <span class="watch-chip__badge" style={seen ? '' : `background-color:${accent}22;color:${accent}`}>
                     {$displayAbbreviations[u]}
                   </span>
                   <span class="truncate">{getDisplayNameForUser(u)}</span>
-                  <span class="ml-auto text-xs opacity-80">{seen ? 'Watched' : 'Mark'}</span>
                 </button>
               {/each}
             </div>
@@ -452,3 +453,41 @@
     </div>
   </Modal>
 {/if}
+
+<style>
+  /* Compact watched-by chips. `touch-sm` opts out of the global 44px
+     coarse-pointer minimum, which stretched these into tall slabs; the chip
+     keeps a comfortable 32px target without the wasted vertical padding. */
+  .watch-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2rem;
+    padding: 0.2rem 0.6rem 0.2rem 0.25rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--color-text-muted, #57534e);
+    max-width: 100%;
+    transition: background-color 120ms, border-color 120ms, color 120ms;
+  }
+  .watch-chip.is-seen { color: #fff; }
+  .watch-chip__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    font-size: 0.62rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .watch-chip.is-seen .watch-chip__badge {
+    background: rgba(255, 255, 255, 0.28);
+    color: #fff;
+  }
+</style>

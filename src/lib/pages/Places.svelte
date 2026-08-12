@@ -531,10 +531,10 @@
                 · {discoverIndex + 1}/{discoverCandidates.length}
               </div>
             </div>
-            <button type="button" class="disc-btn" onclick={rerollDiscovery} title="Show another" aria-label="Reroll">
+            <button type="button" class="disc-btn touch-sm" onclick={rerollDiscovery} title="Show another" aria-label="Reroll">
               <RotateCw size={16} />
             </button>
-            <button type="button" class="disc-btn disc-btn--add" onclick={addCandidate} title="Add this place" aria-label="Add">
+            <button type="button" class="disc-btn disc-btn--add touch-sm" onclick={addCandidate} title="Add this place" aria-label="Add">
               <Plus size={16} />
             </button>
           </div>
@@ -807,7 +807,8 @@
   }
   .disc-btn {
     flex-shrink: 0;
-    width: 38px; height: 38px;
+    width: 38px; height: 38px; min-height: 0; padding: 0;
+    aspect-ratio: 1;
     display: flex; align-items: center; justify-content: center;
     border-radius: 0.6rem;
     border: 1px solid var(--color-border);
