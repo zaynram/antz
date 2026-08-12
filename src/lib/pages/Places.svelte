@@ -131,13 +131,17 @@
         : [39.5, -98.35] // continental US fallback
       const zoom = start ? 13 : 4
 
-      map = L.map(mapEl, { zoomControl: true, attributionControl: true, fadeAnimation: false }).setView(center, zoom)
+      map = L.map(mapEl, { zoomControl: true, attributionControl: true }).setView(center, zoom)
       const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap',
       }).addTo(map)
       // Reveal once the first batch of tiles has loaded; fall back after a
       // moment so an offline/slow tile server can't leave it hidden forever.
+      // Reveal on the first painted tile as well as the full batch: if any tile
+      // 404s or a request stalls, `load` may never fire and the map would sit
+      // behind the cover until the fallback timer.
+      tiles.once('tileload', () => { tilesLoaded = true })
       tiles.once('load', () => { tilesLoaded = true })
       tileFallbackTimer = setTimeout(() => { tilesLoaded = true }, 2500)
       savedLayer = L.layerGroup().addTo(map)
@@ -493,12 +497,10 @@
 
   <!-- Map -->
   <div class="map-frame mb-3">
-    <div class="map-canvas {tilesLoaded ? 'is-ready' : ''}" bind:this={mapEl}></div>
-    {#if !tilesLoaded}
-      <div class="map-loading">
-        <div class="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    {/if}
+    <div class="map-canvas" bind:this={mapEl}></div>
+    <div class="map-loading {tilesLoaded ? 'is-done' : ''}" aria-hidden={tilesLoaded}>
+      <div class="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>
+    </div>
 
     <!-- Discovery overlay -->
     {#if discoverOpen}
@@ -697,14 +699,7 @@
     border: 1.5px solid color-mix(in srgb, var(--color-accent) 22%, #b7a381);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 10px 26px rgba(70,50,25,0.16);
   }
-  .map-canvas {
-    position: absolute;
-    inset: 0;
-    background: #ece3d2;
-    opacity: 0;
-    transition: opacity 260ms ease;
-  }
-  .map-canvas.is-ready { opacity: 1; }
+  .map-canvas { position: absolute; inset: 0; background: #ece3d2; }
   :global(.dark) .map-canvas { background: #26221c; }
   /* Leaflet paints its own container background behind the tiles. */
   .map-frame :global(.leaflet-container) { background: #ece3d2; }
@@ -732,11 +727,15 @@
     background: radial-gradient(120% 120% at 50% 40%, transparent 62%, rgba(0,0,0,0.4) 100%);
     mix-blend-mode: normal;
   }
+  /* Opaque cover that hides the half-painted map, then fades away. Fading the
+     cover (not the map) keeps Leaflet's own tile opacity handling untouched. */
   .map-loading {
     position: absolute; inset: 0; z-index: 500;
     display: flex; align-items: center; justify-content: center;
     background: #ece3d2;
+    transition: opacity 260ms ease;
   }
+  .map-loading.is-done { opacity: 0; pointer-events: none; }
   :global(.dark) .map-loading { background: #2a2620; }
 
   /* ===== Map pins (divIcon) ===== */
