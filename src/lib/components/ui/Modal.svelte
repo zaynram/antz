@@ -1,8 +1,11 @@
 <script module lang="ts">
   // Shared across every Modal instance: the currently-open modals, innermost
-  // last. Reactive so each instance can tell whether it is the top-most, which
-  // is what lets Escape dismiss only the innermost of a stack.
-  const openStack = $state<symbol[]>([])
+  // last. The array itself is deliberately NOT reactive — mutating a $state
+  // array from inside an $effect makes that effect depend on state it writes,
+  // which self-triggers into an infinite loop. Instead the top of the stack is
+  // published through one write-only reactive signal that instances read.
+  const openStack: symbol[] = []
+  let topToken = $state<symbol | null>(null)
   let idCounter = 0
 </script>
 
@@ -47,13 +50,15 @@
   $effect(() => {
     if (!open) return
     openStack.push(token)
+    topToken = token
     return () => {
       const i = openStack.indexOf(token)
       if (i !== -1) openStack.splice(i, 1)
+      topToken = openStack.length > 0 ? openStack[openStack.length - 1] : null
     }
   })
 
-  let isTopMost = $derived(open && openStack[openStack.length - 1] === token)
+  let isTopMost = $derived(open && topToken === token)
 
   // Unique per instance: duplicating one id across stacked modals makes screen
   // readers announce the wrong title.
