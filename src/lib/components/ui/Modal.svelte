@@ -8,6 +8,7 @@
     title: string
     onclose: () => void
     size?: 'sm' | 'md' | 'lg'
+    zIndex?: number // Stack above other modals (e.g. a detail over a thread)
     header?: Snippet
     children: Snippet
     footer?: Snippet
@@ -18,6 +19,7 @@
     title,
     onclose,
     size = 'md',
+    zIndex = 50,
     header,
     children,
     footer
@@ -48,6 +50,7 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    style="z-index:{zIndex}"
     onclick={handleBackdrop}
     onkeydown={handleKeydown}
     role="dialog"
