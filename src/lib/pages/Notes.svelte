@@ -1434,7 +1434,7 @@
             <div class="flex items-center gap-1.5">
               <span class="thread-time">{getRelativeTime(n.createdAt)}</span>
               {#if canUnlink(n)}
-                <button type="button" class="thread-unlink" onclick={(e) => { e.stopPropagation(); unlinkNote(n) }} aria-label="Unlink from thread" title="Unlink from thread">
+                <button type="button" class="thread-unlink touch-sm" onclick={(e) => { e.stopPropagation(); unlinkNote(n) }} aria-label="Unlink from thread" title="Unlink from thread">
                   <Unlink size={13} />
                 </button>
               {/if}
@@ -2517,7 +2517,9 @@
   .thread-time { font-size: 0.65rem; color: var(--note-ink); opacity: 0.5; }
   .thread-unlink {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 1.5rem; height: 1.5rem; border-radius: 50%;
+    flex: 0 0 auto;
+    width: 1.5rem; height: 1.5rem; min-height: 0; padding: 0;
+    aspect-ratio: 1; border-radius: 50%;
     color: var(--note-ink); opacity: 0.5;
     transition: opacity 120ms, background 120ms;
   }

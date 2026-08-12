@@ -872,7 +872,7 @@
                   {@const seen = hasWatched(item, u)}
                   <button
                     type="button"
-                    class="seen-dot {seen ? 'is-seen' : ''}"
+                    class="seen-dot touch-sm {seen ? 'is-seen' : ''}"
                     style={seen ? `background-color:${$userPreferences[u]?.accentColor ?? DEFAULT_ACCENT}` : ''}
                     onclick={(e) => { e.stopPropagation(); toggleSeen(item, u) }}
                     aria-pressed={seen}
@@ -950,16 +950,23 @@
   .lens-chip.is-on .lens-count { background: rgba(255,255,255,0.25); }
 
   /* ===== Per-card seen-by faces ===== */
+  /* Compact, strictly circular. `touch-sm` opts out of the global 44px
+     coarse-pointer minimum, which would otherwise stretch these into ovals. */
   .seen-dot {
     position: relative;
-    width: 1.4rem;
-    height: 1.4rem;
+    flex: 0 0 auto;
+    width: 1.35rem;
+    height: 1.35rem;
+    min-height: 0;
+    padding: 0;
+    aspect-ratio: 1;
     border-radius: 50%;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.6rem;
+    font-size: 0.58rem;
     font-weight: 800;
+    line-height: 1;
     color: var(--color-text-hint, #78716c);
     background: transparent;
     border: 1.5px dashed var(--color-border);
