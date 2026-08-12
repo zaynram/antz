@@ -37,6 +37,9 @@
   let discoverLayer: LayerGroup | undefined
   let L: typeof import('leaflet') | undefined
   let mapReady = $state(false)
+  // Only reveal the map once its first tiles have painted, so we don't flash a
+  // bright half-loaded map (especially jarring in dark mode).
+  let tilesLoaded = $state(false)
   const markerById = new Map<string, Marker>()
 
   // ---- UI state ----
@@ -128,11 +131,15 @@
         : [39.5, -98.35] // continental US fallback
       const zoom = start ? 13 : 4
 
-      map = L.map(mapEl, { zoomControl: true, attributionControl: true }).setView(center, zoom)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      map = L.map(mapEl, { zoomControl: true, attributionControl: true, fadeAnimation: false }).setView(center, zoom)
+      const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap',
       }).addTo(map)
+      // Reveal once the first batch of tiles has loaded; fall back after a
+      // moment so an offline/slow tile server can't leave it hidden forever.
+      tiles.once('load', () => { tilesLoaded = true })
+      setTimeout(() => { tilesLoaded = true }, 2500)
       savedLayer = L.layerGroup().addTo(map)
       discoverLayer = L.layerGroup().addTo(map)
       mapReady = true
@@ -150,6 +157,7 @@
       map?.remove()
       map = undefined
       mapReady = false
+      tilesLoaded = false
     }
   })
 
@@ -473,8 +481,8 @@
 
   <!-- Map -->
   <div class="map-frame mb-3">
-    <div class="map-canvas" bind:this={mapEl}></div>
-    {#if !mapReady}
+    <div class="map-canvas {tilesLoaded ? 'is-ready' : ''}" bind:this={mapEl}></div>
+    {#if !tilesLoaded}
       <div class="map-loading">
         <div class="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>
       </div>
@@ -677,7 +685,18 @@
     border: 1.5px solid color-mix(in srgb, var(--color-accent) 22%, #b7a381);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 10px 26px rgba(70,50,25,0.16);
   }
-  .map-canvas { position: absolute; inset: 0; background: #ece3d2; }
+  .map-canvas {
+    position: absolute;
+    inset: 0;
+    background: #ece3d2;
+    opacity: 0;
+    transition: opacity 260ms ease;
+  }
+  .map-canvas.is-ready { opacity: 1; }
+  :global(.dark) .map-canvas { background: #26221c; }
+  /* Leaflet paints its own container background behind the tiles. */
+  .map-frame :global(.leaflet-container) { background: #ece3d2; }
+  :global(.dark) .map-frame :global(.leaflet-container) { background: #26221c; }
   /* Give real OSM tiles an aged, hand-drawn cartography feel. */
   .map-frame :global(.leaflet-tile-pane) {
     filter: grayscale(0.55) sepia(0.4) saturate(0.85) contrast(1.05) brightness(1.04);
